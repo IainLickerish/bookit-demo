@@ -1,8 +1,9 @@
 # M0-24b: clinic administration
 
 Bead: `supportagents-m0-24b-stl`. Requirements: REQ-18.1-01 and REQ-18.1-03.
-Baseline: `c35507f` (BookIt operations endpoints, PR #2). This change is stacked after PR #2 and PR #1;
-the owner approves and merges them in that order. No deployment or default-branch push is part of this change.
+Baseline: `c35507f` (BookIt operations endpoints, PR #2). The owner approves and merges PR #1, then PR #2,
+then this change, retargeting each stacked PR to `main` after its predecessor merges. No deployment or
+default-branch push is part of this change.
 
 ## Behaviour
 
