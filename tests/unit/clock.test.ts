@@ -23,7 +23,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe('shared virtual clock in test-clock builds (REQ-18.1-06, plan 12.8 and 13.10)', () => {
+describe('shared virtual clock in test-clock builds (REQ-18.1-01, plan 12.8 and 13.10)', () => {
   it('uses the system clock when BOOKIT_TEST_CLOCK is not set', () => {
     expect(resolveClock({}, true)).toBe(systemClock);
     expect(resolveClock({ BOOKIT_TEST_CLOCK: '' }, false)).toBe(systemClock);
