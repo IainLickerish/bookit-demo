@@ -1,0 +1,7 @@
+node_modules/
+.next/
+.next-*/
+drizzle/meta/
+test-results/
+playwright-report/
+bun.lock

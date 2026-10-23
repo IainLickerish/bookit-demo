@@ -1,0 +1,32 @@
+@import 'tailwindcss';
+
+@layer base {
+  h1 {
+    @apply mb-4 text-2xl font-semibold;
+  }
+  h2 {
+    @apply mt-6 mb-2 text-lg font-semibold;
+  }
+  label {
+    @apply block text-sm font-medium;
+  }
+  input,
+  select {
+    @apply mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2;
+  }
+}
+
+@layer components {
+  .button {
+    @apply inline-block rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800;
+  }
+  .button-secondary {
+    @apply inline-block rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100;
+  }
+  .notice {
+    @apply mb-4 rounded border border-teal-200 bg-teal-50 px-4 py-3 text-sm;
+  }
+  .alert {
+    @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
+  }
+}
