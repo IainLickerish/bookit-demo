@@ -25,6 +25,8 @@ FROM node:24.22.1-bookworm-slim AS runtime
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
+# Supply BOOKIT_PUBLIC_URL at runtime for this tenant's public origin; never
+# bake a shared origin into the image (password-reset contract, PR #4).
 COPY --from=production-dependencies /app/node_modules ./node_modules
 # next start loads next.config.ts; provide its pinned compiler without a
 # runtime install attempt on the isolated clinic network.

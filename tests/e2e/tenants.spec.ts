@@ -113,6 +113,9 @@ async function signIn(browser: Browser, clinic: ComposeTenant, localPart: string
 
 test('REQ-18.1-06 both local Compose tenants expose distinct identity, virtual time and local SDK receipt', async () => {
   for (const clinic of [acme, beacon]) {
+    const publicOrigin = await clinic.command(['exec', '-T', 'bookit', 'node', '-p', 'process.env.BOOKIT_PUBLIC_URL']);
+    expect(publicOrigin.code).toBe(0);
+    expect(publicOrigin.output.trim()).toBe(clinic.url);
     expect((await fetch(`${clinic.url}/api/health`, { signal: AbortSignal.timeout(10_000) })).status).toBe(200);
     const version = (await (
       await fetch(`${clinic.url}/api/version`, { signal: AbortSignal.timeout(10_000) })

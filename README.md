@@ -45,6 +45,7 @@ export GIT_COMMIT="$(git rev-parse HEAD)"
 export BOOKIT_TENANT=acme BOOKIT_PRODUCT=ACME BOOKIT_ENV=local
 export BOOKIT_MAIL_FROM=noreply@acmephysio.test
 export BOOKIT_PORT=4101 BOOKIT_MAIL_PORT=8025
+export BOOKIT_PUBLIC_URL=http://localhost:4101
 docker compose -p bookit-acme up --build -d --wait
 docker compose -p bookit-acme ps --all
 ```
@@ -63,6 +64,7 @@ export BOOKIT_CREDENTIALS_DIR="$PWD/test-results/local/beacon"
 export BOOKIT_TENANT=beacon BOOKIT_PRODUCT=BEACON BOOKIT_ENV=local
 export BOOKIT_MAIL_FROM=noreply@beacondental.test
 export BOOKIT_PORT=4201 BOOKIT_MAIL_PORT=8026
+export BOOKIT_PUBLIC_URL=http://localhost:4201
 docker compose -p bookit-beacon up --build -d --wait
 ```
 
@@ -104,6 +106,7 @@ Runtime variables are listed by name in `.env.example`:
 | ------------------------------------- | -------------------------------------------------------------------------------------- |
 | `BOOKIT_ENV`                          | `local`, `staging` or `production`                                                     |
 | `BOOKIT_PRODUCT`, `BOOKIT_TENANT`     | `ACME`/`acme` or `BEACON`/`beacon`; required container identity                        |
+| `BOOKIT_PUBLIC_URL`                   | This clinic's public HTTP(S) origin, without a path, query or credentials              |
 | `BOOKIT_DEPLOYMENT_ID`                | A new identifier for each deployment                                                   |
 | `BOOKIT_SMTP_URL`, `BOOKIT_MAIL_FROM` | Local Mailpit connection and the tenant's `.test` sender                               |
 | `BOOKIT_SENTRY_DSN`                   | Optional local receiver; unset sends no errors                                         |
@@ -116,6 +119,13 @@ Compose additionally consumes `BOOKIT_CREDENTIALS_DIR`, `BOOKIT_PORT`,
 `BOOKIT_DB_PASSWORD_FILE`; the seed reads `BOOKIT_SEED_PASSWORDS_FILE`. Secret values
 are mounted files, never build arguments. The seed password file is mounted only
 into the seed service. No credentials are copied into an image.
+
+Compose requires `BOOKIT_PUBLIC_URL` and passes it into the container. This prepares
+the runtime contract added by password-reset PR #4, whose `.env.example` lists it;
+that branch remains separate from this PR's base. Use each clinic's published local
+origin as above, or its actual origin when configuring staging or production. The
+password-reset implementation requires it outside local mode and never trusts the
+request's Host header for email links. With `docker run`, pass it using `--env`.
 
 For a local test-clock image set the build argument to `true`, then mount a file
 such as `{"now":"2026-10-20T07:00:00.000Z"}` into the web and seed containers and set

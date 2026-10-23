@@ -117,6 +117,7 @@ export async function prepareComposeTenant(name: TenantName) {
     GIT_COMMIT: TEST_COMMIT,
     BOOKIT_ENV: 'staging',
     BOOKIT_TENANT: name,
+    BOOKIT_PUBLIC_URL: `http://127.0.0.1:${port}`,
     BOOKIT_PRODUCT: tenant.product,
     BOOKIT_MAIL_FROM: tenant.mailFrom,
     BOOKIT_CREDENTIALS_DIR: privateDir,

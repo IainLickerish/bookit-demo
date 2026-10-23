@@ -135,3 +135,30 @@ Scanner logs are directly under `test-results/`: `m0-24d-ubs-final.log` SHA-256
 `e0de0ac82c2cd4335ecaa194e2e11ab5f48acad7c5b7cc8e62b3cd5218c30990`;
 `m0-24d-ubs-full.log` SHA-256
 `1c4e0cdaf0c1a179e4ae39466ac9dd1aebd59ef3747e7a226742f134afb61482`.
+
+## Password-reset runtime contract follow-up
+
+Agent Mail #79 added `BOOKIT_PUBLIC_URL` for password-reset PR #4, which remains
+separate from this PR's base. Compose now requires and forwards the tenant's public
+origin; the README supplies distinct Acme/Beacon examples and documents passing
+the variable to a direct container run. The image does not bake in a shared origin.
+Both Article 08 files retain the owner's old-path baseline.
+
+The focused container suite passed 4/4 again, now also reading the public-origin
+variable from each running BookIt container and checking it against that clinic's
+published URL. This verifies the Compose handoff; PR #4 owns the reset-route logic.
+The test-clock image reused unchanged application code; the production image was
+rebuilt. Type checking, lint, formatting and diff checks pass. Both clinic stacks
+were stopped after guaranteed evidence capture.
+
+The two changed TypeScript files passed UBS with zero critical findings and two
+reviewed warnings (the existing disposable database test's synchronous secret-file
+read and the checked-in account fixture assertion). Scan exit status was zero.
+This does not replace the broader scan limitations above.
+
+Follow-up artifacts under `test-results/m0-24d/`:
+
+- `public-origin-compose-4.json`: SHA-256
+  `42e0b4aa3a0b01828e6a44243b404f497c874e7421e2dd11ce9d1390f3bc838e`.
+- `public-origin-ubs.log`: SHA-256
+  `90a7e9259e57111ca372b3e156e2deccc5008ede1197ccf7f79059d223b235d7`.
