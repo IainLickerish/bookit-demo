@@ -1,0 +1,6 @@
+﻿"Booking ID","Patient","Practitioner","Start (UTC)","End (UTC)","Status","Late cancellation","Phone"
+"01a1581c-1d80-7308-a1e5-c5e88547365b","Zoë Brontë","Report Practitioner","2026-10-24T22:30:00.000Z","2026-10-24T23:15:00.000Z","confirmed","no",""
+"01a1581c-1d80-73ee-9e91-cfa50304c207","Łukasz Wiśniewski","Report Practitioner","2026-10-24T23:15:00.000Z","2026-10-25T00:00:00.000Z","confirmed","no",""
+"01a1581c-1d80-7073-8ef2-edeb676769bd","Siobhán Ó Briain","Report Practitioner","2026-10-25T23:30:00.000Z","2026-10-26T00:15:00.000Z","cancelled","yes",""
+"01a1581c-1d80-7248-a29b-12a228972b61","Ada, ""Clinic""
+Test","Report Practitioner","2026-10-26T00:00:00.000Z","2026-10-26T00:45:00.000Z","confirmed","no",""
