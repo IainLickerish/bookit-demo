@@ -18,7 +18,11 @@
     "incremental": true,
     "jsx": "react-jsx",
     "types": ["node"],
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "paths": {
       "@/*": ["./src/*"]
     }
@@ -30,7 +34,9 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     ".next-e2e/types/**/*.ts",
-    ".next-e2e/dev/types/**/*.ts"
+    ".next-e2e/dev/types/**/*.ts",
+    ".next-ops/types/**/*.ts",
+    ".next-ops/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules", ".next*", "test-results", "playwright-report"]
 }

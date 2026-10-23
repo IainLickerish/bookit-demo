@@ -8,10 +8,16 @@ export const E2E_DIR = path.join(ROOT, 'test-results/m0-24a/e2e');
 export const STATE_FILE = path.join(E2E_DIR, 'state.json');
 export const E2E_START = '2026-10-20T07:00:00.000Z';
 
+/** The commit the e2e test-clock build is made with; deliberately not a full SHA. */
+export const E2E_COMMIT = 'e2e-local';
+export const E2E_MAIL_FROM = 'noreply@clinic.example.test';
+
 export interface E2eState {
   databaseUrl: string;
   clockFile: string;
   serverLog: string;
+  /** One JSON line per email the local SMTP receiver accepted. */
+  mailLog: string;
   password: string;
   patient1: string;
   patient2: string;
@@ -51,6 +57,19 @@ export async function query<T extends Record<string, unknown>>(sql: string, para
   } finally {
     await client.end();
   }
+}
+
+export interface ReceivedMail {
+  from: string;
+  to: string[];
+  raw: string;
+}
+
+export function receivedMail(): ReceivedMail[] {
+  return readFileSync(loadState().mailLog, 'utf8')
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => JSON.parse(line) as ReceivedMail);
 }
 
 export function serverLogLines(): Record<string, unknown>[] {

@@ -4,6 +4,7 @@ import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
 import type { Logger } from '@/lib/logger';
 import { isUniqueViolation } from '../errors';
+import { composeConfirmation, sendConfirmation, type MailSettings } from '../notifications/confirmation';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
 import { findUserById } from '../users';
@@ -15,6 +16,7 @@ export interface BookingDependencies {
   db: Database;
   clock: Clock;
   log: Logger;
+  mail: MailSettings;
 }
 
 export interface BookSlotRequest {
@@ -26,7 +28,7 @@ export interface BookSlotRequest {
 export async function bookSlot(deps: BookingDependencies, request: BookSlotRequest): Promise<BookingView> {
   const phone = normalisePhone(request.phone);
   const now = deps.clock.now();
-  const booking = await deps.db.transaction(async (tx) => {
+  const { booking, confirmation } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
     const patient = await findUserById(tx, request.patientId);
     if (!patient || patient.role !== 'patient') {
@@ -61,7 +63,12 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     if (!created) {
       throw new Error('A booking inserted in this transaction could not be read back.');
     }
-    return created;
+    // Composed inside the transaction, so a booking is only confirmed if its
+    // confirmation can be written; it is sent once the booking has committed.
+    return {
+      booking: created,
+      confirmation: composeConfirmation({ booking: created, patient, settings, from: deps.mail.from }),
+    };
   });
   deps.log.info(
     {
@@ -73,5 +80,6 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     },
     'Booking confirmed',
   );
+  await sendConfirmation(deps.mail, deps.log, confirmation, booking.id);
   return booking;
 }
