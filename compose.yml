@@ -1,0 +1,107 @@
+# One fictional clinic/environment per project. Run with separate -p names
+# and credential directories for Acme and Beacon. No database port is published.
+x-bookit: &bookit
+  image: ${BOOKIT_LOCAL_IMAGE:-bookit-demo:local}
+  build:
+    context: .
+    args:
+      GIT_COMMIT: ${GIT_COMMIT:?Set the full source commit SHA}
+      BUILD_ID: ${BUILD_ID:-local-compose}
+      BOOKIT_IMAGE: ${BOOKIT_LOCAL_IMAGE:-bookit-demo:local}
+      BUILT_AT: ${BUILT_AT:-}
+      BOOKIT_ALLOW_TEST_CLOCK: ${BOOKIT_ALLOW_TEST_CLOCK:-false}
+  environment: &bookit-environment
+    BOOKIT_ENV: ${BOOKIT_ENV:-local}
+    BOOKIT_PRODUCT: ${BOOKIT_PRODUCT:?Select ACME or BEACON}
+    BOOKIT_TENANT: ${BOOKIT_TENANT:?Select acme or beacon}
+    BOOKIT_DEPLOYMENT_ID: ${BOOKIT_DEPLOYMENT_ID:-local-compose}
+    BOOKIT_SMTP_URL: smtp://mailpit:1025
+    BOOKIT_MAIL_FROM: ${BOOKIT_MAIL_FROM:?Set the tenant noreply address}
+    BOOKIT_SENTRY_DSN: ${BOOKIT_SENTRY_DSN:-}
+    BOOKIT_LOG_DIR: /app/logs
+    BOOKIT_DB_PASSWORD_FILE: /run/secrets/database_password
+  secrets:
+    - database_password
+  networks: [clinic]
+  init: true
+
+services:
+  db:
+    image: postgres:17-alpine
+    entrypoint: [/bin/sh, /bookit-start-database.sh]
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, database_password]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./scripts/init-database.sh:/docker-entrypoint-initdb.d/bookit.sh:ro
+      - ./scripts/start-database.sh:/bookit-start-database.sh:ro
+    networks: [clinic]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d postgres]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  migrate:
+    <<: *bookit
+    command: [migrate]
+    depends_on:
+      db: { condition: service_healthy }
+  seed:
+    <<: *bookit
+    command: [seed]
+    environment:
+      <<: *bookit-environment
+      BOOKIT_SEED_PASSWORDS_FILE: /run/secrets/seed_passwords
+    secrets: [database_password, seed_passwords]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+  mailpit:
+    image: axllent/mailpit:v1.27.10
+    networks: [clinic]
+  bookit:
+    <<: *bookit
+    volumes:
+      - logs:/app/logs
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      mailpit: { condition: service_started }
+  web:
+    image: node:24.22.1-bookworm-slim
+    user: node
+    command: [node, /local-proxy.mjs]
+    volumes:
+      - ./scripts/local-proxy.mjs:/local-proxy.mjs:ro
+    networks: [clinic, ingress]
+    ports:
+      - '127.0.0.1:${BOOKIT_PORT:-4101}:3000'
+      - '127.0.0.1:${BOOKIT_MAIL_PORT:-8025}:8025'
+    depends_on:
+      bookit: { condition: service_healthy }
+      mailpit: { condition: service_started }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+secrets:
+  database_password:
+    file: ${BOOKIT_CREDENTIALS_DIR:?Set an absolute private credential directory}/database-password
+  postgres_password:
+    file: ${BOOKIT_CREDENTIALS_DIR:?Set an absolute private credential directory}/postgres-password
+  seed_passwords:
+    file: ${BOOKIT_CREDENTIALS_DIR:?Set an absolute private credential directory}/accounts.json
+volumes:
+  database:
+  logs:
+networks:
+  clinic:
+    internal: true
+  ingress: {}

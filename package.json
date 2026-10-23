@@ -22,7 +22,9 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun scripts/migrate.ts",
-    "slots:ensure": "bun scripts/ensure-slots.ts"
+    "slots:ensure": "bun scripts/ensure-slots.ts",
+    "seed": "bun scripts/seed.ts",
+    "local:credentials": "bun scripts/local-credentials.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "11.6.0",
