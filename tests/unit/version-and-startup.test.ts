@@ -22,6 +22,7 @@ const staging = {
   BOOKIT_PRODUCT: 'ACME',
   BOOKIT_TENANT: 'acme',
   BOOKIT_DEPLOYMENT_ID: 'dep-0001',
+  BOOKIT_PUBLIC_URL: 'https://acme-staging.example.test',
 };
 
 describe('build identity from build arguments (REQ-18.1-05, plan 12.6, F-39)', () => {
@@ -124,6 +125,12 @@ describe('start-up refusal on identity (REQ-18.1-05, plan 12.6, security)', () =
     ).toThrow('BOOKIT_PRODUCT must be set when BOOKIT_ENV is production.');
     expect(() => checkStartupConfiguration({ ...staging, BOOKIT_TENANT: '' }, false, goodBuild)).toThrow(
       'BOOKIT_TENANT must be set',
+    );
+  });
+
+  it('refuses a staging or production container without BOOKIT_PUBLIC_URL (bead supportagents-8uvs)', () => {
+    expect(() => checkStartupConfiguration({ ...staging, BOOKIT_PUBLIC_URL: '' }, false, goodBuild)).toThrow(
+      'BOOKIT_PUBLIC_URL must be set outside local runs.',
     );
   });
 

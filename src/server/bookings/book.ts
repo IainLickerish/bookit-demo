@@ -4,7 +4,8 @@ import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
 import type { Logger } from '@/lib/logger';
 import { isUniqueViolation } from '../errors';
-import { composeConfirmation, sendConfirmation, type MailSettings } from '../notifications/confirmation';
+import { composeConfirmation } from '../notifications/confirmation';
+import { deliverEmail, type MailSettings } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
 import { findUserById } from '../users';
@@ -80,6 +81,7 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     },
     'Booking confirmed',
   );
-  await sendConfirmation(deps.mail, deps.log, confirmation, booking.id);
+  // A failed email never undoes the booking; the patient still sees it in "My bookings".
+  await deliverEmail(deps.mail, deps.log, confirmation, 'confirmation', { booking_id: booking.id });
   return booking;
 }

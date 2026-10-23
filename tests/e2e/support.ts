@@ -65,6 +65,13 @@ export interface ReceivedMail {
   raw: string;
 }
 
+/** The text of a received message, with quoted-printable soft line breaks and escapes undone. */
+export function mailText(raw: string): string {
+  return raw
+    .replace(/=\r?\n/g, '')
+    .replace(/=([0-9A-F]{2})/g, (_match, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+}
+
 export function receivedMail(): ReceivedMail[] {
   return readFileSync(loadState().mailLog, 'utf8')
     .split('\n')

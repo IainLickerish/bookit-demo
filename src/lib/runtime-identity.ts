@@ -69,3 +69,40 @@ export function runtimeIdentity(env: Readonly<Record<string, string | undefined>
     deploymentId: deploymentId || 'unset',
   };
 }
+
+/** The base URL local runs use when BOOKIT_PUBLIC_URL is not set: `next start` on its default port. */
+export const LOCAL_PUBLIC_URL = 'http://localhost:3000';
+
+/**
+ * The address patients reach this container at, for links in emails such as
+ * password resets. It comes only from BOOKIT_PUBLIC_URL, never from the
+ * request's Host header, which a client controls. Required outside local runs.
+ */
+export function publicBaseUrl(env: Readonly<Record<string, string | undefined>> = process.env): URL {
+  const raw = value(env, 'BOOKIT_PUBLIC_URL');
+  if (raw === '') {
+    if (value(env, 'BOOKIT_ENV') === 'local') {
+      return new URL(LOCAL_PUBLIC_URL);
+    }
+    throw new RuntimeConfigurationError('BOOKIT_PUBLIC_URL must be set outside local runs.');
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new RuntimeConfigurationError('BOOKIT_PUBLIC_URL must be an absolute http or https URL.');
+  }
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.search !== '' ||
+    url.hash !== '' ||
+    url.pathname !== '/'
+  ) {
+    throw new RuntimeConfigurationError(
+      'BOOKIT_PUBLIC_URL must be an http or https origin such as https://acme-staging.example.test, with no path, query or credentials.',
+    );
+  }
+  return url;
+}
