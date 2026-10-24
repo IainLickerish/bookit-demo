@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import { loadTenant, type TenantName } from '@/server/seed/tenant';
@@ -150,7 +150,70 @@ export async function prepareComposeTenant(name: TenantName) {
       return command(['up', '--no-build', '-d', '--wait', '--wait-timeout', '180'], 240_000);
     },
     async stop() {
-      return command(['stop'], 60_000);
+      // Owner authorization (supportagents-a3eg, comment 36): remove only this test-created project's
+      // containers/networks. Named database/log volumes and the already captured host evidence stay intact.
+      const inventory = async (kind: 'network' | 'volume') => {
+        const result = await runDocker(
+          [kind, 'ls', '--filter', `label=com.docker.compose.project=${project}`, '--format', '{{.Name}}'],
+          env,
+          30_000,
+        ).catch(() => ({ code: -1, output: '' }));
+        return {
+          code: result.code,
+          names: result.code === 0 ? result.output.trim().split('\n').filter(Boolean).sort() : [],
+        };
+      };
+      const evidenceFile = path.join(directory, 'evidence.json');
+      const evidenceHash = () => {
+        try {
+          return existsSync(evidenceFile)
+            ? createHash('sha256').update(readFileSync(evidenceFile)).digest('hex')
+            : null;
+        } catch {
+          return undefined;
+        }
+      };
+      const beforeEvidence = evidenceHash();
+      const [networksBefore, volumesBefore] = await Promise.all([inventory('network'), inventory('volume')]);
+      const down = await command(['down', '--remove-orphans', '--timeout', '20'], 120_000).catch(() => ({
+        code: -1,
+        output: '',
+      }));
+      const [networksAfter, volumesAfter] = await Promise.all([inventory('network'), inventory('volume')]);
+      const afterEvidence = evidenceHash();
+      const checks = {
+        downSucceeded: down.code === 0,
+        inventorySucceeded: [networksBefore, volumesBefore, networksAfter, volumesAfter].every(
+          (item) => item.code === 0,
+        ),
+        projectNetworksRemoved: networksAfter.names.length === 0,
+        volumesRetained: volumesBefore.names.every((name) => volumesAfter.names.includes(name)),
+        evidenceRetained:
+          beforeEvidence !== undefined && afterEvidence !== undefined && beforeEvidence === afterEvidence,
+      };
+      // Do not retain Docker diagnostic text: it is untrusted and can contain environment details.
+      writeFileSync(
+        path.join(directory, 'cleanup.json'),
+        `${JSON.stringify(
+          {
+            contract: 'a3eg.compose-cleanup.v1',
+            project,
+            command: ['docker', ...prefix, 'down', '--remove-orphans', '--timeout', '20'],
+            downExit: down.code,
+            networksBefore,
+            networksAfter,
+            volumesBefore,
+            volumesAfter,
+            evidenceSha256: beforeEvidence,
+            checks,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      if (!Object.values(checks).every(Boolean))
+        throw new Error(`Compose project cleanup failed; see ${directory}/cleanup.json`);
+      return down;
     },
   };
 }
