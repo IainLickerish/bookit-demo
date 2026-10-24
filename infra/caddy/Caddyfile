@@ -1,0 +1,21 @@
+# BookIt front door on each AWS host (plan 2.5). ACME_HOST and BEACON_HOST are this environment's hostnames.
+{
+	servers {
+		# F-21: a request whose Host header differs from the TLS server name gets 421 Misdirected Request.
+		# Set explicitly: Caddy enables it by default only when client authentication is configured.
+		strict_sni_host on
+	}
+}
+
+{$ACME_HOST} {
+	reverse_proxy acme-app:3000
+}
+
+{$BEACON_HOST} {
+	reverse_proxy beacon-app:3000
+}
+
+# Any other host name on plain HTTP gets no response. HTTPS for an unknown name fails the TLS handshake (no certificate).
+http:// {
+	abort
+}

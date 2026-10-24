@@ -2,7 +2,12 @@ import { buildIdentity, testClockAllowedByBuild } from '@/lib/build-flags';
 import { FULL_COMMIT_SHA, type BuildIdentity } from '@/lib/build-identity';
 import { getClock, resolveClock } from '@/lib/clock';
 import { getLogger } from '@/lib/logger';
-import { RuntimeConfigurationError, runtimeIdentity, type RuntimeIdentity } from '@/lib/runtime-identity';
+import {
+  publicBaseUrl,
+  RuntimeConfigurationError,
+  runtimeIdentity,
+  type RuntimeIdentity,
+} from '@/lib/runtime-identity';
 import { parseSentryDsn } from '@/lib/sentry-options';
 import { initErrorReporting } from './error-reporting';
 import { recordStartedAt } from './version';
@@ -16,6 +21,8 @@ import { recordStartedAt } from './version';
  * - BOOKIT_ENV must be local, staging or production, and outside local the
  *   build must carry a full commit SHA and the container a product and tenant
  *   (plan 12.6);
+ * - BOOKIT_PUBLIC_URL, the origin used in email links, must be set outside
+ *   local runs;
  * - BOOKIT_SENTRY_DSN, when set, must be a DSN, and a local receiver in a
  *   test-clock build.
  */
@@ -31,6 +38,7 @@ export function checkStartupConfiguration(
       `GIT_COMMIT must be a 40-character commit SHA when BOOKIT_ENV is ${runtime.environment}; this build was made without one.`,
     );
   }
+  publicBaseUrl(env);
   parseSentryDsn(env, allowTestClock);
   return runtime;
 }

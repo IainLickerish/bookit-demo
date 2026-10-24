@@ -1,0 +1,14 @@
+set -euo pipefail
+umask 027
+dir=/opt/bookit/${product}
+expected="$(cat /etc/bookit/environment)"
+if [ "{{ environment }}" != "$expected" ]; then echo "Refused: this instance runs $expected, not {{ environment }}." >&2; exit 1; fi
+cd "$dir"
+image='{{ image }}'
+docker pull --quiet "$image"
+if [ ! -e credentials/database-password ]; then docker run --rm --network none --user 0 --entrypoint bun -v "$dir/credentials:/credentials" "$image" scripts/local-credentials.ts ${product} /credentials; fi
+for script in init-database.sh start-database.sh; do docker run --rm --network none --entrypoint cat "$image" "/app/scripts/$script" > "scripts/$script.new"; mv "scripts/$script.new" "scripts/$script"; done
+chmod 0644 scripts/init-database.sh scripts/start-database.sh
+printf 'BOOKIT_IMAGE=%s\nBOOKIT_DEPLOYMENT_ID=%s\n' "$image" '{{ deploymentId }}' > deploy.env
+docker compose -p bookit-${product} --env-file static.env --env-file deploy.env up -d --remove-orphans
+echo "Started ${product} {{ environment }} with $image, deployment {{ deploymentId }}."

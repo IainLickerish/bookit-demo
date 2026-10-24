@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BookingView } from '@/server/bookings/queries';
-import { composeConfirmation, formatPhone, sendConfirmation } from '@/server/notifications/confirmation';
+import { composeConfirmation, formatPhone } from '@/server/notifications/confirmation';
+import { deliverEmail } from '@/server/notifications/deliver';
 import {
   assertTestAddress,
   disabledMailer,
@@ -100,7 +101,7 @@ describe('sending confirmations (REQ-18.1-01; brief 18: no real email)', () => {
     const logs = captureLogs(clock);
     const mailer = recordingMailer();
     const email = composeConfirmation({ booking: booking('+44 7700 900001'), patient, settings, from: TEST_MAIL_FROM });
-    expect(await sendConfirmation(testMail(mailer), logs.log, email, 'b-1')).toBe(true);
+    expect(await deliverEmail(testMail(mailer), logs.log, email, 'confirmation', { booking_id: 'b-1' })).toBe(true);
     expect(mailer.sent).toEqual([email]);
     expect(logs.lines).toEqual([
       expect.objectContaining({
@@ -120,7 +121,7 @@ describe('sending confirmations (REQ-18.1-01; brief 18: no real email)', () => {
       send: () => Promise.reject(new Error('connect ECONNREFUSED 127.0.0.1:1025')),
     };
     const email = composeConfirmation({ booking: booking(null), patient, settings, from: TEST_MAIL_FROM });
-    expect(await sendConfirmation(testMail(failing), logs.log, email, 'b-2')).toBe(false);
+    expect(await deliverEmail(testMail(failing), logs.log, email, 'confirmation', { booking_id: 'b-2' })).toBe(false);
     expect(logs.lines).toEqual([
       expect.objectContaining({
         level: 'error',
@@ -134,7 +135,9 @@ describe('sending confirmations (REQ-18.1-01; brief 18: no real email)', () => {
   it('sends nothing without an SMTP server, but still refuses non-.test addresses', async () => {
     const logs = captureLogs(manualClock('2026-10-20T07:00:00Z'));
     const email = composeConfirmation({ booking: booking(null), patient, settings, from: TEST_MAIL_FROM });
-    expect(await sendConfirmation(testMail(disabledMailer), logs.log, email, 'b-3')).toBe(true);
+    expect(await deliverEmail(testMail(disabledMailer), logs.log, email, 'confirmation', { booking_id: 'b-3' })).toBe(
+      true,
+    );
     expect(logs.lines[0]).toMatchObject({ event: 'email.confirmation.sent', mailer: 'disabled', message_id: null });
     await expect(disabledMailer.send({ ...email, to: 'someone@example.com' })).rejects.toThrow(
       EmailAddressRefusedError,

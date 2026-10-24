@@ -71,6 +71,7 @@ beforeAll(async () => {
     BOOKIT_PRODUCT: 'ACME',
     BOOKIT_TENANT: 'acme',
     BOOKIT_DEPLOYMENT_ID: 'dep-0001',
+    BOOKIT_PUBLIC_URL: 'https://acme-staging.example.test',
     BOOKIT_TEST_CLOCK: writeClockFile(VIRTUAL_START),
     BOOKIT_SENTRY_DSN: receiver.dsn,
     BOOKIT_LOG_DIR: logDir,
@@ -217,6 +218,7 @@ describe('test-clock builds refuse a real Sentry DSN (security: tests never cont
       BOOKIT_ENV: 'staging',
       BOOKIT_PRODUCT: 'ACME',
       BOOKIT_TENANT: 'acme',
+      BOOKIT_PUBLIC_URL: 'https://acme-staging.example.test',
       BOOKIT_SENTRY_DSN: 'https://key@o1.ingest.sentry.io/1',
     });
     recordEvidence('test-clock-build-refuses-hosted-dsn', {
