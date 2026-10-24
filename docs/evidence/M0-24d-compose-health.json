@@ -1,0 +1,272 @@
+{
+  "bead": "supportagents-m0-24d-xa4",
+  "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+  "clinics": [
+    {
+      "sourceEvidence": "test-results/m0-24d/compose-acme-b7778b80-5173-40ea-b6f1-ae815963c193/evidence.json",
+      "sourceEvidenceSha256": "cfb5970349931a99b2733a5d97e4622270b34df87de003812883960d8bac1d32",
+      "services": [
+        {
+          "service": "bookit",
+          "instance": "bookit24d-acme-705c377c-bookit-1",
+          "image": "bookit-m0-24d:test",
+          "state": "running",
+          "health": "healthy",
+          "exitCode": 0
+        },
+        {
+          "service": "bookit",
+          "instance": "bookit24d-acme-705c377c-bookit-run-5fccdd552cf3",
+          "image": "bookit-m0-24d:test",
+          "state": "exited",
+          "health": "",
+          "exitCode": 1
+        },
+        {
+          "service": "bookit",
+          "instance": "bookit24d-acme-705c377c-bookit-run-b8a9297fe96d",
+          "image": "bookit-m0-24d:production-test",
+          "state": "exited",
+          "health": "",
+          "exitCode": 1
+        },
+        {
+          "service": "db",
+          "instance": "bookit24d-acme-705c377c-db-1",
+          "image": "postgres:17-alpine",
+          "state": "running",
+          "health": "healthy",
+          "exitCode": 0
+        },
+        {
+          "service": "fake-sentry",
+          "instance": "bookit24d-acme-705c377c-fake-sentry-1",
+          "image": "node:24.22.1-bookworm-slim",
+          "state": "running",
+          "health": "",
+          "exitCode": 0
+        },
+        {
+          "service": "mailpit",
+          "instance": "bookit24d-acme-705c377c-mailpit-1",
+          "image": "axllent/mailpit:v1.27.10",
+          "state": "running",
+          "health": "healthy",
+          "exitCode": 0
+        },
+        {
+          "service": "migrate",
+          "instance": "bookit24d-acme-705c377c-migrate-1",
+          "image": "bookit-m0-24d:test",
+          "state": "exited",
+          "health": "",
+          "exitCode": 0
+        },
+        {
+          "service": "seed",
+          "instance": "bookit24d-acme-705c377c-seed-1",
+          "image": "bookit-m0-24d:test",
+          "state": "exited",
+          "health": "",
+          "exitCode": 0
+        },
+        {
+          "service": "seed",
+          "instance": "bookit24d-acme-705c377c-seed-run-f881e60dfc02",
+          "image": "bookit-m0-24d:test",
+          "state": "exited",
+          "health": "",
+          "exitCode": 0
+        },
+        {
+          "service": "web",
+          "instance": "bookit24d-acme-705c377c-web-1",
+          "image": "node:24.22.1-bookworm-slim",
+          "state": "running",
+          "health": "healthy",
+          "exitCode": 0
+        }
+      ],
+      "independentSdkReceiver": {
+        "available": true,
+        "events": [
+          {
+            "release": "0123456789abcdef0123456789abcdef01234567",
+            "environment": "staging",
+            "product": "ACME",
+            "tenant": "acme",
+            "requestId": "req-000018"
+          }
+        ]
+      },
+      "redaction": {
+        "passed": true,
+        "checked": 14,
+        "matches": 0
+      },
+      "outcomes": [
+        {
+          "testId": "acme-compose-up",
+          "expected": 0,
+          "observed": 0
+        },
+        {
+          "testId": "beacon-compose-up",
+          "expected": 0,
+          "observed": 0
+        },
+        {
+          "testId": "REQ-18.1-06 both local Compose tenants expose distinct identity, virtual time and local SDK receipt",
+          "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+          "expected": "passed",
+          "observed": "passed"
+        },
+        {
+          "testId": "REQ-18.2-01 admin pages and downloaded exports contain only their own seeded tenant",
+          "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+          "expected": "passed",
+          "observed": "passed"
+        },
+        {
+          "testId": "REQ-18.2-01 patient sees the three-hour appointment, rerun seed preserves data and database role denies foreign databases",
+          "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+          "expected": "passed",
+          "observed": "passed"
+        },
+        {
+          "testId": "image-refusals",
+          "missingCommitExit": 1,
+          "productionBuildExit": 0,
+          "testClockRefusalExit": 1
+        },
+        {
+          "testId": "REQ-18.1-06 container build requires GIT_COMMIT and the production image refuses the virtual clock",
+          "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+          "expected": "passed",
+          "observed": "passed"
+        }
+      ]
+    },
+    {
+      "sourceEvidence": "test-results/m0-24d/compose-beacon-5c882b6b-99b5-40d9-89cd-1cd3720813d1/evidence.json",
+      "sourceEvidenceSha256": "8f5a8a19b428e6d94f3cc3d8936d160b978b42094c783eb186332279d0a55292",
+      "services": [
+        {
+          "service": "bookit",
+          "instance": "bookit24d-beacon-d293bc87-bookit-1",
+          "image": "bookit-m0-24d:test",
+          "state": "running",
+          "health": "healthy",
+          "exitCode": 0
+        },
+        {
+          "service": "db",
+          "instance": "bookit24d-beacon-d293bc87-db-1",
+          "image": "postgres:17-alpine",
+          "state": "running",
+          "health": "healthy",
+          "exitCode": 0
+        },
+        {
+          "service": "fake-sentry",
+          "instance": "bookit24d-beacon-d293bc87-fake-sentry-1",
+          "image": "node:24.22.1-bookworm-slim",
+          "state": "running",
+          "health": "",
+          "exitCode": 0
+        },
+        {
+          "service": "mailpit",
+          "instance": "bookit24d-beacon-d293bc87-mailpit-1",
+          "image": "axllent/mailpit:v1.27.10",
+          "state": "running",
+          "health": "healthy",
+          "exitCode": 0
+        },
+        {
+          "service": "migrate",
+          "instance": "bookit24d-beacon-d293bc87-migrate-1",
+          "image": "bookit-m0-24d:test",
+          "state": "exited",
+          "health": "",
+          "exitCode": 0
+        },
+        {
+          "service": "seed",
+          "instance": "bookit24d-beacon-d293bc87-seed-1",
+          "image": "bookit-m0-24d:test",
+          "state": "exited",
+          "health": "",
+          "exitCode": 0
+        },
+        {
+          "service": "web",
+          "instance": "bookit24d-beacon-d293bc87-web-1",
+          "image": "node:24.22.1-bookworm-slim",
+          "state": "running",
+          "health": "healthy",
+          "exitCode": 0
+        }
+      ],
+      "independentSdkReceiver": {
+        "available": true,
+        "events": [
+          {
+            "release": "0123456789abcdef0123456789abcdef01234567",
+            "environment": "staging",
+            "product": "BEACON",
+            "tenant": "beacon",
+            "requestId": "req-000006"
+          }
+        ]
+      },
+      "redaction": {
+        "passed": true,
+        "checked": 14,
+        "matches": 0
+      },
+      "outcomes": [
+        {
+          "testId": "acme-compose-up",
+          "expected": 0,
+          "observed": 0
+        },
+        {
+          "testId": "beacon-compose-up",
+          "expected": 0,
+          "observed": 0
+        },
+        {
+          "testId": "REQ-18.1-06 both local Compose tenants expose distinct identity, virtual time and local SDK receipt",
+          "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+          "expected": "passed",
+          "observed": "passed"
+        },
+        {
+          "testId": "REQ-18.2-01 admin pages and downloaded exports contain only their own seeded tenant",
+          "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+          "expected": "passed",
+          "observed": "passed"
+        },
+        {
+          "testId": "REQ-18.2-01 patient sees the three-hour appointment, rerun seed preserves data and database role denies foreign databases",
+          "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+          "expected": "passed",
+          "observed": "passed"
+        },
+        {
+          "testId": "image-refusals",
+          "missingCommitExit": 1,
+          "productionBuildExit": 0,
+          "testClockRefusalExit": 1
+        },
+        {
+          "testId": "REQ-18.1-06 container build requires GIT_COMMIT and the production image refuses the virtual clock",
+          "ids": ["REQ-18.1-03", "REQ-18.1-06", "REQ-18.2-01"],
+          "expected": "passed",
+          "observed": "passed"
+        }
+      ]
+    }
+  ]
+}
