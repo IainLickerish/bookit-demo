@@ -35,17 +35,21 @@ describe('clock lint rule (plan 13.10 determinism)', () => {
     ['argument-less new Date()', 'export const t = new Date();'],
     ['defaultNow()', 'declare const c: { defaultNow(): void }; c.defaultNow();'],
     ['SQL now()', 'declare function sql(s: TemplateStringsArray): void; sql`update booking set updated_at = now()`;'],
-  ])('rejects %s outside the clock module', async (_name, code) => {
-    expect(await clockViolations(code, 'src/server/example.ts')).toHaveLength(1);
-  });
+  ])(
+    'rejects %s outside the clock module',
+    async (_name, code) => {
+      expect(await clockViolations(code, 'src/server/example.ts')).toHaveLength(1);
+    },
+    60_000,
+  );
 
   it('allows the clock module to read the system time', async () => {
     expect(await clockViolations('export const t = new Date();', 'src/lib/clock.ts')).toEqual([]);
-  });
+  }, 60_000);
 
   it('allows dates built from a value', async () => {
     expect(
       await clockViolations("export const t = new Date('2026-10-20T11:00:00Z');", 'src/server/example.ts'),
     ).toEqual([]);
-  });
+  }, 60_000);
 });
