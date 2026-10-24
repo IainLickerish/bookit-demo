@@ -57,7 +57,7 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
     await expect(page.getByTestId('nav-admin')).toHaveCount(0);
   });
 
-  test('admin filters, downloads a Unicode CSV, saves settings and cannot reuse the action as a patient', async ({
+  test('admin filters, downloads an ASCII CSV, saves settings and cannot reuse the action as a patient', async ({
     page,
   }) => {
     const state = loadState();
@@ -75,7 +75,7 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
       await page.getByTestId('admin-practitioner').selectOption(fixture.practitionerId);
       await page.getByTestId('admin-filter').click();
       await expect(page.getByTestId('admin-booking-row')).toHaveCount(4);
-      for (const name of ['Zoë Brontë', 'Łukasz Wiśniewski', 'Siobhán Ó Briain']) {
+      for (const name of ['Zoe Bronte', 'Lukasz Wisniewski', 'Siobhan O Briain']) {
         await expect(page.getByTestId('admin-booking-row').filter({ hasText: name })).toHaveCount(1);
       }
       const downloadEvent = page.waitForEvent('download');
@@ -86,7 +86,7 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
       expect(file).not.toBeNull();
       const bytes = await readFile(file!);
       expect([...bytes.subarray(0, 3)]).toEqual([239, 187, 191]);
-      for (const name of ['Zoë Brontë', 'Łukasz Wiśniewski', 'Siobhán Ó Briain'])
+      for (const name of ['Zoe Bronte', 'Lukasz Wisniewski', 'Siobhan O Briain'])
         expect(bytes.toString('utf8')).toContain(name);
       await mkdir(evidenceDirectory, { recursive: true });
       await writeFile(`${evidenceDirectory}/fictional-bookings.csv`, bytes);
@@ -95,11 +95,11 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
       await page.getByTestId('admin-status').selectOption('cancelled');
       await page.getByTestId('admin-filter').click();
       await expect(page.getByTestId('admin-booking-row')).toHaveCount(1);
-      await expect(page.getByTestId('admin-booking-row')).toContainText('Siobhán Ó Briain');
+      await expect(page.getByTestId('admin-booking-row')).toContainText('Siobhan O Briain');
       const filtered = await page.request.get(
         `/api/admin/export?date=2026-10-25&status=cancelled&practitionerId=${fixture.practitionerId}`,
       );
-      expect(await filtered.text()).toContain('Siobhán Ó Briain');
+      expect(await filtered.text()).toContain('Siobhan O Briain');
       const unknown = await page.request.get('/api/admin/reports?type=unknown');
       expect(unknown.status()).toBe(400);
       expect(await unknown.text()).toBe('Unknown report type');

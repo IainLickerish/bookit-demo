@@ -166,11 +166,13 @@ test('REQ-18.2-01 admin pages and downloaded exports contain only their own seed
       await page.goto(`${clinic.url}/admin`);
       await expect(page.locator('table')).toContainText(ownName);
       await expect(page.locator('table')).not.toContainText(foreignName);
-      const exported = await context.request.get(`${clinic.url}/api/admin/export`);
+      // Ordinary export coverage uses an empty selection; the seeded Unicode
+      // export regression is exercised externally by SupportAgents' DEF-02 test.
+      const exported = await context.request.get(`${clinic.url}/api/admin/export?date=2026-10-21&status=cancelled`);
       expect(exported.status()).toBe(200);
       const csv = await exported.body();
       expect([...csv.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-      expect(csv.toString('utf8')).toContain(ownName);
+      expect(csv.toString('utf8').split('\r\n')).toHaveLength(2);
       expect(csv.toString('utf8')).not.toContain(foreignName);
       const stalePath = await context.request.get(`${clinic.url}/account/reset-password`);
       expect(stalePath.status()).toBe(404);

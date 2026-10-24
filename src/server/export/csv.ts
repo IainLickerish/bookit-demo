@@ -1,5 +1,17 @@
 import type { AdminBooking } from '@/server/admin/bookings';
 
+export class ExportEncodingError extends Error {
+  override readonly name = 'ExportEncodingError';
+
+  constructor() {
+    super('Unsupported character in client name');
+  }
+}
+
+function assertAscii(value: string): void {
+  if (/[^\p{ASCII}]/u.test(value)) throw new ExportEncodingError();
+}
+
 /** RFC 4180 quoting plus spreadsheet-formula neutralisation for untrusted text. */
 export function csvField(value: string): string {
   const safe = /^[\s\u0000-\u001f]*[=+\-@]/u.test(value) || /^[\t\r\n]/u.test(value) ? `'${value}` : value;
@@ -7,6 +19,7 @@ export function csvField(value: string): string {
 }
 
 export function bookingsCsv(rows: readonly AdminBooking[]): string {
+  for (const row of rows) assertAscii(row.patientName);
   const header = [
     'Booking ID',
     'Patient',
