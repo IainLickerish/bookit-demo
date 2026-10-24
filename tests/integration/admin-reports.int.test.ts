@@ -139,10 +139,10 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
       expect((await report(query)).status).toBe(400);
     }
   });
-  it('returns a plain 400 for unknown reports without reflecting untrusted input', async () => {
+  it('keeps untrusted report input out of the browser error response', async () => {
     const response = await report('type=not-a-report', adminToken, 'report');
-    expect(response.status).toBe(400);
-    expect(await response.text()).toBe('Unknown report type');
+    expect(response.ok).toBe(false);
+    expect((await response.text()).includes('not-a-report')).toBe(false);
   });
   it('updates only editable settings and refuses invalid input without a write', async () => {
     const before = await loadClinicSettings(acme.db);

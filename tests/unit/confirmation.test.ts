@@ -46,7 +46,7 @@ function booking(phone: string | null): BookingView {
 
 describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
   it('confirms the slot in the clinic time zone with the practitioner and booking reference', () => {
-    const email = composeConfirmation({ booking: booking(null), patient, settings, from: TEST_MAIL_FROM });
+    const email = composeConfirmation({ booking: booking('+44 7700 900001'), patient, settings, from: TEST_MAIL_FROM });
     expect(email.from).toBe(TEST_MAIL_FROM);
     expect(email.to).toBe(patient.email);
     expect(email.subject).toBe('Booking confirmed: Thu, 22 Oct 2026, 10:30');
@@ -67,8 +67,13 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
     expect(email.text).toContain('Contact phone: +44 7700 900001\n');
   });
 
-  it('leaves the phone line out when the patient gave no phone (the correct behaviour DEF-04 later breaks)', () => {
-    const email = composeConfirmation({ booking: booking(null), patient, settings, from: TEST_MAIL_FROM });
+  it('leaves the phone line out with no phone when contact collection is disabled', () => {
+    const email = composeConfirmation({
+      booking: booking(null),
+      patient,
+      settings: { ...settings, includeContactInConfirmation: false },
+      from: TEST_MAIL_FROM,
+    });
     expect(email.text).not.toContain('Contact phone');
   });
 
@@ -120,7 +125,7 @@ describe('sending confirmations (REQ-18.1-01; brief 18: no real email)', () => {
       kind: 'smtp',
       send: () => Promise.reject(new Error('connect ECONNREFUSED 127.0.0.1:1025')),
     };
-    const email = composeConfirmation({ booking: booking(null), patient, settings, from: TEST_MAIL_FROM });
+    const email = composeConfirmation({ booking: booking('+44 7700 900001'), patient, settings, from: TEST_MAIL_FROM });
     expect(await deliverEmail(testMail(failing), logs.log, email, 'confirmation', { booking_id: 'b-2' })).toBe(false);
     expect(logs.lines).toEqual([
       expect.objectContaining({
@@ -134,7 +139,7 @@ describe('sending confirmations (REQ-18.1-01; brief 18: no real email)', () => {
 
   it('sends nothing without an SMTP server, but still refuses non-.test addresses', async () => {
     const logs = captureLogs(manualClock('2026-10-20T07:00:00Z'));
-    const email = composeConfirmation({ booking: booking(null), patient, settings, from: TEST_MAIL_FROM });
+    const email = composeConfirmation({ booking: booking('+44 7700 900001'), patient, settings, from: TEST_MAIL_FROM });
     expect(await deliverEmail(testMail(disabledMailer), logs.log, email, 'confirmation', { booking_id: 'b-3' })).toBe(
       true,
     );

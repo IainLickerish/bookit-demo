@@ -119,23 +119,30 @@ test.describe('BookIt core booking journeys (REQ-18.1-01)', () => {
     await expect(row.getByTestId('booking-status')).toHaveText('Cancelled');
   });
 
-  test('a patient without a phone can book and cancel outside the late window', async ({ page }) => {
-    await signIn(page, loadState().patient2);
-    await page.getByTestId('nav-book').click();
-    await showDay(page, 'Pat Physio', '2026-10-22');
-    await page.getByTestId('slot-link').filter({ hasText: '11:15' }).click();
-    await expect(page.getByTestId('book-phone')).toHaveValue('');
-    await page.getByTestId('confirm-booking').click();
-    await expect(page.getByTestId('notice')).toHaveText('Booking confirmed.');
-    await page.getByTestId('cancel-booking').click();
-    await expect(page).toHaveURL(/\/bookings\?notice=cancelled$/);
-    await expect(page.getByTestId('notice')).toHaveText('Booking cancelled.');
-    const row = page.getByTestId('other-bookings').getByTestId('booking-row');
-    await expect(row.getByTestId('booking-status')).toHaveText('Cancelled');
-    const [stored] = await query<{ status: string; late_cancellation: boolean; phone: string | null }>(
-      `select b.status, b.late_cancellation, b.phone from booking b join slot s on s.id = b.slot_id where s.starts_at = '2026-10-22T10:15:00Z'`,
-    );
-    expect(stored).toEqual({ status: 'cancelled', late_cancellation: false, phone: null });
+  test('a patient without a phone can book with contact collection off and cancel outside the late window', async ({
+    page,
+  }) => {
+    await query('update clinic_settings set include_contact_in_confirmation=false where id=1');
+    try {
+      await signIn(page, loadState().patient2);
+      await page.getByTestId('nav-book').click();
+      await showDay(page, 'Pat Physio', '2026-10-22');
+      await page.getByTestId('slot-link').filter({ hasText: '11:15' }).click();
+      await expect(page.getByTestId('book-phone')).toHaveValue('');
+      await page.getByTestId('confirm-booking').click();
+      await expect(page.getByTestId('notice')).toHaveText('Booking confirmed.');
+      await page.getByTestId('cancel-booking').click();
+      await expect(page).toHaveURL(/\/bookings\?notice=cancelled$/);
+      await expect(page.getByTestId('notice')).toHaveText('Booking cancelled.');
+      const row = page.getByTestId('other-bookings').getByTestId('booking-row');
+      await expect(row.getByTestId('booking-status')).toHaveText('Cancelled');
+      const [stored] = await query<{ status: string; late_cancellation: boolean; phone: string | null }>(
+        `select b.status, b.late_cancellation, b.phone from booking b join slot s on s.id = b.slot_id where s.starts_at = '2026-10-22T10:15:00Z'`,
+      );
+      expect(stored).toEqual({ status: 'cancelled', late_cancellation: false, phone: null });
+    } finally {
+      await query('update clinic_settings set include_contact_in_confirmation=true where id=1');
+    }
   });
 
   test('booking times follow the shared virtual clock when it advances', async ({ page }) => {

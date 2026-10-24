@@ -103,6 +103,8 @@ export function sentryOptions(dsn: URL, build: BuildIdentity, runtime: RuntimeId
       graphQL: { document: false, variables: false },
     },
     tracesSampleRate: 0,
+    // Keep each failed request as an occurrence; Sentry groups by fingerprint.
+    integrations: (defaults) => defaults.filter((integration) => integration.name !== 'Dedupe'),
     initialScope: {
       tags: {
         service: 'bookit',

@@ -42,6 +42,9 @@ describe('Sentry options (REQ-18.1-04, REQ-15.4-05)', () => {
       stackFrameVariables: false,
     });
     expect(options.beforeBreadcrumb?.({ message: 'GET /bookings?email=x' }, undefined)).toBeNull();
+    expect(typeof options.integrations).toBe('function');
+    if (typeof options.integrations !== 'function') throw new Error('Integration filter missing');
+    expect(options.integrations([{ name: 'Dedupe' }, { name: 'RequestData' }])).toEqual([{ name: 'RequestData' }]);
   });
 
   it('treats only loopback addresses and Compose service names as local receivers', () => {

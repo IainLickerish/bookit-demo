@@ -18,6 +18,6 @@ export function initErrorReporting(env: Readonly<Record<string, string | undefin
 }
 
 /** Reports an error that was handled, so it did not reach `onRequestError`. A no-op without a DSN. */
-export function reportError(error: unknown, tags: Record<string, string>): void {
-  Sentry.captureException(error, { tags });
+export function reportError(error: unknown, tags: Record<string, string>, fingerprint?: string[]): void {
+  Sentry.captureException(error, { tags, ...(fingerprint ? { fingerprint } : {}) });
 }

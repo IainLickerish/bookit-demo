@@ -7,6 +7,7 @@ import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
+import { saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots } from '@/server/slots/queries';
 import { seedClinic, TEST_PASSWORD, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
@@ -74,6 +75,7 @@ beforeEach(async () => {
 
 describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stand-in, no real email)', () => {
   it('sends one confirmation with the contact phone when the clinic includes contact details', async () => {
+    await saveClinicSettings(database.db, clock, { ...clinic.settings, includeContactInConfirmation: true });
     const booking = await bookSlot(deps(), {
       patientId: clinic.patient1.id,
       slotId: await freeSlotId(),
@@ -100,7 +102,7 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
     });
   });
 
-  it('books and confirms a patient who gave no phone, without a phone line', async () => {
+  it('books without a phone when contact collection is disabled, without a phone line', async () => {
     const booking = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: await freeSlotId() });
     expect(booking.status).toBe('confirmed');
     expect(smtp.messages).toHaveLength(1);

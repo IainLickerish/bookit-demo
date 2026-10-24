@@ -4,6 +4,7 @@ import { loadClinicSettings } from '@/server/settings';
 import { bookingsCsv, ExportEncodingError } from '@/server/export/csv';
 import { reportError } from '@/server/error-reporting';
 import { listAdminBookings, parseBookingFilters } from './bookings';
+import { UnknownReportTypeError } from './report-type';
 
 const privateHeaders = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
 
@@ -25,9 +26,10 @@ export async function adminReportResponse(
     const query = new URLSearchParams(params);
     const type = format === 'csv' ? 'bookings' : query.get('type');
     if (format === 'report') {
-      if (query.getAll('type').length !== 1 || !['bookings', 'summary'].includes(type ?? '')) {
+      if (query.getAll('type').length !== 1) {
         return new Response('Unknown report type', { status: 400, headers: privateHeaders });
       }
+      if (!['bookings', 'summary'].includes(type ?? '')) throw new UnknownReportTypeError(type ?? '');
       query.delete('type');
     }
     let filters;
@@ -63,6 +65,7 @@ export async function adminReportResponse(
     return Response.json(data, { headers: privateHeaders });
   } catch (error) {
     if (error instanceof ExportEncodingError) reportError(error, { operation: 'admin.export' });
+    if (error instanceof UnknownReportTypeError) reportError(error, { operation: 'admin.report' });
     // Database/provider exceptions may include bound personal data. Do not log them.
     deps.log.error({ event: 'admin.report_failed' }, 'Admin report unavailable');
     return new Response('Report unavailable', { status: 500, headers: privateHeaders });
