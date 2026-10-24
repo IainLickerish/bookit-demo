@@ -14,6 +14,7 @@ import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/database';
 import { captureLogs } from '../helpers/logs';
+import { recordingMailer, testMail } from '../helpers/mail';
 
 const EVIDENCE_DIR = path.resolve(import.meta.dirname, '../../test-results/m0-24a');
 
@@ -97,9 +98,10 @@ describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () =>
   it('twenty patients booking the same slot at once: exactly one succeeds', async () => {
     const [slotId] = await freeSlotIds(1);
     const logs = captureLogs(clock);
+    const mailer = recordingMailer();
     const results = await Promise.allSettled(
       clinic.extraPatientIds.map((patientId) =>
-        bookSlot({ db: database.db, clock, log: logs.log }, { patientId, slotId: slotId! }),
+        bookSlot({ db: database.db, clock, log: logs.log, mail: testMail(mailer) }, { patientId, slotId: slotId! }),
       ),
     );
     const succeeded = results.filter((r) => r.status === 'fulfilled');
@@ -110,6 +112,8 @@ describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () =>
     expect(refusals).toEqual(Array(19).fill('slot_unavailable'));
     expect(await confirmedCount(slotId!)).toBe(1);
     expect(logs.events().filter((e) => e === 'booking.confirmed')).toHaveLength(1);
+    // Refused bookings roll back before anything is sent (REQ-18.1-01 confirmation email).
+    expect(mailer.sent).toHaveLength(1);
     recordEvidence('concurrent-book-same-slot', {
       slotId,
       attempts: results.length,
@@ -122,7 +126,7 @@ describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () =>
 
   it('two bookings rescheduled into the same free slot at once: exactly one moves', async () => {
     const [slotA, slotB, target] = await freeSlotIds(3);
-    const deps = { db: database.db, clock, log: captureLogs(clock).log };
+    const deps = { db: database.db, clock, log: captureLogs(clock).log, mail: testMail() };
     const a = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slotA! });
     const b = await bookSlot(deps, { patientId: clinic.patient2.id, slotId: slotB! });
     const results = await Promise.allSettled([
@@ -139,7 +143,7 @@ describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () =>
 
   it('a cancelled booking frees its slot for another patient', async () => {
     const [slotId] = await freeSlotIds(1);
-    const deps = { db: database.db, clock, log: captureLogs(clock).log };
+    const deps = { db: database.db, clock, log: captureLogs(clock).log, mail: testMail() };
     const first = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slotId! });
     await expect(bookSlot(deps, { patientId: clinic.patient2.id, slotId: slotId! })).rejects.toMatchObject({
       code: 'slot_unavailable',

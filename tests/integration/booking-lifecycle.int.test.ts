@@ -12,11 +12,13 @@ import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/database';
 import { captureLogs, type CapturedLogs } from '../helpers/logs';
+import { recordingMailer, testMail, type RecordingMailer } from '../helpers/mail';
 
 let database: TestDatabase;
 let clinic: SeededClinic;
 let logs: CapturedLogs;
 let deps: BookingDependencies;
+let mailer: RecordingMailer;
 const clock = manualClock('2026-10-20T07:00:00Z');
 
 async function slotsOn(localDate: string, practitionerId = clinic.practitioners.weekdays): Promise<SlotView[]> {
@@ -61,7 +63,8 @@ beforeEach(async () => {
   await emptyDatabase(database.db);
   clinic = await seedClinic(database.db, clock);
   logs = captureLogs(clock);
-  deps = { db: database.db, clock, log: logs.log };
+  mailer = recordingMailer();
+  deps = { db: database.db, clock, log: logs.log, mail: testMail(mailer) };
 });
 
 describe('booking a slot (REQ-18.1-01)', () => {
@@ -157,7 +160,7 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     expect(result).toMatchObject({ ok: true, late: false });
     expect(result.booking).toMatchObject({ status: 'cancelled', lateCancellation: false });
     expect(result.booking.cancelledAt?.toISOString()).toBe('2026-10-20T07:30:00.000Z');
-    expect(logs.events()).toEqual(['booking.confirmed', 'booking.cancelled']);
+    expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.sent', 'booking.cancelled']);
   });
 
   it('a late cancellation sets the status to cancelled and flags it late', async () => {
@@ -169,7 +172,12 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     expect(result).toMatchObject({ ok: true, late: true });
     const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
     expect(stored).toMatchObject({ status: 'cancelled', lateCancellation: true });
-    expect(logs.events()).toEqual(['booking.confirmed', 'booking.cancel.late', 'booking.cancelled']);
+    expect(logs.events()).toEqual([
+      'booking.confirmed',
+      'email.confirmation.sent',
+      'booking.cancel.late',
+      'booking.cancelled',
+    ]);
   });
 
   it('refuses to cancel after the start, twice, or for another patient', async () => {

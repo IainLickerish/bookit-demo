@@ -13,6 +13,7 @@ import { seedClinic, TEST_PASSWORD, type SeededClinic } from '../helpers/clinic'
 import { manualClock } from '../helpers/clock';
 import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/database';
 import { captureLogs } from '../helpers/logs';
+import { testMail } from '../helpers/mail';
 
 let database: TestDatabase;
 let clinic: SeededClinic;
@@ -105,7 +106,7 @@ describe('slots up to the booking horizon (REQ-18.1-01)', () => {
     const before = await listAvailableSlots(database.db, query);
     expect(before).toHaveLength(10);
     await bookSlot(
-      { db: database.db, clock, log: captureLogs(clock).log },
+      { db: database.db, clock, log: captureLogs(clock).log, mail: testMail() },
       { patientId: clinic.patient1.id, slotId: before[0]!.id },
     );
     const after = await listAvailableSlots(database.db, query);

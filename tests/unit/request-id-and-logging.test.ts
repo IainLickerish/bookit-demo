@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createLogger, emailHash, logFilePath } from '@/lib/logger';
 import { nextRequestId } from '@/lib/request-id';
 import { manualClock } from '../helpers/clock';
 import { captureLogs } from '../helpers/logs';
@@ -60,5 +64,64 @@ describe('request logs (REQ-18.1-01 logging)', () => {
     expect(text).not.toContain('7700');
     expect(text).not.toContain('not-a-real-password');
     expect(logs.lines[0]).toMatchObject({ email: '[redacted]', phone: '[redacted]' });
+  });
+});
+
+describe('log identity fields and the FakeLogSource file (REQ-18.1-01 logging, REQ-15.4-05)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('puts product, environment and release on every line', () => {
+    const lines: Record<string, unknown>[] = [];
+    const log = createLogger({
+      clock: () => manualClock('2026-10-20T11:00:00Z'),
+      product: 'ACME',
+      tenant: 'acme',
+      environment: 'staging',
+      release: '0123456789abcdef0123456789abcdef01234567',
+      destination: { write: (line: string) => lines.push(JSON.parse(line) as Record<string, unknown>) },
+    });
+    log.child({ request_id: 'req-000001', route: '/api/version' }).info({ event: 'http.request' });
+    expect(lines[0]).toMatchObject({
+      service: 'bookit',
+      product: 'ACME',
+      tenant: 'acme',
+      environment: 'staging',
+      release: '0123456789abcdef0123456789abcdef01234567',
+      request_id: 'req-000001',
+    });
+  });
+
+  it('writes <BOOKIT_LOG_DIR>/<product>/<environment>.jsonl as well as stdout when BOOKIT_LOG_DIR is set', () => {
+    expect(logFilePath({})).toBeNull();
+    expect(logFilePath({ BOOKIT_LOG_DIR: '/var/log/bookit', BOOKIT_PRODUCT: 'BEACON', BOOKIT_ENV: 'production' })).toBe(
+      '/var/log/bookit/beacon/production.jsonl',
+    );
+    const dir = mkdtempSync(path.join(tmpdir(), 'bookit-logs-'));
+    vi.stubEnv('BOOKIT_LOG_DIR', dir);
+    vi.stubEnv('BOOKIT_PRODUCT', 'ACME');
+    vi.stubEnv('BOOKIT_ENV', 'staging');
+    const log = createLogger({ clock: () => manualClock('2026-10-20T11:00:00Z') });
+    log.info({ event: 'booking.confirmed', email: 'patient1@patients.example.test' }, 'Booking confirmed');
+    log.flush();
+    const written = readFileSync(path.join(dir, 'acme', 'staging.jsonl'), 'utf8')
+      .trim()
+      .split('\n');
+    expect(written).toHaveLength(1);
+    expect(JSON.parse(written[0]!)).toMatchObject({
+      event: 'booking.confirmed',
+      product: 'ACME',
+      environment: 'staging',
+      email: '[redacted]',
+      time: '2026-10-20T11:00:00.000Z',
+    });
+  });
+
+  it('hashes email addresses to a stable reference that does not contain them', () => {
+    const hash = emailHash('Patient1@Patients.Example.test ');
+    expect(hash).toMatch(/^[0-9a-f]{16}$/);
+    expect(hash).toBe(emailHash('patient1@patients.example.test'));
+    expect(hash).not.toBe(emailHash('patient2@patients.example.test'));
   });
 });
