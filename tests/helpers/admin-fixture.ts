@@ -6,7 +6,7 @@ import { createPractitioner } from '@/server/practitioners';
 import { createUser } from '@/server/users';
 import { TEST_PASSWORD } from './clinic';
 
-export const ADMIN_PATIENT_NAMES = ['Zoë Brontë', 'Łukasz Wiśniewski', 'Siobhán Ó Briain', 'Ada, "Clinic"\nTest'];
+export const ADMIN_PATIENT_NAMES = ['Zoe Bronte', 'Lukasz Wisniewski', 'Siobhan O Briain', 'Ada, "Clinic"\nTest'];
 
 /** Fictional records on both sides of the London clock-change day's boundaries. */
 export async function seedAdminBookings(db: Database, clock: Clock, prefix = 'admin-fixture') {

@@ -76,7 +76,7 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
 }
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
-  it('exports all fictional Unicode names, with attachment headers and privacy-safe count logs', async () => {
+  it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');

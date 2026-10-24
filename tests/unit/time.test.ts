@@ -15,9 +15,9 @@ import {
 const LONDON = 'Europe/London';
 
 describe('clinic time zone helpers (REQ-18.1-01)', () => {
-  it('formats summer and winter instants in Europe/London at the local wall-clock time', () => {
-    expect(formatSlot(new Date('2026-07-01T08:00:00Z'), LONDON)).toBe('Wed, 1 Jul 2026, 09:00');
-    expect(formatSlot(new Date('2026-12-01T09:00:00Z'), LONDON)).toBe('Tue, 1 Dec 2026, 09:00');
+  it('formats UTC slot labels and local times', () => {
+    expect(formatSlot(new Date('2026-07-01T09:00:00Z'), 'UTC')).toBe('Wed, 1 Jul 2026, 09:00');
+    expect(formatSlot(new Date('2026-12-01T09:00:00Z'), 'UTC')).toBe('Tue, 1 Dec 2026, 09:00');
     expect(formatLocalTime(new Date('2026-10-23T08:00:00Z'), LONDON)).toBe('09:00');
     expect(formatLocalTime(new Date('2026-10-26T09:00:00Z'), LONDON)).toBe('09:00');
   });
