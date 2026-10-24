@@ -1,0 +1,33 @@
+# The TLS front door on each AWS host: Caddy with automatic HTTPS for this environment's two hostnames, on one edge
+# network per product (plan 2.5, F-21). Started at first boot from /opt/bookit/edge/.
+services:
+  caddy:
+    image: caddy:2.11.7@sha256:504a44d7d74bd2bc28a66afc4774912fc21223ca8a67734af1c54ab2f999b489
+    restart: unless-stopped
+    environment:
+      ACME_HOST: ${ACME_HOST:?}
+      BEACON_HOST: ${BEACON_HOST:?}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge-acme, edge-beacon]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+volumes:
+  caddy_data:
+  caddy_config:
+networks:
+  edge-acme:
+    external: true
+    name: bookit-edge-acme
+  edge-beacon:
+    external: true
+    name: bookit-edge-beacon

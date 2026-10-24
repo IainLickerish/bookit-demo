@@ -1,0 +1,97 @@
+# One product and environment on an AWS host (plan 2.5). Written to /opt/bookit/<product>/ at first boot and started by
+# the product's SSM deploy document with static.env (identity) and deploy.env (image digest and deployment ID).
+# Every service logs to /bookit/<product>/<environment> through the awslogs driver with the instance role.
+x-logging: &logging
+  driver: awslogs
+  options:
+    awslogs-region: ${AWS_LOG_REGION:?}
+    awslogs-group: /bookit/${BOOKIT_TENANT:?}/${BOOKIT_ENV:?}
+    awslogs-create-group: 'false'
+    tag: '{{.Name}}'
+
+x-bookit: &bookit
+  image: ${BOOKIT_IMAGE:?Set the image digest reference}
+  environment: &bookit-environment
+    BOOKIT_ENV: ${BOOKIT_ENV:?}
+    BOOKIT_PRODUCT: ${BOOKIT_PRODUCT:?}
+    BOOKIT_TENANT: ${BOOKIT_TENANT:?}
+    BOOKIT_PUBLIC_URL: ${BOOKIT_PUBLIC_URL:?}
+    BOOKIT_DEPLOYMENT_ID: ${BOOKIT_DEPLOYMENT_ID:?}
+    BOOKIT_SMTP_URL: smtp://mailpit:1025
+    BOOKIT_MAIL_FROM: ${BOOKIT_MAIL_FROM:?}
+    BOOKIT_LOG_DIR: /app/logs
+    BOOKIT_DB_PASSWORD_FILE: /run/secrets/database_password
+  secrets:
+    - database_password
+  networks: [clinic]
+  init: true
+  logging: *logging
+
+services:
+  db:
+    image: postgres:17-alpine
+    entrypoint: [/bin/sh, /bookit-start-database.sh]
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, database_password]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./scripts/init-database.sh:/docker-entrypoint-initdb.d/bookit.sh:ro
+      - ./scripts/start-database.sh:/bookit-start-database.sh:ro
+    networks: [clinic]
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d postgres]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  migrate:
+    <<: *bookit
+    command: [migrate]
+    depends_on:
+      db: { condition: service_healthy }
+  seed:
+    <<: *bookit
+    command: [seed]
+    environment:
+      <<: *bookit-environment
+      BOOKIT_SEED_PASSWORDS_FILE: /run/secrets/seed_passwords
+    secrets: [database_password, seed_passwords]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+  # Fictional product: confirmation emails stay in Mailpit on the internal network and are never delivered.
+  mailpit:
+    image: axllent/mailpit:v1.27.10
+    networks: [clinic]
+    restart: unless-stopped
+    logging: *logging
+  bookit:
+    <<: *bookit
+    restart: unless-stopped
+    volumes:
+      - logs:/app/logs
+    networks:
+      clinic: {}
+      edge:
+        aliases: ['${BOOKIT_TENANT}-app']
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      mailpit: { condition: service_started }
+
+secrets:
+  database_password:
+    file: ./credentials/database-password
+  postgres_password:
+    file: ./credentials/postgres-password
+  seed_passwords:
+    file: ./credentials/accounts.json
+volumes:
+  database:
+  logs:
+networks:
+  clinic:
+    internal: true
+  edge:
+    external: true
+    name: ${BOOKIT_EDGE_NETWORK:?}

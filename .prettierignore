@@ -5,3 +5,4 @@ drizzle/meta/
 test-results/
 playwright-report/
 bun.lock
+.terraform/

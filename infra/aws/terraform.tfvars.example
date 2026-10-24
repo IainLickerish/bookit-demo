@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars (ignored by git) and set real values before applying from the owner's machine.
+aws_account_id     = "123456789012"
+demo_domain        = "demo.example.com"
+budget_monthly_usd = 25 # placeholder: set the real monthly amount
+budget_alert_email = "owner@example.com"
+
+# Route 53 hosted zone for demo_domain, or leave null and create the A records from the host_addresses output.
+dns_zone_id = null
+
+# At the bookit-demo-beacon switch (owner decision C-07), change beacon to:
+# products = {
+#   acme   = { github_repository = "IainLickerish/bookit-demo", image_repository = "ghcr.io/iainlickerish/bookit-demo", deployer_role_name = "bookit-deployer" }
+#   beacon = { github_repository = "IainLickerish/bookit-demo-beacon", image_repository = "ghcr.io/iainlickerish/bookit-demo-beacon", deployer_role_name = "bookit-deployer-beacon" }
+# }
