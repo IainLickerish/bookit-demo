@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "tenant": "beacon",
+  "product": "BEACON",
+  "client": "BEACONDENTAL",
+  "domain": "beacondental.test",
+  "allowedSenderDomains": ["beacondental.test"],
+  "mailFrom": "noreply@beacondental.test",
+  "branding": { "practitionerLabel": "clinician", "welcome": "Book appointments with your dentist or hygienist" },
+  "settings": {
+    "clinicName": "Beacon Dental",
+    "timeZone": "Europe/London",
+    "lateCancellationHours": 48,
+    "includeContactInConfirmation": false,
+    "slotHorizonDays": 220,
+    "sessionMinutes": 30,
+    "maxReschedulesPerBooking": 2
+  },
+  "supportHours": "Monday to Saturday 08:00 to 18:00, Europe/London",
+  "tone": "Warm, plain",
+  "contacts": [
+    { "name": "Bella Byrne", "title": "Reception Lead", "role": "contact", "email": "bella@beacondental.test" },
+    { "name": "Ben Barker", "title": "Owner", "role": "approver", "email": "ben@beacondental.test" }
+  ],
+  "endpoints": {
+    "staging": "http://localhost:4201",
+    "production": "http://localhost:4202",
+    "inbound": "beacon@support.supportagents.test"
+  },
+  "accounts": [
+    {
+      "email": "patient1@patients.beacondental.test",
+      "name": "Niamh O’Connell",
+      "role": "patient",
+      "phone": "+44 7700 900002"
+    },
+    { "email": "patient2@patients.beacondental.test", "name": "Emil Andersson", "role": "patient", "phone": null },
+    { "email": "patient3@patients.beacondental.test", "name": "Róisín Murphy", "role": "patient", "phone": null },
+    { "email": "admin@beacondental.test", "name": "Beacon Demo Admin", "role": "admin", "phone": null }
+  ],
+  "practitioners": [
+    {
+      "name": "Blair Dentist",
+      "bio": "Beacon preventive dentistry. BEACON-SEED-MARKER",
+      "workingDays": [1, 2, 3, 4, 5, 6, 7],
+      "workdayStart": "09:00",
+      "workdayEnd": "17:00"
+    }
+  ]
+}

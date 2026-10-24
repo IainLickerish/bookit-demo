@@ -67,7 +67,7 @@ describe('production-mode builds refuse BOOKIT_TEST_CLOCK (security, plan 12.8)'
   it('fails the start-up check of a production-mode build that has BOOKIT_TEST_CLOCK set', () => {
     const file = clockFile({ now: '2026-10-20T11:00:00Z' });
     expect(() => checkStartupConfiguration({ BOOKIT_TEST_CLOCK: file }, false)).toThrow(TEST_CLOCK_REFUSED_MESSAGE);
-    expect(() => checkStartupConfiguration({}, false)).not.toThrow();
+    expect(() => checkStartupConfiguration({ BOOKIT_ENV: 'local' }, false)).not.toThrow();
   });
 
   it('fails the start-up check of a test-clock build whose clock file is unreadable', () => {
@@ -75,7 +75,7 @@ describe('production-mode builds refuse BOOKIT_TEST_CLOCK (security, plan 12.8)'
       ClockConfigurationError,
     );
     const file = clockFile({ now: '2026-10-20T11:00:00Z' });
-    expect(() => checkStartupConfiguration({ BOOKIT_TEST_CLOCK: file }, true)).not.toThrow();
+    expect(() => checkStartupConfiguration({ BOOKIT_TEST_CLOCK: file, BOOKIT_ENV: 'local' }, true)).not.toThrow();
   });
 
   it('takes the build flag only from the value Next.js inlines at build time', () => {

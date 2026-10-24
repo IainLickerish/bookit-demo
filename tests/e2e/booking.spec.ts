@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { E2E_START, loadState, query, serverLogLines, showDay, signIn, writeClock } from './support';
+import {
+  E2E_MAIL_FROM,
+  E2E_START,
+  loadState,
+  query,
+  receivedMail,
+  serverLogLines,
+  showDay,
+  signIn,
+  writeClock,
+} from './support';
 
 const UNKNOWN_ID = '019a0000-0000-7000-8000-000000000000';
 
@@ -51,6 +61,14 @@ test.describe('BookIt core booking journeys (REQ-18.1-01)', () => {
     expect(stored?.starts_at.toISOString()).toBe('2026-10-22T09:30:00.000Z');
     // Written at virtual time, not at the real time of the test run.
     expect(stored?.created_at.toISOString()).toBe(E2E_START);
+
+    // One confirmation email to the patient, with the contact phone because
+    // the test clinic includes contact details (M0-24c, plan 12.1).
+    const mail = receivedMail();
+    expect(mail).toHaveLength(1);
+    expect(mail[0]).toMatchObject({ from: E2E_MAIL_FROM, to: [loadState().patient1] });
+    expect(mail[0]!.raw).toContain('Contact phone: +44 7700 900001');
+    expect(mail[0]!.raw).toContain('With: Pat Physio');
   });
 
   test('another patient is not offered the booked slot and cannot open the first patient’s booking', async ({

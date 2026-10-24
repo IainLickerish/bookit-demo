@@ -1,125 +1,60 @@
-import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-
-const ROOT = path.resolve(import.meta.dirname, '../..');
-const NEXT = path.join(ROOT, 'node_modules/.bin/next');
-const EVIDENCE_DIR = path.join(ROOT, 'test-results/m0-24a');
+import {
+  buildServer,
+  launchServer,
+  ROOT,
+  startOutcome,
+  TEST_COMMIT,
+  writeClockFile,
+  type StartOutcome,
+} from '../helpers/built-server';
 
 const PRODUCTION_DIST = '.next';
 const TEST_CLOCK_DIST = '.next-e2e';
+const LOCAL = { BOOKIT_TENANT: 'test', BOOKIT_ENV: 'local' };
+const STAGING = {
+  BOOKIT_ENV: 'staging',
+  BOOKIT_PRODUCT: 'ACME',
+  BOOKIT_TENANT: 'acme',
+  BOOKIT_PUBLIC_URL: 'https://acme-staging.example.test',
+};
 
-function baseEnv(): NodeJS.ProcessEnv {
-  return {
-    NODE_ENV: 'production',
-    PATH: process.env.PATH ?? '',
-    HOME: process.env.HOME ?? '',
-    NEXT_TELEMETRY_DISABLED: '1',
-  };
-}
-
-function build(distDir: string, allowTestClock: boolean): void {
-  const result = spawnSync(NEXT, ['build'], {
-    cwd: ROOT,
-    env: {
-      ...baseEnv(),
-      BOOKIT_DIST_DIR: distDir,
-      BOOKIT_ALLOW_TEST_CLOCK: allowTestClock ? 'true' : 'false',
-    },
-    encoding: 'utf8',
-    timeout: 300_000,
-  });
-  if (result.status !== 0) {
-    console.log(result.stdout, result.stderr);
-  }
-  expect(result.status).toBe(0);
-}
-
-async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => resolve(typeof address === 'object' && address ? address.port : 0));
-    });
-  });
-}
-
-interface StartOutcome {
-  exitCode: number | null;
-  served: boolean;
-  output: string;
-}
-
-/** Starts a built server and reports whether it served a request or exited. */
-async function start(distDir: string, env: Record<string, string>): Promise<StartOutcome> {
-  const port = await freePort();
-  const child = spawn(NEXT, ['start', '-p', String(port), '-H', '127.0.0.1'], {
-    cwd: ROOT,
-    env: { ...baseEnv(), BOOKIT_DIST_DIR: distDir, BOOKIT_TENANT: 'test', BOOKIT_ENV: 'local', ...env },
-  });
-  let output = '';
-  child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()));
-  child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()));
-  const exited = new Promise<number | null>((resolve) => child.once('exit', (code) => resolve(code)));
-  let served = false;
-  let exitCode: number | null = null;
-  const deadline = performance.now() + 30_000;
-  while (performance.now() < deadline) {
-    const finished = await Promise.race([exited, new Promise<'running'>((r) => setTimeout(() => r('running'), 250))]);
-    if (finished !== 'running') {
-      exitCode = finished;
-      break;
-    }
-    try {
-      await fetch(`http://127.0.0.1:${port}/favicon.ico`, { signal: AbortSignal.timeout(2_000) });
-      served = true;
-      break;
-    } catch {
-      // Not listening yet.
-    }
-  }
-  if (exitCode === null) {
-    child.kill('SIGTERM');
-    await exited;
-  }
-  return { exitCode, served, output };
-}
-
-function clockFile(): string {
-  const file = path.join(mkdtempSync(path.join(tmpdir(), 'bookit-clock-')), 'clock.json');
-  writeFileSync(file, JSON.stringify({ now: '2026-10-20T07:00:00Z' }));
-  return file;
-}
-
-function record(name: string, outcome: StartOutcome): void {
-  mkdirSync(EVIDENCE_DIR, { recursive: true });
+function record(bead: 'm0-24a' | 'm0-24c', name: string, outcome: StartOutcome): void {
+  const dir = path.join(ROOT, 'test-results', bead);
+  mkdirSync(dir, { recursive: true });
   const summary = {
     exitCode: outcome.exitCode,
     served: outcome.served,
     refusalLines: outcome.output.split('\n').filter((line) => line.includes('startup.refused')),
   };
-  writeFileSync(path.join(EVIDENCE_DIR, `${name}.json`), `${JSON.stringify(summary, null, 2)}\n`);
+  writeFileSync(path.join(dir, `${name}.json`), `${JSON.stringify(summary, null, 2)}\n`);
   console.log(`evidence ${name}: ${JSON.stringify(summary)}`);
 }
 
-describe('start-up refusal of BOOKIT_TEST_CLOCK (security, plan 12.8)', () => {
-  beforeAll(() => {
-    build(PRODUCTION_DIST, false);
-    build(TEST_CLOCK_DIST, true);
-  }, 600_000);
+beforeAll(() => {
+  const production = buildServer(PRODUCTION_DIST, { allowTestClock: false, args: { GIT_COMMIT: TEST_COMMIT } });
+  // The test-clock build gets a commit that is not a full SHA, as a build
+  // from a work-in-progress tree might.
+  const testClock = buildServer(TEST_CLOCK_DIST, { allowTestClock: true, args: { GIT_COMMIT: 'e2e-local' } });
+  for (const result of [production, testClock]) {
+    if (result.status !== 0) {
+      console.log(result.output);
+    }
+    expect(result.status).toBe(0);
+  }
+}, 600_000);
 
+describe('start-up refusal of BOOKIT_TEST_CLOCK (security, plan 12.8)', () => {
   it('a production-mode build refuses to start with BOOKIT_TEST_CLOCK set, even if the runtime tries to allow it', async () => {
-    const outcome = await start(PRODUCTION_DIST, {
-      BOOKIT_TEST_CLOCK: clockFile(),
+    const outcome = await startOutcome(PRODUCTION_DIST, {
+      ...LOCAL,
+      BOOKIT_TEST_CLOCK: writeClockFile('2026-10-20T07:00:00Z'),
       BOOKIT_ALLOW_TEST_CLOCK: 'true',
       BOOKIT_BUILD_ALLOW_TEST_CLOCK: 'true',
     });
-    record('production-build-refuses-test-clock', outcome);
+    record('m0-24a', 'production-build-refuses-test-clock', outcome);
     expect(outcome.served).toBe(false);
     expect(outcome.exitCode).toBe(1);
     expect(outcome.output).toContain('"event":"startup.refused"');
@@ -127,20 +62,71 @@ describe('start-up refusal of BOOKIT_TEST_CLOCK (security, plan 12.8)', () => {
   });
 
   it('a production-mode build starts normally without BOOKIT_TEST_CLOCK', async () => {
-    const outcome = await start(PRODUCTION_DIST, {});
-    record('production-build-starts', outcome);
+    const outcome = await startOutcome(PRODUCTION_DIST, LOCAL);
+    record('m0-24a', 'production-build-starts', outcome);
     expect(outcome.served).toBe(true);
     expect(outcome.output).not.toContain('startup.refused');
   });
 
   it('a test-clock build starts with a readable clock file and refuses an unreadable one', async () => {
-    const good = await start(TEST_CLOCK_DIST, { BOOKIT_TEST_CLOCK: clockFile() });
-    record('test-clock-build-starts', good);
+    const good = await startOutcome(TEST_CLOCK_DIST, {
+      ...LOCAL,
+      BOOKIT_TEST_CLOCK: writeClockFile('2026-10-20T07:00:00Z'),
+    });
+    record('m0-24a', 'test-clock-build-starts', good);
     expect(good.served).toBe(true);
-    const missing = await start(TEST_CLOCK_DIST, { BOOKIT_TEST_CLOCK: '/nonexistent/bookit-clock.json' });
-    record('test-clock-build-refuses-missing-clock', missing);
+    const missing = await startOutcome(TEST_CLOCK_DIST, {
+      ...LOCAL,
+      BOOKIT_TEST_CLOCK: '/nonexistent/bookit-clock.json',
+    });
+    record('m0-24a', 'test-clock-build-refuses-missing-clock', missing);
     expect(missing.served).toBe(false);
     expect(missing.exitCode).toBe(1);
     expect(missing.output).toContain('Cannot read the virtual clock file');
+  });
+});
+
+describe('start-up refusal on build and container identity (REQ-18.1-05, plan 12.6, security)', () => {
+  it('next build fails when GIT_COMMIT is empty', () => {
+    const result = buildServer('.next-no-commit', { allowTestClock: false, args: { GIT_COMMIT: '' } });
+    const summary = { exitCode: result.status, mentionsGitCommit: result.output.includes('GIT_COMMIT is empty') };
+    mkdirSync(path.join(ROOT, 'test-results/m0-24c'), { recursive: true });
+    writeFileSync(
+      path.join(ROOT, 'test-results/m0-24c/build-refuses-empty-git-commit.json'),
+      `${JSON.stringify(summary, null, 2)}\n`,
+    );
+    console.log(`evidence build-refuses-empty-git-commit: ${JSON.stringify(summary)}`);
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain('GIT_COMMIT is empty');
+  });
+
+  it('a staging container built with a full SHA and given product and tenant starts, without the injected error route', async () => {
+    const server = await launchServer(PRODUCTION_DIST, STAGING);
+    try {
+      expect(server.served).toBe(true);
+      const injected = await fetch(`${server.url}/api/debug/error`, { signal: AbortSignal.timeout(5_000) });
+      expect(injected.status).toBe(404);
+    } finally {
+      await server.stop();
+    }
+    expect(server.output()).not.toContain('startup.refused');
+  });
+
+  it('a staging container without BOOKIT_PRODUCT refuses to start', async () => {
+    const outcome = await startOutcome(PRODUCTION_DIST, { BOOKIT_ENV: 'staging', BOOKIT_TENANT: 'acme' });
+    record('m0-24c', 'staging-refuses-missing-product', outcome);
+    expect(outcome.served).toBe(false);
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.output).toContain('BOOKIT_PRODUCT must be set when BOOKIT_ENV is staging.');
+  });
+
+  it('a staging container whose build has no full GIT_COMMIT refuses to start, and the same build runs locally', async () => {
+    const outcome = await startOutcome(TEST_CLOCK_DIST, STAGING);
+    record('m0-24c', 'staging-refuses-build-without-full-commit', outcome);
+    expect(outcome.served).toBe(false);
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.output).toContain('GIT_COMMIT must be a 40-character commit SHA when BOOKIT_ENV is staging');
+    const local = await startOutcome(TEST_CLOCK_DIST, LOCAL);
+    expect(local.served).toBe(true);
   });
 });

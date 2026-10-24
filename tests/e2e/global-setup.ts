@@ -1,10 +1,11 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { seedClinic, TEST_PASSWORD } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { startTestDatabase } from '../helpers/database';
-import { E2E_DIR, E2E_START, ROOT, STATE_FILE, writeClock, type E2eState } from './support';
+import { startSmtpReceiver } from '../helpers/mail';
+import { E2E_COMMIT, E2E_DIR, E2E_MAIL_FROM, E2E_START, ROOT, STATE_FILE, writeClock, type E2eState } from './support';
 
 const NEXT = path.join(ROOT, 'node_modules/.bin/next');
 const DIST_DIR = '.next-e2e';
@@ -32,14 +33,20 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   mkdirSync(E2E_DIR, { recursive: true });
   const clockFile = path.join(E2E_DIR, 'clock.json');
   const serverLog = path.join(E2E_DIR, 'server.log');
+  const mailLog = path.join(E2E_DIR, 'mail.jsonl');
   writeClock(clockFile, E2E_START);
+  writeFileSync(mailLog, '');
 
+  // Stands in for Mailpit: confirmation emails stay on this machine.
+  const smtp = await startSmtpReceiver();
+  smtp.onMessage((message) => appendFileSync(mailLog, `${JSON.stringify(message)}\n`));
   const database = await startTestDatabase(5);
   const clinic = await seedClinic(database.db, manualClock(E2E_START));
   const state: E2eState = {
     databaseUrl: database.url,
     clockFile,
     serverLog,
+    mailLog,
     password: TEST_PASSWORD,
     patient1: clinic.patient1.email,
     patient2: clinic.patient2.email,
@@ -56,12 +63,13 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   if (process.env.BOOKIT_E2E_SKIP_BUILD !== '1') {
     const built = spawnSync(NEXT, ['build'], {
       cwd: ROOT,
-      env: { ...baseEnv, BOOKIT_ALLOW_TEST_CLOCK: 'true' },
+      env: { ...baseEnv, BOOKIT_ALLOW_TEST_CLOCK: 'true', GIT_COMMIT: E2E_COMMIT },
       stdio: 'inherit',
       timeout: 300_000,
     });
     if (built.status !== 0) {
       await database.stop();
+      await smtp.stop();
       throw new Error('next build failed for the test-clock build.');
     }
   }
@@ -76,6 +84,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       BOOKIT_TEST_CLOCK: clockFile,
       BOOKIT_TENANT: 'test',
       BOOKIT_ENV: 'local',
+      BOOKIT_SMTP_URL: smtp.url,
+      BOOKIT_PUBLIC_URL: `http://127.0.0.1:${port}`,
+      BOOKIT_MAIL_FROM: E2E_MAIL_FROM,
     },
   });
   server.stdout.pipe(log);
@@ -92,6 +103,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   } catch (error) {
     server.kill('SIGTERM');
     await database.stop();
+    await smtp.stop();
     throw error;
   }
 
@@ -102,5 +114,6 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     }
     log.end();
     await database.stop();
+    await smtp.stop();
   };
 }

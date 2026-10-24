@@ -6,7 +6,12 @@ import { getLogger, type Logger } from '@/lib/logger';
 import { REQUEST_ID_HEADER, ROUTE_HEADER } from '@/lib/request-id';
 import { findSessionUser, SESSION_COOKIE } from './auth/session';
 import type { BookingDependencies } from './bookings/book';
+import type { MailSettings } from './notifications/deliver';
+import { getMailer } from './notifications/mailer';
 import type { PublicUser } from './users';
+
+/** The sender when BOOKIT_MAIL_FROM is unset; each tenant's container sets its own (plan 12.3 article 05). */
+const DEFAULT_MAIL_FROM = 'noreply@bookit.test';
 
 /** The logger for the current request, carrying its request ID and route. */
 export async function requestLogger(): Promise<Logger> {
@@ -17,8 +22,24 @@ export async function requestLogger(): Promise<Logger> {
   });
 }
 
+export function mailSettings(): MailSettings {
+  return { mailer: getMailer(), from: (process.env.BOOKIT_MAIL_FROM ?? '').trim() || DEFAULT_MAIL_FROM };
+}
+
 export async function bookingDependencies(): Promise<BookingDependencies> {
-  return { db: getDatabase(), clock: getClock(), log: await requestLogger() };
+  return { db: getDatabase(), clock: getClock(), log: await requestLogger(), mail: mailSettings() };
+}
+
+/**
+ * The client address for rate limiting: the first X-Forwarded-For entry when
+ * a proxy sets one, else X-Real-IP. Clients can forge these headers, so this
+ * limit is best effort; the per-email limit is the one that protects a
+ * patient's inbox.
+ */
+export async function clientIp(): Promise<string> {
+  const incoming = await headers();
+  const forwarded = incoming.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return forwarded || incoming.get('x-real-ip')?.trim() || 'unknown';
 }
 
 export async function currentUser(): Promise<PublicUser | null> {
