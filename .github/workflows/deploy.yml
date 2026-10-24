@@ -1,0 +1,209 @@
+# BookIt deploy (plan 2.5, F-38, F-39, F-41, HC-02). A person dispatches it from the default branch; the `staging` and
+# `production` environments accept deployments only from that branch, and production needs the Tech Lead's approval.
+# No step checks out or runs repository code. SupportAgents' App has no Actions write permission, so it cannot start
+# this workflow. With `dry_run` the checks run and nothing is deployed.
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      product:
+        description: Product to deploy
+        type: choice
+        options: [acme, beacon]
+        required: true
+      environment:
+        description: Environment
+        type: choice
+        options: [staging, production]
+        required: true
+      sha:
+        description: Full commit SHA on the default branch, built and published by ci
+        type: string
+        required: true
+      dry_run:
+        description: Run the checks only
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ inputs.product }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  PRODUCT: ${{ inputs.product }}
+  ENVIRONMENT: ${{ inputs.environment }}
+  SHA: ${{ inputs.sha }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      attestations: read
+    outputs:
+      image: ${{ steps.digest.outputs.image }}
+    steps:
+      - id: ref
+        name: Refuse a ref other than the default branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "::error::Refused: deploy runs only from the default branch $DEFAULT_BRANCH, not $GITHUB_REF (F-41)."
+            exit 1
+          fi
+          echo "Ref $GITHUB_REF is the default branch."
+      - id: product
+        name: Refuse a product not in BOOKIT_PRODUCTS
+        env:
+          BOOKIT_PRODUCTS: ${{ vars.BOOKIT_PRODUCTS }}
+        run: |
+          if ! [[ "$PRODUCT" =~ ^[a-z][a-z0-9-]{1,31}$ ]]; then
+            echo "::error::Refused: product must be a lower-case product name."
+            exit 1
+          fi
+          case " ${BOOKIT_PRODUCTS//,/ } " in
+            *" $PRODUCT "*) echo "Product $PRODUCT is listed in BOOKIT_PRODUCTS." ;;
+            *)
+              echo "::error::Refused: product $PRODUCT is not listed in repository variable BOOKIT_PRODUCTS."
+              exit 1
+              ;;
+          esac
+      - id: sha
+        name: Refuse a SHA not reachable from the default branch head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Refused: sha must be a full 40-character lower-case commit SHA."
+            exit 1
+          fi
+          if ! status="$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...$SHA" --jq .status)"; then
+            echo "::error::Refused: commit $SHA could not be compared with the default branch head $GITHUB_SHA."
+            exit 1
+          fi
+          case "$status" in
+            behind | identical) echo "Commit $SHA is reachable from the default branch head $GITHUB_SHA." ;;
+            *)
+              echo "::error::Refused: commit $SHA is not reachable from the default branch head $GITHUB_SHA (compare status: $status)."
+              exit 1
+              ;;
+          esac
+      - id: digest
+        name: Resolve the image digest
+        run: |
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if ! digest="$(docker buildx imagetools inspect "$repository:$SHA" --format '{{json .Manifest}}' | jq -r .digest)"; then
+            echo "::error::Refused: no published image $repository:$SHA. Wait for ci on the default branch to publish it."
+            exit 1
+          fi
+          if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Refused: the image $repository:$SHA has no readable digest."
+            exit 1
+          fi
+          echo "image=$repository@$digest" >> "$GITHUB_OUTPUT"
+          echo "Image for $SHA is $repository@$digest."
+      - id: attestation
+        name: Verify the build attestation names the SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ steps.digest.outputs.image }}
+        run: |
+          if ! gh attestation verify "oci://$IMAGE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/ci.yml" \
+            --source-ref "refs/heads/$DEFAULT_BRANCH" \
+            --source-digest "$SHA" \
+            --deny-self-hosted-runners; then
+            echo "::error::Refused: $IMAGE has no build attestation from ci on $DEFAULT_BRANCH for commit $SHA (F-38)."
+            exit 1
+          fi
+          echo "Attestation: ci on $DEFAULT_BRANCH built $IMAGE from $SHA."
+      - name: Dry run summary
+        if: inputs.dry_run
+        env:
+          IMAGE: ${{ steps.digest.outputs.image }}
+        run: |
+          echo "Dry run passed: would deploy $IMAGE to $PRODUCT $ENVIRONMENT. Nothing was deployed." | tee -a "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: check
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+    env:
+      IMAGE: ${{ needs.check.outputs.image }}
+    steps:
+      - name: Refuse a ref other than the default branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "::error::Refused: deploy runs only from the default branch $DEFAULT_BRANCH, not $GITHUB_REF (F-41)."
+            exit 1
+          fi
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.BOOKIT_DEPLOYER_ROLE }}
+          aws-region: ${{ vars.BOOKIT_AWS_REGION }}
+          role-session-name: deploy-${{ inputs.product }}-${{ inputs.environment }}-${{ github.run_id }}
+      - id: ssm
+        name: Deploy by digest through SSM
+        run: |
+          deployment_id="$PRODUCT-$ENVIRONMENT-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          echo "deployment-id=$deployment_id" >> "$GITHUB_OUTPUT"
+          parameters="$(jq -nc --arg e "$ENVIRONMENT" --arg i "$IMAGE" --arg d "$deployment_id" \
+            '{environment: [$e], image: [$i], deploymentId: [$d]}')"
+          # The document pulls the image and runs `docker compose up -d` with the host's product identity (F-39).
+          command_id="$(aws ssm send-command \
+            --document-name "bookit-deploy-$PRODUCT" \
+            --targets "Key=tag:Name,Values=bookit-$ENVIRONMENT" \
+            --parameters "$parameters" \
+            --comment "deploy $PRODUCT $ENVIRONMENT $SHA" \
+            --query Command.CommandId --output text)"
+          echo "SSM command $command_id deploys $IMAGE as deployment $deployment_id."
+          for _ in $(seq 90); do
+            read -r status targets < <(aws ssm list-commands --command-id "$command_id" \
+              --query 'Commands[0].[Status,TargetCount]' --output text)
+            case "$status" in
+              Success)
+                if [ "$targets" != "1" ]; then
+                  echo "::error::The deploy command reached $targets instances, not exactly bookit-$ENVIRONMENT."
+                  exit 1
+                fi
+                echo "SSM command $command_id succeeded."
+                exit 0
+                ;;
+              Failed | Cancelled | TimedOut | Cancelling)
+                aws ssm list-command-invocations --command-id "$command_id" --details \
+                  --query 'CommandInvocations[].CommandPlugins[].Output' --output text || true
+                echo "::error::SSM command $command_id ended $status."
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::SSM command $command_id did not finish within 15 minutes."
+          exit 1
+      - name: Wait for /api/version to report the SHA
+        env:
+          DEMO_DOMAIN: ${{ vars.BOOKIT_DEMO_DOMAIN }}
+          DEPLOYMENT_ID: ${{ steps.ssm.outputs.deployment-id }}
+        run: |
+          if [ "$ENVIRONMENT" = production ]; then host="$PRODUCT.$DEMO_DOMAIN"; else host="$PRODUCT-staging.$DEMO_DOMAIN"; fi
+          for _ in $(seq 60); do
+            if version="$(curl -fsS --max-time 10 "https://$host/api/version")" &&
+              jq -e --arg c "$SHA" --arg d "$DEPLOYMENT_ID" --arg t "$PRODUCT" --arg e "$ENVIRONMENT" \
+                '.commit == $c and .deploymentId == $d and .tenant == $t and .environment == $e' <<< "$version" > /dev/null; then
+              echo "$version" | jq .
+              echo "https://$host reports $SHA, deployment $DEPLOYMENT_ID." | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::https://$host/api/version did not report $SHA and deployment $DEPLOYMENT_ID within 10 minutes."
+          exit 1

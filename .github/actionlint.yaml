@@ -1,0 +1,6 @@
+# actionlint configuration (M0-34b). Repository variables the workflows read; actionlint flags any other vars.* name.
+config-variables:
+  - BOOKIT_AWS_REGION
+  - BOOKIT_DEMO_DOMAIN
+  - BOOKIT_DEPLOYER_ROLE
+  - BOOKIT_PRODUCTS

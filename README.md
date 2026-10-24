@@ -26,6 +26,13 @@ for the tenant journeys. First runs download pinned base images; tests never use
 a live model, hosted Sentry or a real email service. Container test projects are
 stopped afterwards, preserving their volumes and sanitised evidence for review.
 Raw local test credentials remain private under ignored `test-results/` paths.
+The unit suite also runs actionlint 1.7.12 on the workflows: put it on `PATH` or set
+`ACTIONLINT` to its path. CI installs the pinned release itself.
+
+## CI, deployment and demo reset
+
+[docs/ci-and-deploy.md](docs/ci-and-deploy.md) describes the `ci` and `deploy`
+workflows, the owner's one-time GitHub settings and `scripts/reset-remote.sh`.
 
 ## Run one clinic locally
 
