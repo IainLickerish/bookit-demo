@@ -34,7 +34,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                       My bookings
                     </Link>
                   </>
-                ) : null}
+                ) : (
+                  <Link href="/admin" prefetch={false} data-testid="nav-admin">
+                    Clinic bookings
+                  </Link>
+                )}
                 <form action={signOut}>
                   <button type="submit" className="underline" data-testid="sign-out">
                     Sign out
