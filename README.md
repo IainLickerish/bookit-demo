@@ -159,6 +159,23 @@ clock change. Beacon has its distinctive practitioner marker for isolation tests
 
 ## Guides and demonstration baseline
 
+Coding agents fetch from `IainLickerish/bookit-demo` and push their work to the
+machine-user fork, `iainlickerish-agent/bookit-demo`. Use `origin` for upstream
+fetches and `fork` for pushes:
+
+```sh
+git remote add fork https://github.com/iainlickerish-agent/bookit-demo.git
+git push -u fork <branch>
+gh pr create --repo IainLickerish/bookit-demo --base main --head iainlickerish-agent:<branch>
+```
+
+Inspect and reuse an existing remote rather than overwriting it. Target upstream
+`main` directly unless the parent PR is still open; explain that exception in the
+description. The owner reviews and merges. Workflow files remain owner-only, and
+fork workflow runs may need owner approval. Never add a bypass or token scope to
+work around upstream branch protections. Reopen an existing upstream PR from the
+fork only if the owner requests it.
+
 The eight articles for [Acme](docs/user-guide/acme/01-getting-started.md) and
 [Beacon](docs/user-guide/beacon/01-getting-started.md) cover booking, cancellation,
 rescheduling, confirmations, administration, CSV export and accounts.
