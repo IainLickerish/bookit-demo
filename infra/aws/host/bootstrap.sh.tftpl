@@ -1,0 +1,45 @@
+#!/bin/bash
+# bookit-${environment} first boot: Docker, the pinned Compose plugin, the Caddy edge and one Compose directory per
+# product. Credentials are created on the instance at first deployment, never passed through Terraform.
+set -euo pipefail
+umask 027
+
+dnf install -y docker
+systemctl enable --now docker
+
+plugin=/usr/local/lib/docker/cli-plugins/docker-compose
+mkdir -p "$(dirname "$plugin")"
+curl -fsSL -o /root/docker-compose "https://github.com/docker/compose/releases/download/${compose_plugin_version}/docker-compose-linux-x86_64"
+echo "${compose_plugin_sha256}  /root/docker-compose" | sha256sum -c -
+install -m 0755 /root/docker-compose "$plugin"
+
+install -d -m 0755 /etc/bookit
+printf '%s\n' '${environment}' > /etc/bookit/environment
+
+install -d -m 0750 /opt/bookit/edge
+echo '${edge_compose_b64}' | base64 -d > /opt/bookit/edge/compose.yml
+echo '${caddyfile_b64}' | base64 -d > /opt/bookit/edge/Caddyfile
+cat > /opt/bookit/edge/edge.env <<'EOF'
+%{ for p in products ~}
+${upper(p.name)}_HOST=${p.hostname}
+%{ endfor ~}
+EOF
+
+%{ for p in products ~}
+# ${p.name}: its own edge network, so Caddy reaches each product and the products cannot reach each other.
+docker network inspect bookit-edge-${p.name} >/dev/null 2>&1 || docker network create bookit-edge-${p.name}
+install -d -m 0750 /opt/bookit/${p.name} /opt/bookit/${p.name}/scripts
+install -d -m 0700 /opt/bookit/${p.name}/credentials
+echo '${product_compose_b64}' | base64 -d > /opt/bookit/${p.name}/compose.yml
+cat > /opt/bookit/${p.name}/static.env <<'EOF'
+BOOKIT_ENV=${environment}
+BOOKIT_PRODUCT=${p.code}
+BOOKIT_TENANT=${p.name}
+BOOKIT_PUBLIC_URL=${p.public_url}
+BOOKIT_MAIL_FROM=${p.mail_from}
+BOOKIT_EDGE_NETWORK=bookit-edge-${p.name}
+AWS_LOG_REGION=${region}
+EOF
+%{ endfor ~}
+
+docker compose -p bookit-edge --env-file /opt/bookit/edge/edge.env -f /opt/bookit/edge/compose.yml up -d
