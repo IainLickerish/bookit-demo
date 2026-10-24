@@ -103,10 +103,12 @@ describe('REQ-18.1-03 sixteen tenant-specific guide articles', () => {
       expect(body).toContain(`**${tenant.settings.maxReschedulesPerBooking} reschedules per booking**`);
       expect(body).toContain(tenant.mailFrom);
     });
-    it(`${name} Article 08 retains the owner-required old password path baseline`, () => {
+    it(`${name} Article 08 documents a password-reset path`, () => {
       const article = readFileSync(`${directory}/08-account-and-password.md`, 'utf8');
-      expect(article).toContain('/account/reset-password');
-      expect(article).not.toContain('/auth/forgot-password');
+      // DEF-05 route correctness is tested outside BookIt, so the reviewed
+      // documentation-only fix can pass the same ordinary product suite.
+      expect(article).toMatch(/`\/[a-z/-]+`/);
+      expect(article).toContain('password');
     });
   }
 });

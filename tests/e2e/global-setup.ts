@@ -41,7 +41,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   const smtp = await startSmtpReceiver();
   smtp.onMessage((message) => appendFileSync(mailLog, `${JSON.stringify(message)}\n`));
   const database = await startTestDatabase(5);
-  const clinic = await seedClinic(database.db, manualClock(E2E_START));
+  const clinic = await seedClinic(database.db, manualClock(E2E_START), {
+    settings: { includeContactInConfirmation: true },
+  });
   const state: E2eState = {
     databaseUrl: database.url,
     clockFile,

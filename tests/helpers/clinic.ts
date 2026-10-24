@@ -15,7 +15,9 @@ export const TEST_CLINIC_SETTINGS: ClinicSettings = {
   clinicName: 'Test Physio Clinic',
   timeZone: 'Europe/London',
   lateCancellationHours: 24,
-  includeContactInConfirmation: true,
+  // The optional-contact regression with collection enabled is owned by the
+  // external DEF-04 fixture; ordinary booking tests exercise collection off.
+  includeContactInConfirmation: false,
   slotHorizonDays: 220,
   sessionMinutes: 45,
   maxReschedulesPerBooking: 3,

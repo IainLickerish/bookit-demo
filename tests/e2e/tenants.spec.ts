@@ -17,6 +17,7 @@ test.use({ trace: 'off' });
 let acme: ComposeTenant;
 let beacon: ComposeTenant;
 const outcomes: unknown[] = [];
+const startupLogs = new Map<string, string>();
 const buildDirectory = tenantEvidenceDirectory('container-build');
 
 test.beforeAll(async () => {
@@ -35,6 +36,7 @@ test.beforeAll(async () => {
   beacon = await prepareComposeTenant('beacon');
   for (const clinic of [acme, beacon]) {
     const up = await clinic.start();
+    startupLogs.set(clinic.project, up.output);
     outcomes.push({ testId: `${clinic.tenant.tenant}-compose-up`, expected: 0, observed: up.code });
     if (up.code !== 0) writeTenantEvidence(clinic.directory, outcomes, up.output, clinic.canaries);
     expect(up.code, `Compose startup failed; see ${clinic.directory}/evidence.json`).toBe(0);
@@ -82,7 +84,7 @@ test.afterAll(async () => {
       writeTenantEvidence(
         clinic.directory,
         { outcomes, health: health.output, independentSdkReceiver: receiver },
-        logs.output,
+        `${startupLogs.get(clinic.project) ?? ''}\n${logs.output}`,
         clinic.canaries,
       );
     } catch (error) {

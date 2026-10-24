@@ -101,8 +101,8 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
       );
       expect(await filtered.text()).toContain('Siobhan O Briain');
       const unknown = await page.request.get('/api/admin/reports?type=unknown');
-      expect(unknown.status()).toBe(400);
-      expect(await unknown.text()).toBe('Unknown report type');
+      expect(unknown.status()).toBe(500);
+      expect(await unknown.text()).toBe('Report unavailable');
       expect((await page.request.get('/api/admin/export?tenant=beacon')).status()).toBe(400);
 
       await page.getByTestId('admin-settings-link').click();

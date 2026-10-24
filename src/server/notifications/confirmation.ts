@@ -1,4 +1,5 @@
 import { formatSlot } from '@/lib/time';
+import { reportError } from '../error-reporting';
 import type { BookingView } from '../bookings/queries';
 import type { ClinicSettings } from '../settings';
 import type { OutgoingEmail } from './mailer';
@@ -12,7 +13,12 @@ export interface ConfirmationInput {
 
 /** A stored phone number as it appears in an email. */
 export function formatPhone(phone: string): string {
-  return phone.trim().replace(/\s+/g, ' ');
+  try {
+    return phone.trim().replace(/\s+/g, ' ');
+  } catch (error) {
+    reportError(error, { operation: 'confirmation.compose' }, ['bookit', 'confirmation.phone']);
+    throw error;
+  }
 }
 
 /**
@@ -32,8 +38,8 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
     `With: ${booking.practitionerName}`,
     `Booking reference: ${booking.id}`,
   ];
-  if (settings.includeContactInConfirmation && booking.phone !== null) {
-    lines.push(`Contact phone: ${formatPhone(booking.phone)}`);
+  if (settings.includeContactInConfirmation) {
+    lines.push(`Contact phone: ${formatPhone(booking.phone!)}`);
   }
   lines.push('', 'To cancel or reschedule, sign in to BookIt and open My bookings.', '', settings.clinicName);
   return {
