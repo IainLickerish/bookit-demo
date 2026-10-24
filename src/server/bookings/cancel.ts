@@ -49,6 +49,9 @@ export async function cancelBooking(
         },
         'Late cancellation',
       );
+      const booking = await findBookingForPatient(tx, request.patientId, request.bookingId);
+      if (!booking) throw new Error('The locked booking could not be read back.');
+      return { ok: true as const, late, booking };
     }
     await tx
       .update(bookings)
@@ -58,8 +61,8 @@ export async function cancelBooking(
     if (!booking) {
       throw new Error('A booking updated in this transaction could not be read back.');
     }
+    deps.log.info({ event: 'booking.cancelled', booking_id: booking.id, late }, 'Booking cancelled');
     return { ok: true as const, late, booking };
   });
-  deps.log.info({ event: 'booking.cancelled', booking_id: result.booking.id, late: result.late }, 'Booking cancelled');
   return result;
 }

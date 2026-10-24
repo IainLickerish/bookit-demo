@@ -163,21 +163,15 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.sent', 'booking.cancelled']);
   });
 
-  it('a late cancellation sets the status to cancelled and flags it late', async () => {
-    // Starts at 10:15 UTC, about three hours after the clock: inside the 24-hour window.
-    const slot = await slotAt('2026-10-20', '11:15');
+  it('cancels exactly at the late-window boundary without a late flag', async () => {
+    const slot = await slotAt('2026-10-21', '09:00');
     const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
-    clock.set('2026-10-20T07:15:00Z');
+    clock.set('2026-10-20T08:00:00Z');
     const result = await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
-    expect(result).toMatchObject({ ok: true, late: true });
+    expect(result).toMatchObject({ ok: true, late: false });
     const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
-    expect(stored).toMatchObject({ status: 'cancelled', lateCancellation: true });
-    expect(logs.events()).toEqual([
-      'booking.confirmed',
-      'email.confirmation.sent',
-      'booking.cancel.late',
-      'booking.cancelled',
-    ]);
+    expect(stored).toMatchObject({ status: 'cancelled', lateCancellation: false });
+    expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.sent', 'booking.cancelled']);
   });
 
   it('refuses to cancel after the start, twice, or for another patient', async () => {

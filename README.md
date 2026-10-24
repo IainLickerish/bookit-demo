@@ -169,3 +169,10 @@ DEF-05 baseline instruction. The working password-reset route is owned by the
 separate password-reset change. Expected fixes and deliberate-defect tests live
 only in SupportAgents, outside this repository. BookIt's ordinary suite passes
 without changing the Article 08 baseline.
+
+The demonstration baseline also contains late-cancellation, non-ASCII CSV export
+and clock-change slot-label defects. Their reproductions, expected fixes and
+failing-then-passing tests live in SupportAgents under `demo/bookit-expected/`.
+BookIt's ordinary tests exercise unaffected cancellation/export/display cases and
+must pass both on this baseline and after each expected fix. The tenant seed keeps
+its Unicode names and DST reference slots so those defects remain reproducible.

@@ -5,11 +5,11 @@ import { bookingsCsv, csvField } from '@/server/export/csv';
 import { adminLogEvidence } from '../helpers/admin-evidence';
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
-  it('writes UTF-8 with a BOM, RFC 4180 quotes and CRLF records, preserving Unicode and embedded newlines', () => {
+  it('writes a BOM, RFC 4180 quotes and CRLF records with embedded newlines', () => {
     const csv = bookingsCsv([
       {
         id: 'booking-1',
-        patientName: 'Zoë Brontë, "Łukasz"\nSiobhán Ó Briain',
+        patientName: 'Zoe Bronte, "Lukasz"\nSiobhan O Briain',
         practitionerId: 'p1',
         practitionerName: 'Pat',
         startsAt: new Date('2026-10-25T09:00:00Z'),
@@ -22,7 +22,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
     const bytes = Buffer.from(csv, 'utf8');
     expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     expect(bytes.toString('utf8')).toBe(csv);
-    expect(csv).toContain('"Zoë Brontë, ""Łukasz""\nSiobhán Ó Briain"');
+    expect(csv).toContain('"Zoe Bronte, ""Lukasz""\nSiobhan O Briain"');
     expect(csv).toContain('"2026-10-25T09:00:00.000Z"');
     expect(csv.endsWith('\r\n')).toBe(true);
     expect(bookingsCsv([]).split('\r\n')).toHaveLength(2);

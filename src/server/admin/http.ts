@@ -1,7 +1,8 @@
 import type { BookingDependencies } from '@/server/bookings/book';
 import { findSessionUser } from '@/server/auth/session';
 import { loadClinicSettings } from '@/server/settings';
-import { bookingsCsv } from '@/server/export/csv';
+import { bookingsCsv, ExportEncodingError } from '@/server/export/csv';
+import { reportError } from '@/server/error-reporting';
 import { listAdminBookings, parseBookingFilters } from './bookings';
 
 const privateHeaders = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
@@ -60,7 +61,8 @@ export async function adminReportResponse(
           }
         : { bookings: rows };
     return Response.json(data, { headers: privateHeaders });
-  } catch {
+  } catch (error) {
+    if (error instanceof ExportEncodingError) reportError(error, { operation: 'admin.export' });
     // Database/provider exceptions may include bound personal data. Do not log them.
     deps.log.error({ event: 'admin.report_failed' }, 'Admin report unavailable');
     return new Response('Report unavailable', { status: 500, headers: privateHeaders });

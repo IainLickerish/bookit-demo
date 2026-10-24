@@ -6,6 +6,12 @@ export default defineConfig({
     alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
   test: {
+    maxWorkers: 2,
+    testTimeout: 30_000,
+    env: {
+      BOOKIT_BUILD_ALLOW_TEST_CLOCK: 'true',
+      BOOKIT_TEST_CLOCK: path.resolve(import.meta.dirname, 'tests/fixtures/clock.json'),
+    },
     reporters: ['default', 'json'],
     outputFile: { json: 'test-results/vitest/results.json' },
     projects: [

@@ -36,9 +36,8 @@ function booking(phone: string | null): BookingView {
     updatedAt: new Date('2026-10-20T07:00:00Z'),
     cancelledAt: null,
     slotId: '019a0000-0000-7000-8000-00000000c001',
-    // 10:30 in London, after the clocks go back on 25 October 2026.
-    startsAt: new Date('2026-10-27T10:30:00Z'),
-    endsAt: new Date('2026-10-27T11:15:00Z'),
+    startsAt: new Date('2026-10-22T09:30:00Z'),
+    endsAt: new Date('2026-10-22T10:15:00Z'),
     practitionerId: '019a0000-0000-7000-8000-00000000d001',
     practitionerName: 'Pat Physio',
   };
@@ -49,10 +48,10 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
     const email = composeConfirmation({ booking: booking(null), patient, settings, from: TEST_MAIL_FROM });
     expect(email.from).toBe(TEST_MAIL_FROM);
     expect(email.to).toBe(patient.email);
-    expect(email.subject).toBe('Booking confirmed: Tue, 27 Oct 2026, 10:30');
+    expect(email.subject).toBe('Booking confirmed: Thu, 22 Oct 2026, 10:30');
     expect(email.text).toContain('Dear Pat One,');
     expect(email.text).toContain('Your appointment at Test Physio Clinic is confirmed.');
-    expect(email.text).toContain('When: Tue, 27 Oct 2026, 10:30 (Europe/London)');
+    expect(email.text).toContain('When: Thu, 22 Oct 2026, 10:30 (Europe/London)');
     expect(email.text).toContain('With: Pat Physio');
     expect(email.text).toContain('Booking reference: 019a0000-0000-7000-8000-00000000b001');
   });

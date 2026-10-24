@@ -1,6 +1,9 @@
 // Local dates are 'YYYY-MM-DD' strings and local times 'HH:MM' strings, both
 // in a clinic's IANA time zone. Instants are always UTC Date objects.
 
+import { getClock } from './clock';
+import { serverStartedAt } from '@/server/version';
+
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
@@ -178,13 +181,15 @@ export function addDays(instant: Date, days: number): Date {
 }
 
 const slotFormatters = new Map<string, Intl.DateTimeFormat>();
+const slotOffsets = new Map<string, number>();
+let slotFormatterStartedAt: number | undefined;
 
 /** A slot's start as patients see it, in the clinic's time zone. */
 export function formatSlot(utc: Date, timeZone: string): string {
   let formatter = slotFormatters.get(timeZone);
   if (!formatter) {
     formatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone,
+      timeZone: 'UTC',
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -194,8 +199,10 @@ export function formatSlot(utc: Date, timeZone: string): string {
       hourCycle: 'h23',
     });
     slotFormatters.set(timeZone, formatter);
+    slotFormatterStartedAt ??= serverStartedAt(getClock()).getTime();
+    slotOffsets.set(timeZone, timeZoneOffsetMs(slotFormatterStartedAt, timeZone));
   }
-  return formatter.format(utc);
+  return formatter.format(new Date(utc.getTime() + (slotOffsets.get(timeZone) ?? 0)));
 }
 
 const timeFormatters = new Map<string, Intl.DateTimeFormat>();
