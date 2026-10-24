@@ -50,7 +50,9 @@ describe('a3eg REQ-18.1-03 REQ-18.1-06 REQ-18.2-01 scoped Compose cleanup', () =
         expect(args).not.toContain('--volumes');
         expect(args).not.toContain('-v');
         expect(args).not.toContain('--rmi');
-        for (const name of [...networks]) if (name.startsWith(`${own}_`)) networks.delete(name);
+        if (args.includes('down')) {
+          for (const name of [...networks]) if (name.startsWith(`${own}_`)) networks.delete(name);
+        }
         return { code: 0, output: 'removed project resources' };
       }
       expect(args).toContain(`label=com.docker.compose.project=${own}`);
