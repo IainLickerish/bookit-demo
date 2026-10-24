@@ -1,5 +1,6 @@
 import type { ErrorEvent, NodeOptions } from '@sentry/nextjs';
 import type { BuildIdentity } from './build-identity';
+import { redactPath, redactUrl } from './routes';
 import type { RuntimeIdentity } from './runtime-identity';
 
 // Error reporting (plan 12.1, REQ-18.1-04, REQ-15.4-05): `release` is the
@@ -48,13 +49,10 @@ export function parseSentryDsn(env: Readonly<Record<string, string | undefined>>
 
 const REQUEST_ID_HEADER = 'x-request-id';
 
-function withoutQuery(url: string): string {
-  return url.split('?')[0] ?? '';
-}
-
 /**
- * Keeps personal data out of error reports: no user, cookies, body or query
- * string, and only the request ID header, which becomes a tag.
+ * Keeps personal data and secrets out of error reports: no user, cookies,
+ * body, query string or password reset token, and only the request ID
+ * header, which becomes a tag.
  */
 export function scrubEvent(event: ErrorEvent): ErrorEvent {
   delete event.user;
@@ -69,13 +67,16 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
     delete event.request.data;
     delete event.request.query_string;
     if (event.request.url) {
-      event.request.url = withoutQuery(event.request.url);
+      event.request.url = redactUrl(event.request.url);
     }
   }
   // The Next.js integration repeats the request path, query string included.
   const nextjs = event.contexts?.nextjs;
   if (nextjs && typeof nextjs.request_path === 'string') {
-    nextjs.request_path = withoutQuery(nextjs.request_path);
+    nextjs.request_path = redactPath(nextjs.request_path);
+  }
+  if (event.transaction) {
+    event.transaction = event.transaction.replace(/\S+$/, (requestPath) => redactPath(requestPath));
   }
   return event;
 }

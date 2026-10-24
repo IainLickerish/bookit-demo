@@ -85,6 +85,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       BOOKIT_TENANT: 'test',
       BOOKIT_ENV: 'local',
       BOOKIT_SMTP_URL: smtp.url,
+      BOOKIT_PUBLIC_URL: `http://127.0.0.1:${port}`,
       BOOKIT_MAIL_FROM: E2E_MAIL_FROM,
     },
   });
