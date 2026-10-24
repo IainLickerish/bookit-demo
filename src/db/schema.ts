@@ -49,6 +49,29 @@ export const sessions = pgTable(
   (t) => [uniqueIndex('session_token_hash_key').on(t.tokenHash), index('session_user_idx').on(t.userId)],
 );
 
+export const passwordResetTokens = pgTable(
+  'password_reset_token',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The tenant that issued the token; a token never works for another tenant. */
+    tenant: text('tenant').notNull(),
+    /** sha256 of the tenant and the token; the token itself is never stored. */
+    tokenHash: text('token_hash').notNull(),
+    createdAt: instant('created_at').notNull(),
+    expiresAt: instant('expires_at').notNull(),
+    /** Set when the token is used, or when a newer reset or a completed reset replaces it. */
+    usedAt: instant('used_at'),
+  },
+  (t) => [
+    uniqueIndex('password_reset_token_hash_key').on(t.tokenHash),
+    index('password_reset_token_user_idx').on(t.userId),
+    check('password_reset_token_expires_after_created', sql`"expires_at" > "created_at"`),
+  ],
+);
+
 export const practitioners = pgTable(
   'practitioner',
   {

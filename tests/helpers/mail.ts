@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 import { SMTPServer } from 'smtp-server';
-import type { MailSettings } from '@/server/notifications/confirmation';
+import type { MailSettings } from '@/server/notifications/deliver';
 import { assertTestAddress, type Mailer, type OutgoingEmail } from '@/server/notifications/mailer';
 
 export const TEST_MAIL_FROM = 'noreply@clinic.example.test';

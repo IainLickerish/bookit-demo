@@ -14,7 +14,12 @@ import {
 const PRODUCTION_DIST = '.next';
 const TEST_CLOCK_DIST = '.next-e2e';
 const LOCAL = { BOOKIT_TENANT: 'test', BOOKIT_ENV: 'local' };
-const STAGING = { BOOKIT_ENV: 'staging', BOOKIT_PRODUCT: 'ACME', BOOKIT_TENANT: 'acme' };
+const STAGING = {
+  BOOKIT_ENV: 'staging',
+  BOOKIT_PRODUCT: 'ACME',
+  BOOKIT_TENANT: 'acme',
+  BOOKIT_PUBLIC_URL: 'https://acme-staging.example.test',
+};
 
 function record(bead: 'm0-24a' | 'm0-24c', name: string, outcome: StartOutcome): void {
   const dir = path.join(ROOT, 'test-results', bead);

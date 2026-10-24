@@ -1,15 +1,7 @@
-import { emailHash, type Logger } from '@/lib/logger';
 import { formatSlot } from '@/lib/time';
 import type { BookingView } from '../bookings/queries';
-import { reportError } from '../error-reporting';
 import type { ClinicSettings } from '../settings';
-import type { Mailer, OutgoingEmail } from './mailer';
-
-export interface MailSettings {
-  mailer: Mailer;
-  /** The clinic's sender address, from BOOKIT_MAIL_FROM. */
-  from: string;
-}
+import type { OutgoingEmail } from './mailer';
 
 export interface ConfirmationInput {
   booking: BookingView;
@@ -50,47 +42,4 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
     subject: `Booking confirmed: ${when}`,
     text: `${lines.join('\n')}\n`,
   };
-}
-
-/**
- * Sends a confirmation after the booking has committed. A failed email never
- * undoes a booking: it is logged and reported, and the patient still sees the
- * booking in "My bookings".
- */
-export async function sendConfirmation(
-  mail: MailSettings,
-  log: Logger,
-  email: OutgoingEmail,
-  bookingId: string,
-): Promise<boolean> {
-  const recipientHash = emailHash(email.to);
-  try {
-    const sent = await mail.mailer.send(email);
-    log.info(
-      {
-        event: 'email.confirmation.sent',
-        booking_id: bookingId,
-        recipient_hash: recipientHash,
-        mailer: mail.mailer.kind,
-        message_id: sent.messageId,
-      },
-      mail.mailer.kind === 'disabled'
-        ? 'Confirmation email not sent: no SMTP server configured'
-        : 'Confirmation email sent',
-    );
-    return true;
-  } catch (error) {
-    log.error(
-      {
-        event: 'email.confirmation.failed',
-        booking_id: bookingId,
-        recipient_hash: recipientHash,
-        mailer: mail.mailer.kind,
-        error_name: error instanceof Error ? error.name : 'unknown',
-      },
-      'Confirmation email failed',
-    );
-    reportError(error, { operation: 'confirmation_email' });
-    return false;
-  }
 }
