@@ -1,0 +1,196 @@
+# BookIt CI (plan 2.5, T-29, F-01, F-38). Every job is read-only except `publish`, which runs only on pushes to the
+# default branch, checks out no code and pushes the image that `image` built and verified. Pushes to `sa/**` start
+# nothing; pull requests from `sa/**` or from a bot wait for approval of the secret-free `agent-ci` environment.
+name: ci
+
+on:
+  push:
+    branches-ignore: ['sa/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+jobs:
+  # F-01: SupportAgents' App opens pull requests from sa/** branches. Their code runs only after the Tech Lead approves
+  # this environment, which holds no secrets and no cloud trust.
+  agent-approval:
+    if: github.event_name == 'pull_request' && (startsWith(github.head_ref, 'sa/') || github.event.pull_request.user.type == 'Bot')
+    runs-on: ubuntu-24.04
+    permissions: {}
+    environment: agent-ci
+    steps:
+      - run: echo "Tech Lead approved CI for this agent pull request."
+
+  test:
+    name: test
+    needs: agent-approval
+    if: ${{ !cancelled() && (needs.agent-approval.result == 'success' || needs.agent-approval.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.4
+      - name: Install actionlint 1.7.12
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl -fsSL -o "$archive" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          echo "ACTIONLINT=$RUNNER_TEMP/actionlint" >> "$GITHUB_ENV"
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run format:check
+      - run: bun run test:unit
+      - run: bun run test:integration
+      - run: bun x playwright install --with-deps chromium
+      - run: bun run test:e2e
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: test-results
+          path: |
+            test-results/
+            !test-results/local/**
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # F-38: build the image with its commit and build ID, run it, and fail unless /api/version reports exactly this
+  # commit. On default-branch pushes the verified image is handed to `publish` as an artifact.
+  image:
+    needs: agent-approval
+    if: ${{ !cancelled() && (needs.agent-approval.result == 'success' || needs.agent-approval.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+      image-id: ${{ steps.build.outputs.image-id }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - id: build
+        name: Build the image
+        run: |
+          commit="$(git rev-parse HEAD)"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:$commit"
+          docker buildx build --load --provenance=false --sbom=false \
+            --build-arg GIT_COMMIT="$commit" \
+            --build-arg BUILD_ID="$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --build-arg BOOKIT_IMAGE="$image" \
+            --build-arg BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --tag "$image" .
+          {
+            echo "commit=$commit"
+            echo "image=$image"
+            echo "image-id=$(docker image inspect --format '{{.Id}}' "$image")"
+          } >> "$GITHUB_OUTPUT"
+      - name: Run the image and check /api/version
+        env:
+          COMMIT: ${{ steps.build.outputs.commit }}
+          IMAGE: ${{ steps.build.outputs.image }}
+        run: |
+          credentials="$RUNNER_TEMP/acme-credentials"
+          mkdir -m 0700 "$credentials"
+          docker run --rm --network none --user 0 --entrypoint bun \
+            -v "$credentials:/credentials" "$IMAGE" scripts/local-credentials.ts acme /credentials
+          export BOOKIT_LOCAL_IMAGE="$IMAGE" GIT_COMMIT="$COMMIT" BOOKIT_CREDENTIALS_DIR="$credentials"
+          export BOOKIT_TENANT=acme BOOKIT_PRODUCT=ACME BOOKIT_ENV=local BOOKIT_MAIL_FROM=noreply@acmephysio.test
+          export BOOKIT_PORT=4101 BOOKIT_MAIL_PORT=8025 BOOKIT_PUBLIC_URL=http://localhost:4101
+          docker compose -p bookit-ci up --no-build -d --wait
+          version="$(curl -fsS --max-time 10 http://127.0.0.1:4101/api/version)"
+          echo "$version" | jq .
+          reported="$(jq -r .commit <<< "$version")"
+          if [ "$reported" != "$COMMIT" ]; then
+            echo "::error::/api/version reports commit $reported, not $COMMIT (F-38)."
+            exit 1
+          fi
+          if [ "$(jq -r .image <<< "$version")" != "$IMAGE" ]; then
+            echo "::error::/api/version does not report the image $IMAGE (F-38)."
+            exit 1
+          fi
+          echo "/api/version reports exactly $COMMIT."
+      - name: Show container logs
+        if: always()
+        run: docker compose -p bookit-ci logs --no-color --tail 200 || true
+      - name: Save the verified image for publish
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          IMAGE: ${{ steps.build.outputs.image }}
+        run: docker save "$IMAGE" | gzip > "$RUNNER_TEMP/image.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        with:
+          name: image
+          path: ${{ runner.temp }}/image.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  # The only job with package write permission. It checks out nothing and runs no repository code: it pushes the image
+  # `image` verified, records its digest and attests that this commit built it (F-38).
+  publish:
+    needs: [test, image]
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: image
+          path: ${{ runner.temp }}
+      - id: push
+        name: Push the verified image
+        env:
+          IMAGE: ${{ needs.image.outputs.image }}
+          IMAGE_ID: ${{ needs.image.outputs.image-id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$IMAGE" != "ghcr.io/${GITHUB_REPOSITORY,,}:$GITHUB_SHA" ]; then
+            echo "::error::The built image $IMAGE is not tagged with this push's commit $GITHUB_SHA."
+            exit 1
+          fi
+          gunzip -c "$RUNNER_TEMP/image.tar.gz" | docker load
+          if [ "$(docker image inspect --format '{{.Id}}' "$IMAGE")" != "$IMAGE_ID" ]; then
+            echo "::error::The loaded image is not the one the image job verified."
+            exit 1
+          fi
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE"
+          digest="$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' | jq -r .digest)"
+          docker logout ghcr.io
+          if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Could not read the pushed image digest."
+            exit 1
+          fi
+          echo "name=${IMAGE%:*}" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Pushed ${IMAGE%:*}@$digest for commit $GITHUB_SHA." | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.push.outputs.name }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
