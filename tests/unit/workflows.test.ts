@@ -55,7 +55,11 @@ describe('M0-34b F-01 F-38 ci.yml: only default-branch pushes publish images', (
     );
     expect(writers.map(([name]) => name)).toEqual(['publish']);
     const publish = workflow.jobs.publish!;
-    expect(publish.if).toBe(DEFAULT_BRANCH_PUSH);
+    expect(publish.if?.replace(/\s+/g, ' ').trim()).toBe(
+      "${{ !cancelled() && needs.test.result == 'success' && needs.image.result == 'success' && " +
+        DEFAULT_BRANCH_PUSH +
+        ' }}',
+    );
     expect(checksOut(publish)).toBe(false);
     expect(writes(publish).sort()).toEqual(['attestations', 'id-token', 'packages']);
     expect(publish.needs).toEqual(['test', 'image']);
