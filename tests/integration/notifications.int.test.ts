@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
@@ -47,6 +48,23 @@ function bodyOf(raw: string): string {
   return body
     .replace(/=\r?\n/g, '')
     .replace(/=([0-9A-F]{2})/g, (_match, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+/** The decoded calendar attachment of a received message. */
+function calendarFileIn(raw: string): string {
+  const part = /Content-Type: text\/calendar[^]*?\r?\n\r?\n([A-Za-z0-9+/=\r\n]+?)\r?\n(?:\r?\n|--)/i.exec(raw);
+  if (!part) {
+    throw new Error('No calendar attachment in the message');
+  }
+  return Buffer.from(part[1]!.replace(/\s/g, ''), 'base64').toString('utf8');
+}
+
+/** `20261022T093000Z`, as a calendar file writes a UTC time. */
+function icsInstant(instant: Date): string {
+  return instant
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z')
+    .replace(/[-:]/g, '');
 }
 
 function recordEvidence(name: string, data: unknown): void {
@@ -112,6 +130,60 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
       status: booking.status,
       containsPhoneLine: bodyOf(smtp.messages[0]!.raw).includes('Contact phone:'),
     });
+  });
+
+  it('attaches a calendar file with the appointment time, length, clinic and practitioner', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: await freeSlotId() });
+    const raw = smtp.messages[0]!.raw;
+    expect(raw).toMatch(/Content-Type: text\/calendar; charset=utf-8; method=PUBLISH/i);
+    expect(raw).toContain('filename=appointment-2026-10-22.ics');
+    const ics = calendarFileIn(raw);
+    expect(ics).toContain(`DTSTART:${icsInstant(booking.startsAt)}\r\n`);
+    expect(ics).toContain(`DTEND:${icsInstant(booking.endsAt)}\r\n`);
+    expect(ics.replace(/\r\n /g, '')).toContain(
+      `SUMMARY:Appointment with ${booking.practitionerName} at ${clinic.settings.clinicName}\r\n`,
+    );
+    expect(ics).toContain(`Length: ${clinic.settings.sessionMinutes} minutes`);
+  });
+
+  it('sends a "booking moved" confirmation with an updated calendar file when a booking is rescheduled', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: await freeSlotId() });
+    const moved = await rescheduleBooking(deps(), {
+      patientId: clinic.patient2.id,
+      bookingId: booking.id,
+      newSlotId: await freeSlotId(1),
+    });
+    expect(smtp.messages).toHaveLength(2);
+    const message = smtp.messages[1]!;
+    expect(message.to).toEqual([clinic.patient2.email]);
+    const body = bodyOf(message.raw);
+    expect(body).toContain('has been moved');
+    expect(body).toContain(
+      `When: Thu, 22 Oct 2026, ${formatLocalTime(moved.startsAt, 'Europe/London')} (Europe/London)`,
+    );
+    const ics = calendarFileIn(message.raw);
+    expect(ics).toContain(`UID:booking-${booking.id}@bookit\r\n`);
+    expect(ics).toContain('SEQUENCE:1\r\n');
+    expect(ics).toContain(`DTSTART:${icsInstant(moved.startsAt)}\r\n`);
+    expect(logs.events()).toEqual([
+      'booking.confirmed',
+      'email.confirmation.sent',
+      'booking.rescheduled',
+      'email.confirmation.sent',
+    ]);
+  });
+
+  it('keeps a reschedule when its confirmation cannot be sent', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: await freeSlotId() });
+    const target = await freeSlotId(1);
+    await rescheduleBooking(deps('smtp://127.0.0.1:9'), {
+      patientId: clinic.patient2.id,
+      bookingId: booking.id,
+      newSlotId: target,
+    });
+    const [row] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+    expect(row?.slotId).toBe(target);
+    expect(logs.events().slice(-2)).toEqual(['booking.rescheduled', 'email.confirmation.failed']);
   });
 
   it('keeps the booking when the SMTP server is down, and logs the failure', async () => {

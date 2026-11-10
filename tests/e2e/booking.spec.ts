@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import {
   E2E_MAIL_FROM,
   E2E_START,
   loadState,
+  mailText,
   query,
   receivedMail,
   serverLogLines,
@@ -19,7 +21,14 @@ test.describe('BookIt core booking journeys (REQ-18.1-01)', () => {
   let bookedSlotId = '';
 
   test('booking routes require sign-in (security)', async ({ page }) => {
-    for (const route of ['/', '/slots', '/bookings', `/book/${UNKNOWN_ID}`, `/bookings/${UNKNOWN_ID}/reschedule`]) {
+    for (const route of [
+      '/',
+      '/slots',
+      '/bookings',
+      `/book/${UNKNOWN_ID}`,
+      `/bookings/${UNKNOWN_ID}/reschedule`,
+      `/bookings/${UNKNOWN_ID}/calendar`,
+    ]) {
       await page.goto(route);
       await expect(page, `GET ${route} without a session`).toHaveURL(/\/auth\/sign-in$/);
     }
@@ -45,12 +54,31 @@ test.describe('BookIt core booking journeys (REQ-18.1-01)', () => {
     await expect(page.getByTestId('book-when')).toHaveText('Thu, 22 Oct 2026, 10:30 (45 minutes)');
     await expect(page.getByTestId('book-phone')).toHaveValue('+44 7700 900001');
     await page.getByTestId('confirm-booking').click();
-    await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+    await expect(page).toHaveURL(/\/bookings\?notice=booked&booking=[0-9a-f-]{36}$/);
     await expect(page.getByTestId('notice')).toHaveText('Booking confirmed.');
     const row = page.getByTestId('upcoming-bookings').getByTestId('booking-row');
     await expect(row).toHaveCount(1);
     await expect(row.getByTestId('booking-when')).toHaveText('Thu, 22 Oct 2026, 10:30');
     await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
+
+    // Add to calendar, straight after booking and on the booking row.
+    const offer = page.getByTestId('confirmation-calendar');
+    await expect(offer).toContainText('Thu, 22 Oct 2026, 10:30 with Pat Physio');
+    await offer.getByText('Add to calendar').click();
+    await expect(offer.getByTestId('calendar-google')).toHaveAttribute(
+      'href',
+      /^https:\/\/calendar\.google\.com\/calendar\/render\?.*dates=20261022T093000Z%2F20261022T101500Z/,
+    );
+    await expect(offer.getByTestId('calendar-outlook')).toHaveAttribute('href', /^https:\/\/outlook\.live\.com\//);
+    const download = page.waitForEvent('download');
+    await offer.getByTestId('calendar-file').click();
+    const file = await download;
+    expect(file.suggestedFilename()).toBe('appointment-2026-10-22.ics');
+    const ics = readFileSync((await file.path())!, 'utf8');
+    expect(ics).toContain('DTSTART:20261022T093000Z\r\n');
+    expect(ics).toContain('DTEND:20261022T101500Z\r\n');
+    expect(ics.replace(/\r\n /g, '')).toContain('Length: 45 minutes');
+    await expect(row.getByTestId('add-to-calendar')).toHaveCount(1);
 
     const [stored] = await query<{ status: string; phone: string; created_at: Date; starts_at: Date }>(
       `select b.status, b.phone, b.created_at, s.starts_at from booking b join slot s on s.id = b.slot_id where b.slot_id = $1`,
@@ -69,6 +97,7 @@ test.describe('BookIt core booking journeys (REQ-18.1-01)', () => {
     expect(mail[0]).toMatchObject({ from: E2E_MAIL_FROM, to: [loadState().patient1] });
     expect(mail[0]!.raw).toContain('Contact phone: +44 7700 900001');
     expect(mail[0]!.raw).toContain('With: Pat Physio');
+    expect(mail[0]!.raw).toMatch(/Content-Type: text\/calendar; charset=utf-8; method=PUBLISH/i);
   });
 
   test('another patient is not offered the booked slot and cannot open the first patient’s booking', async ({
@@ -85,6 +114,9 @@ test.describe('BookIt core booking journeys (REQ-18.1-01)', () => {
     await expect(page.getByTestId('confirm-booking')).toHaveCount(0);
     await page.goto(`/bookings/${booking?.id}/reschedule`);
     await expect(page.getByTestId('not-found')).toBeVisible();
+    const calendar = await page.request.get(`/bookings/${booking?.id}/calendar`);
+    expect(calendar.status()).toBe(404);
+    expect(await calendar.text()).not.toContain('BEGIN:VCALENDAR');
   });
 
   test('a patient reschedules a booking to another free slot', async ({ page }) => {
@@ -94,10 +126,13 @@ test.describe('BookIt core booking journeys (REQ-18.1-01)', () => {
     await expect(page.getByTestId('reschedules-remaining')).toHaveText('You can reschedule this booking 3 more times.');
     await expect(page.getByTestId('date-input')).toHaveValue('2026-10-22');
     await page.getByTestId('reschedule-to').filter({ hasText: '14:15' }).click();
-    await expect(page).toHaveURL(/\/bookings\?notice=rescheduled$/);
+    await expect(page).toHaveURL(/\/bookings\?notice=rescheduled&booking=[0-9a-f-]{36}$/);
     await expect(page.getByTestId('notice')).toHaveText('Booking rescheduled.');
     const row = page.getByTestId('upcoming-bookings').getByTestId('booking-row');
     await expect(row.getByTestId('booking-when')).toHaveText('Thu, 22 Oct 2026, 14:15');
+    await expect(page.getByTestId('confirmation-calendar')).toContainText('Thu, 22 Oct 2026, 14:15 with Pat Physio');
+    const moved = mailText(receivedMail().at(-1)!.raw);
+    expect(moved).toContain('Subject: Booking moved: Thu, 22 Oct 2026, 14:15');
     const [stored] = await query<{ reschedule_count: number; slot_id: string }>(
       `select reschedule_count, slot_id from booking where patient_id = (select id from "user" where email = $1)`,
       [loadState().patient1],

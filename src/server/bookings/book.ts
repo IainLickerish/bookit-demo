@@ -68,7 +68,7 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     // confirmation can be written; it is sent once the booking has committed.
     return {
       booking: created,
-      confirmation: composeConfirmation({ booking: created, patient, settings, from: deps.mail.from }),
+      confirmation: composeConfirmation({ booking: created, patient, settings, from: deps.mail.from, now }),
     };
   });
   deps.log.info(

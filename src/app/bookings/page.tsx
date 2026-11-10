@@ -7,6 +7,7 @@ import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
+import { AddToCalendar } from './add-to-calendar';
 
 function statusText(booking: BookingView): string {
   if (booking.status === 'confirmed') {
@@ -25,6 +26,12 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
+  // Straight after booking or moving an appointment, offer to add it to a calendar.
+  const noticeCode = single(params.notice);
+  const justChanged =
+    noticeCode === 'booked' || noticeCode === 'rescheduled'
+      ? upcoming.find((b) => b.id === single(params.booking))
+      : undefined;
 
   const row = (booking: BookingView, changeable: boolean) => (
     <li
@@ -43,7 +50,8 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <AddToCalendar booking={booking} clinic={settings} />
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -70,6 +78,18 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         <p role="status" className="notice" data-testid="notice">
           {notice}
         </p>
+      ) : null}
+      {justChanged ? (
+        <div
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+          data-testid="confirmation-calendar"
+        >
+          <p>
+            {formatSlot(justChanged.startsAt, settings.timeZone)} with {justChanged.practitionerName} at{' '}
+            {settings.clinicName}. Add it to your calendar so you don&apos;t miss it.
+          </p>
+          <AddToCalendar booking={justChanged} clinic={settings} />
+        </div>
       ) : null}
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">

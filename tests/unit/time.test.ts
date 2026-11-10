@@ -18,6 +18,11 @@ describe('clinic time zone helpers (REQ-18.1-01)', () => {
   it('formats UTC slot labels and local times', () => {
     expect(formatSlot(new Date('2026-07-01T09:00:00Z'), 'UTC')).toBe('Wed, 1 Jul 2026, 09:00');
     expect(formatSlot(new Date('2026-12-01T09:00:00Z'), 'UTC')).toBe('Tue, 1 Dec 2026, 09:00');
+    // The offset is the one in force on the slot's own day, not today's.
+    expect(formatSlot(new Date('2026-07-01T09:00:00Z'), LONDON)).toBe('Wed, 1 Jul 2026, 10:00');
+    expect(formatSlot(new Date('2026-12-01T09:00:00Z'), LONDON)).toBe('Tue, 1 Dec 2026, 09:00');
+    expect(formatSlot(new Date('2026-10-23T08:00:00Z'), LONDON)).toBe('Fri, 23 Oct 2026, 09:00');
+    expect(formatSlot(new Date('2026-10-26T09:00:00Z'), LONDON)).toBe('Mon, 26 Oct 2026, 09:00');
     expect(formatLocalTime(new Date('2026-10-23T08:00:00Z'), LONDON)).toBe('09:00');
     expect(formatLocalTime(new Date('2026-10-26T09:00:00Z'), LONDON)).toBe('09:00');
   });
