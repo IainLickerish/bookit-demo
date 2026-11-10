@@ -133,6 +133,8 @@ export const bookings = pgTable(
     createdAt: instant('created_at').notNull(),
     updatedAt: instant('updated_at').notNull(),
     cancelledAt: instant('cancelled_at'),
+    /** When the appointment reminder was sent; a booking gets at most one (src/server/notifications/reminders.ts). */
+    reminderSentAt: instant('reminder_sent_at'),
   },
   (t) => [
     // At most one confirmed booking per slot, so concurrent bookings of the
@@ -141,6 +143,9 @@ export const bookings = pgTable(
       .on(t.slotId)
       .where(sql`"status" = 'confirmed'`),
     index('booking_patient_idx').on(t.patientId),
+    index('booking_reminder_pending_idx')
+      .on(t.slotId)
+      .where(sql`"status" = 'confirmed' and "reminder_sent_at" is null`),
     check('booking_cancelled_at_matches_status', sql`("status" = 'cancelled') = ("cancelled_at" is not null)`),
     check('booking_late_only_when_cancelled', sql`not "late_cancellation" or "status" = 'cancelled'`),
     check('booking_reschedule_count_nonnegative', sql`"reschedule_count" >= 0`),
@@ -158,6 +163,7 @@ export const clinicSettings = pgTable(
     slotHorizonDays: integer('slot_horizon_days').notNull(),
     sessionMinutes: integer('session_minutes').notNull(),
     maxReschedulesPerBooking: integer('max_reschedules_per_booking').notNull(),
+    appointmentReminders: boolean('appointment_reminders').notNull().default(true),
     updatedAt: instant('updated_at').notNull(),
   },
   () => [

@@ -110,6 +110,7 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
       await page.getByTestId('admin-time-zone').fill('Europe/Paris');
       await page.getByTestId('admin-late-hours').fill('48');
       await page.getByTestId('admin-include-contact').uncheck();
+      await page.getByTestId('admin-appointment-reminders').uncheck();
       await page.getByTestId('admin-save-settings').click();
       await expect(page.getByTestId('admin-settings-saved')).toHaveText('Clinic settings saved.');
       await expect(page.getByTestId('clinic-name')).toHaveText('Acme Admin Test');
@@ -119,6 +120,7 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
         timeZone: 'Europe/Paris',
         lateCancellationHours: 48,
         includeContactInConfirmation: false,
+        appointmentReminders: false,
       };
       expect(await loadClinicSettings(handle.db)).toEqual(changed);
 
@@ -149,6 +151,7 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
         timeZone: before.timeZone,
         lateCancellationHours: before.lateCancellationHours,
         includeContactInConfirmation: before.includeContactInConfirmation,
+        appointmentReminders: before.appointmentReminders,
       });
       await handle.pool.end();
     }

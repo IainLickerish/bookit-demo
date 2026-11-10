@@ -13,6 +13,8 @@ export const clinicSettingsInput = z.object({
   slotHorizonDays: z.number().int().min(1).max(366),
   sessionMinutes: z.number().int().min(5).max(480),
   maxReschedulesPerBooking: z.number().int().min(0).max(20),
+  /** Email clients a reminder about 24 hours before each appointment. */
+  appointmentReminders: z.boolean(),
 });
 
 export type ClinicSettings = z.infer<typeof clinicSettingsInput>;
@@ -39,6 +41,7 @@ export async function loadClinicSettings(db: Executor): Promise<ClinicSettings> 
     slotHorizonDays: row.slotHorizonDays,
     sessionMinutes: row.sessionMinutes,
     maxReschedulesPerBooking: row.maxReschedulesPerBooking,
+    appointmentReminders: row.appointmentReminders,
   });
 }
 

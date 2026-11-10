@@ -21,6 +21,7 @@ const settings: ClinicSettings = {
   slotHorizonDays: 220,
   sessionMinutes: 45,
   maxReschedulesPerBooking: 3,
+  appointmentReminders: true,
 };
 
 const patient = { email: 'patient1@patients.example.test', name: 'Pat One' };

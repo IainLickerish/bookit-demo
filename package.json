@@ -23,6 +23,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun scripts/migrate.ts",
     "slots:ensure": "bun scripts/ensure-slots.ts",
+    "reminders:send": "bun scripts/send-reminders.ts",
     "seed": "bun scripts/seed.ts",
     "local:credentials": "bun scripts/local-credentials.ts"
   },

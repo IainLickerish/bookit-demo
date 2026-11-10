@@ -151,6 +151,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
       timeZone: 'Europe/Paris',
       lateCancellationHours: 48,
       includeContactInConfirmation: false,
+      appointmentReminders: false,
     };
     try {
       await updateAdminSettings(acme.db, clock, updated);
@@ -163,6 +164,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
         timeZone: before.timeZone,
         lateCancellationHours: before.lateCancellationHours,
         includeContactInConfirmation: before.includeContactInConfirmation,
+        appointmentReminders: before.appointmentReminders,
       });
     }
   });

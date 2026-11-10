@@ -21,6 +21,7 @@ export const TEST_CLINIC_SETTINGS: ClinicSettings = {
   slotHorizonDays: 220,
   sessionMinutes: 45,
   maxReschedulesPerBooking: 3,
+  appointmentReminders: true,
 };
 
 export interface SeededClinic {

@@ -10,6 +10,7 @@ import {
 } from '@/lib/runtime-identity';
 import { parseSentryDsn } from '@/lib/sentry-options';
 import { initErrorReporting } from './error-reporting';
+import { reminderSweepSeconds } from './notifications/reminder-scheduler';
 import { recordStartedAt } from './version';
 
 /**
@@ -24,7 +25,8 @@ import { recordStartedAt } from './version';
  * - BOOKIT_PUBLIC_URL, the origin used in email links, must be set outside
  *   local runs;
  * - BOOKIT_SENTRY_DSN, when set, must be a DSN, and a local receiver in a
- *   test-clock build.
+ *   test-clock build;
+ * - BOOKIT_REMINDER_SWEEP_SECONDS, when set, must be 0 to 3600.
  */
 export function checkStartupConfiguration(
   env: Readonly<Record<string, string | undefined>> = process.env,
@@ -40,6 +42,7 @@ export function checkStartupConfiguration(
   }
   publicBaseUrl(env);
   parseSentryDsn(env, allowTestClock);
+  reminderSweepSeconds(env);
   return runtime;
 }
 

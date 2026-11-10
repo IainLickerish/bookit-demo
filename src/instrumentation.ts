@@ -2,6 +2,8 @@ export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { runStartupChecks } = await import('./server/startup');
     runStartupChecks();
+    const { startReminderScheduler } = await import('./server/notifications/reminder-scheduler');
+    startReminderScheduler();
   }
 }
 

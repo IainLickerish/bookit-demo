@@ -231,3 +231,34 @@ export function formatLocalDate(localDate: string): string {
     year: 'numeric',
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
+
+const appointmentFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** The zone's name as patients read it in emails: the UK clinics' zone is "UK time". */
+export function timeZoneLabel(timeZone: string): string {
+  return timeZone === 'Europe/London' ? 'UK time' : timeZone;
+}
+
+/**
+ * An appointment's start for an email, such as "Thursday 22 October 2026 at
+ * 14:30 (UK time)". It uses the zone's offset on the appointment's own date,
+ * so a reminder sent before a clock change shows the time on the clinic wall.
+ */
+export function formatAppointmentTime(utc: Date, timeZone: string): string {
+  let formatter = appointmentFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    appointmentFormatters.set(timeZone, formatter);
+  }
+  const parts = Object.fromEntries(formatter.formatToParts(utc).map((part) => [part.type, part.value]));
+  return `${parts.weekday} ${parts.day} ${parts.month} ${parts.year} at ${parts.hour}:${parts.minute} (${timeZoneLabel(timeZone)})`;
+}

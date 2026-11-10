@@ -10,10 +10,11 @@ export const adminSettingsInput = clinicSettingsInput
     timeZone: true,
     lateCancellationHours: true,
     includeContactInConfirmation: true,
+    appointmentReminders: true,
   })
   .strict();
 
-/** Update only the four admin-editable fields; preserve the booking rules. */
+/** Update only the admin-editable fields; preserve the booking rules. */
 export async function updateAdminSettings(db: Executor, clock: Clock, input: unknown): Promise<void> {
   const values = adminSettingsInput.parse(input);
   const changed = await db

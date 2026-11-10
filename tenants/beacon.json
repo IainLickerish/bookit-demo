@@ -14,7 +14,8 @@
     "includeContactInConfirmation": false,
     "slotHorizonDays": 220,
     "sessionMinutes": 30,
-    "maxReschedulesPerBooking": 2
+    "maxReschedulesPerBooking": 2,
+    "appointmentReminders": true
   },
   "supportHours": "Monday to Saturday 08:00 to 18:00, Europe/London",
   "tone": "Warm, plain",
