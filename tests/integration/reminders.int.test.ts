@@ -55,7 +55,7 @@ describe('day-before appointment reminders', () => {
     clock.set(new Date(booking.startsAt.getTime() - REMINDER_LEAD_MS - 1));
     await sendDueReminders(deps);
     expect(reminders()).toHaveLength(0);
-    clock.advanceMinutes(1);
+    clock.set(new Date(booking.startsAt.getTime() - REMINDER_LEAD_MS));
     await Promise.all([sendDueReminders(deps), sendDueReminders(deps)]);
     expect(reminders()).toHaveLength(1);
     expect(reminders()[0]!.text).toContain(booking.practitionerName);
