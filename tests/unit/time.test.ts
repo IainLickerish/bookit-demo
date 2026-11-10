@@ -22,6 +22,12 @@ describe('clinic time zone helpers (REQ-18.1-01)', () => {
     expect(formatLocalTime(new Date('2026-10-26T09:00:00Z'), LONDON)).toBe('09:00');
   });
 
+  it('shows UK appointment labels using the offset on the appointment date', () => {
+    expect(formatSlot(new Date('2026-07-01T08:00:00Z'), LONDON)).toBe('Wed, 1 Jul 2026, 09:00');
+    expect(formatSlot(new Date('2026-12-01T09:00:00Z'), LONDON)).toBe('Tue, 1 Dec 2026, 09:00');
+    expect(formatSlot(new Date('2027-07-01T08:00:00Z'), LONDON)).toBe('Thu, 1 Jul 2027, 09:00');
+  });
+
   it('converts local times to UTC on both sides of the October 2026 clock change', () => {
     expect(zonedTimeToUtc('2026-10-23', '09:00', LONDON)?.toISOString()).toBe('2026-10-23T08:00:00.000Z');
     expect(zonedTimeToUtc('2026-10-26', '09:00', LONDON)?.toISOString()).toBe('2026-10-26T09:00:00.000Z');
