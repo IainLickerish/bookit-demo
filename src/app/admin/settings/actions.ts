@@ -13,6 +13,7 @@ export async function saveSettingsAction(form: FormData): Promise<void> {
   const hours = form.get('lateCancellationHours');
   const parsed = adminSettingsInput.safeParse({
     clinicName: form.get('clinicName'),
+    clinicPhone: form.get('clinicPhone'),
     timeZone: form.get('timeZone'),
     lateCancellationHours: typeof hours === 'string' && hours.trim() !== '' ? Number(hours) : NaN,
     includeContactInConfirmation: form.get('includeContactInConfirmation') === 'on',

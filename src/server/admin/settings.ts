@@ -7,13 +7,14 @@ import { clinicSettingsInput, ClinicNotConfiguredError } from '@/server/settings
 export const adminSettingsInput = clinicSettingsInput
   .pick({
     clinicName: true,
+    clinicPhone: true,
     timeZone: true,
     lateCancellationHours: true,
     includeContactInConfirmation: true,
   })
   .strict();
 
-/** Update only the four admin-editable fields; preserve the booking rules. */
+/** Update only the admin-editable fields; preserve the booking rules. */
 export async function updateAdminSettings(db: Executor, clock: Clock, input: unknown): Promise<void> {
   const values = adminSettingsInput.parse(input);
   const changed = await db

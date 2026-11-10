@@ -4,9 +4,11 @@ import type { Executor } from '@/db/client';
 import { clinicSettings } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
 import { isValidTimeZone } from '@/lib/time';
+import { phoneInput } from './bookings/rules';
 
 export const clinicSettingsInput = z.object({
   clinicName: z.string().trim().min(1).max(120),
+  clinicPhone: phoneInput.optional(),
   timeZone: z.string().refine(isValidTimeZone, 'Unknown IANA time zone'),
   lateCancellationHours: z.number().int().min(0).max(336),
   includeContactInConfirmation: z.boolean(),
@@ -33,6 +35,7 @@ export async function loadClinicSettings(db: Executor): Promise<ClinicSettings> 
   }
   return clinicSettingsInput.parse({
     clinicName: row.clinicName,
+    clinicPhone: row.clinicPhone,
     timeZone: row.timeZone,
     lateCancellationHours: row.lateCancellationHours,
     includeContactInConfirmation: row.includeContactInConfirmation,

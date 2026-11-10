@@ -69,6 +69,16 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       {notice ? (
         <p role="status" className="notice" data-testid="notice">
           {notice}
+          {single(params.notice) === 'booked' && settings.clinicPhone ? (
+            <>
+              {' '}
+              Need to change your appointment? Call {settings.clinicName} on{' '}
+              <a href={`tel:${settings.clinicPhone.replace(/[^+0-9]/g, '')}`} className="underline">
+                {settings.clinicPhone}
+              </a>
+              .
+            </>
+          ) : null}
         </p>
       ) : null}
       {error ? (

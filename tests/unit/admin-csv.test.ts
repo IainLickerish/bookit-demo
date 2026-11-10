@@ -71,8 +71,15 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
       includeContactInConfirmation: false,
     };
     expect(adminSettingsInput.parse(valid)).toEqual(valid);
+    expect(adminSettingsInput.parse({ ...valid, clinicPhone: ' +44 (20) 7946 0123 ' }).clinicPhone).toBe(
+      '+44 (20) 7946 0123',
+    );
+    for (const clinicPhone of [null, '', '   ']) {
+      expect(adminSettingsInput.parse({ ...valid, clinicPhone }).clinicPhone).toBeNull();
+    }
     for (const change of [
       { clinicName: '' },
+      { clinicPhone: 'not a phone number' },
       { timeZone: 'invalid' },
       { lateCancellationHours: -1 },
       { lateCancellationHours: 1.5 },

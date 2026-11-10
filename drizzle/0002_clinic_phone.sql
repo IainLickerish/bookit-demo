@@ -1,0 +1,1 @@
+ALTER TABLE "clinic_settings" ADD COLUMN "clinic_phone" text;

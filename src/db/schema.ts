@@ -152,6 +152,7 @@ export const clinicSettings = pgTable(
   {
     id: smallint('id').primaryKey(),
     clinicName: text('clinic_name').notNull(),
+    clinicPhone: text('clinic_phone'),
     timeZone: text('time_zone').notNull(),
     lateCancellationHours: integer('late_cancellation_hours').notNull(),
     includeContactInConfirmation: boolean('include_contact_in_confirmation').notNull(),

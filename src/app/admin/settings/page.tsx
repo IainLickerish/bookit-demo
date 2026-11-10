@@ -24,7 +24,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
       {params.error ? (
         <p role="alert" className="alert" data-testid="admin-settings-error">
           {params.error === 'invalid'
-            ? 'Enter a clinic name, a valid IANA time zone and a whole number of hours from 0 to 336.'
+            ? 'Enter a clinic name, an optional valid clinic phone number, a valid IANA time zone and a whole number of hours from 0 to 336.'
             : 'Settings could not be saved. Please try again.'}
         </p>
       ) : null}
@@ -37,6 +37,16 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             maxLength={120}
             required
             data-testid="admin-clinic-name"
+          />
+        </label>
+        <label>
+          Clinic phone number (optional)
+          <input
+            name="clinicPhone"
+            type="tel"
+            defaultValue={settings.clinicPhone ?? ''}
+            maxLength={32}
+            data-testid="admin-clinic-phone"
           />
         </label>
         <label>
