@@ -76,7 +76,7 @@ describe('practitioner absences', () => {
       endsAt: available.at(-1)!.endsAt,
       reason: 'Training',
     });
-    expect(await bookingsInBlockedTime(database.db, id)).toEqual([
+    expect(await bookingsInBlockedTime(database.db, [id])).toEqual([
       expect.objectContaining({
         id: booking.id,
         patientName: clinic.patient1.name,
@@ -101,7 +101,7 @@ describe('practitioner absences', () => {
     ]);
     expect(block.status).toBe('fulfilled');
     if (block.status !== 'fulfilled') throw new Error('Block failed');
-    const warnings = await bookingsInBlockedTime(database.db, block.value);
+    const warnings = await bookingsInBlockedTime(database.db, [block.value]);
     if (booking.status === 'fulfilled') expect(warnings.map((row) => row.id)).toContain(booking.value.id);
     else {
       expect(booking.reason).toMatchObject({ code: 'slot_not_found' });

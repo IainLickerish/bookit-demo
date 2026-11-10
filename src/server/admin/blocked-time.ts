@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database, Executor } from '@/db/client';
 import { blockedPeriods, bookings, practitioners, slots, users } from '@/db/schema';
@@ -40,8 +40,16 @@ export async function removeBlockedTime(db: Database, id: string) {
   await db.delete(blockedPeriods).where(eq(blockedPeriods.id, id));
 }
 
-export async function listBlockedTime(db: Executor) {
-  return db
+export const BLOCKED_TIME_PAGE_SIZE = 20;
+
+export function blockedTimePage(value: string | string[] | undefined): number {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return 1;
+  const page = Number(value);
+  return Number.isSafeInteger(page) && page <= Math.floor(2_147_483_647 / BLOCKED_TIME_PAGE_SIZE) ? page : 1;
+}
+
+export async function listBlockedTime(db: Executor, page = 1) {
+  const periods = await db
     .select({
       id: blockedPeriods.id,
       practitionerName: practitioners.name,
@@ -51,13 +59,32 @@ export async function listBlockedTime(db: Executor) {
     })
     .from(blockedPeriods)
     .innerJoin(practitioners, eq(practitioners.id, blockedPeriods.practitionerId))
-    .orderBy(asc(blockedPeriods.startsAt), asc(blockedPeriods.id));
+    .orderBy(desc(blockedPeriods.createdAt), desc(blockedPeriods.id))
+    .limit(BLOCKED_TIME_PAGE_SIZE + 1)
+    .offset((page - 1) * BLOCKED_TIME_PAGE_SIZE);
+  const displayed = periods.slice(0, BLOCKED_TIME_PAGE_SIZE);
+  const overlaps = await bookingsInBlockedTime(
+    db,
+    displayed.map((period) => period.id),
+  );
+  const grouped = new Map<string, typeof overlaps>();
+  for (const booking of overlaps) {
+    const group = grouped.get(booking.blockId) ?? [];
+    group.push(booking);
+    grouped.set(booking.blockId, group);
+  }
+  return {
+    rows: displayed.map((period) => ({ ...period, bookings: grouped.get(period.id) ?? [] })),
+    hasMore: periods.length > BLOCKED_TIME_PAGE_SIZE,
+  };
 }
 
 /** Only confirmed bookings overlap; touching an endpoint is allowed. */
-export async function bookingsInBlockedTime(db: Executor, blockId: string) {
+export async function bookingsInBlockedTime(db: Executor, blockIds: string[]) {
+  if (blockIds.length === 0) return [];
   return db
     .select({
+      blockId: blockedPeriods.id,
       id: bookings.id,
       patientName: users.name,
       email: users.email,
@@ -75,6 +102,6 @@ export async function bookingsInBlockedTime(db: Executor, blockId: string) {
     )
     .innerJoin(bookings, and(eq(bookings.slotId, slots.id), eq(bookings.status, 'confirmed')))
     .innerJoin(users, eq(users.id, bookings.patientId))
-    .where(eq(blockedPeriods.id, blockId))
+    .where(inArray(blockedPeriods.id, blockIds))
     .orderBy(asc(slots.startsAt), asc(bookings.id));
 }

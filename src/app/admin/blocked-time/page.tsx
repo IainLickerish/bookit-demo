@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { requireAdmin } from '@/server/admin/context';
 import { listAdminPractitioners } from '@/server/admin/bookings';
-import { bookingsInBlockedTime, listBlockedTime } from '@/server/admin/blocked-time';
+import { blockedTimePage, listBlockedTime } from '@/server/admin/blocked-time';
 import { loadClinicSettings } from '@/server/settings';
 import type { SearchParams } from '../../messages';
 import { blockTimeAction, removeBlockAction } from './actions';
@@ -10,18 +10,13 @@ import { blockTimeAction, removeBlockAction } from './actions';
 export default async function BlockedTimePage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
   const db = getDatabase();
-  const [settings, people, blocks, params] = await Promise.all([
+  const params = await searchParams;
+  const page = blockedTimePage(params.page);
+  const [settings, people, { rows, hasMore }] = await Promise.all([
     loadClinicSettings(db),
     listAdminPractitioners(db),
-    listBlockedTime(db),
-    searchParams,
+    listBlockedTime(db, page),
   ]);
-  const rows = await Promise.all(
-    blocks.map(async (block) => ({
-      ...block,
-      bookings: await bookingsInBlockedTime(db, block.id),
-    })),
-  );
   const when = (instant: Date) =>
     new Intl.DateTimeFormat('en-GB', {
       timeZone: settings.timeZone,
@@ -82,7 +77,8 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
         </button>
       </form>
       <h2>Blocked periods</h2>
-      {rows.length === 0 ? <p>No blocked time.</p> : null}
+      <p>Most recently saved first. Up to 20 periods per page.</p>
+      {rows.length === 0 ? <p>No blocked time on this page.</p> : null}
       {rows.map((block) => (
         <article key={block.id} className="my-4 border-t py-4" data-testid="blocked-period">
           <h3>{block.practitionerName}</h3>
@@ -116,6 +112,19 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
           </form>
         </article>
       ))}
+      <nav aria-label="Blocked periods pages" className="flex items-center gap-4">
+        {page > 1 ? (
+          <Link href={`/admin/blocked-time?page=${page - 1}`} prefetch={false} className="underline">
+            Previous page
+          </Link>
+        ) : null}
+        <p>Page {page}</p>
+        {hasMore ? (
+          <Link href={`/admin/blocked-time?page=${page + 1}`} prefetch={false} className="underline">
+            Next page
+          </Link>
+        ) : null}
+      </nav>
     </section>
   );
 }
