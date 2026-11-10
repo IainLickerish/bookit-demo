@@ -39,6 +39,19 @@ describe('booking confirmation clinic phone', () => {
     expect(html).not.toContain('Need to change');
   });
 
+  it('uses the latest saved clinic number on the next confirmation', async () => {
+    expect(await renderPage('booked')).toContain('+44 (20) 7946 0123');
+
+    vi.mocked(loadClinicSettings).mockResolvedValue({
+      ...TEST_CLINIC_SETTINGS,
+      clinicPhone: '+44 (20) 7946 0456',
+    });
+    const html = await renderPage('booked');
+    expect(html).toContain('+44 (20) 7946 0456');
+    expect(html).toContain('href="tel:+442079460456"');
+    expect(html).not.toContain('+44 (20) 7946 0123');
+  });
+
   it.each([undefined, 'cancelled', 'cancelled_late', 'rescheduled', 'unknown'])(
     'does not add booking confirmation contact text to notice %s',
     async (notice) => {
