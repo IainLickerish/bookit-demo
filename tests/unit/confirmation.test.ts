@@ -18,6 +18,7 @@ const settings: ClinicSettings = {
   timeZone: 'Europe/London',
   lateCancellationHours: 24,
   includeContactInConfirmation: true,
+  remindersEnabled: true,
   slotHorizonDays: 220,
   sessionMinutes: 45,
   maxReschedulesPerBooking: 3,

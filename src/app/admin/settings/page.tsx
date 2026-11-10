@@ -70,6 +70,17 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           />
           Include contact details in confirmation emails
         </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            name="remindersEnabled"
+            defaultChecked={settings.remindersEnabled}
+            className="w-auto"
+            data-testid="admin-reminders-enabled"
+          />
+          Send appointment reminder emails
+        </label>
+        <p className="text-sm">Send one reminder about 24 hours before each appointment, with the time in the UK.</p>
         <button type="submit" className="button" data-testid="admin-save-settings">
           Save settings
         </button>

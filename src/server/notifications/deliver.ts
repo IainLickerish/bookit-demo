@@ -8,7 +8,7 @@ export interface MailSettings {
   from: string;
 }
 
-export type EmailKind = 'confirmation' | 'password_reset';
+export type EmailKind = 'confirmation' | 'password_reset' | 'reminder';
 
 /**
  * Sends one email and logs `email.<kind>.sent` or `email.<kind>.failed` with
