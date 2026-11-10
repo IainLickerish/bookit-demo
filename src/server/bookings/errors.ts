@@ -11,6 +11,10 @@ export const BOOKING_ERRORS = {
     status: 409,
     message: 'Sorry, that slot has just been booked. Please choose another.',
   },
+  slot_in_time_off: {
+    status: 409,
+    message: 'Sorry, that time is no longer available. Please choose another.',
+  },
   slot_in_past: {
     status: 409,
     message: 'That slot has already started. Please choose a later one.',

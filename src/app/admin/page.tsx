@@ -36,6 +36,10 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
         <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
           Clinic settings
         </Link>
+        {' · '}
+        <Link href="/admin/time-off" prefetch={false} className="underline" data-testid="admin-time-off-link">
+          Practitioner time off
+        </Link>
       </p>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
         <label>

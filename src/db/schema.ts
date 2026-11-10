@@ -147,6 +147,35 @@ export const bookings = pgTable(
   ],
 );
 
+/**
+ * A period when a practitioner is away (holiday, training, sick day). No slot
+ * that overlaps it is offered to patients. Existing bookings in the period are
+ * kept; staff are shown them so they can contact the patients.
+ */
+export const practitionerTimeOff = pgTable(
+  'practitioner_time_off',
+  {
+    id: uuid('id').primaryKey(),
+    practitionerId: uuid('practitioner_id')
+      .notNull()
+      .references(() => practitioners.id),
+    startsAt: instant('starts_at').notNull(),
+    endsAt: instant('ends_at').notNull(),
+    /** Staff-only note; never shown to patients or written to logs. */
+    reason: text('reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: instant('created_at').notNull(),
+  },
+  (t) => [
+    index('practitioner_time_off_practitioner_idx').on(t.practitionerId, t.startsAt),
+    index('practitioner_time_off_ends_at_idx').on(t.endsAt),
+    check('practitioner_time_off_ends_after_start', sql`"ends_at" > "starts_at"`),
+    check('practitioner_time_off_reason_length', sql`"reason" is null or char_length("reason") between 1 and 200`),
+  ],
+);
+
 export const clinicSettings = pgTable(
   'clinic_settings',
   {
@@ -173,4 +202,5 @@ export type UserRow = typeof users.$inferSelect;
 export type PractitionerRow = typeof practitioners.$inferSelect;
 export type SlotRow = typeof slots.$inferSelect;
 export type BookingRow = typeof bookings.$inferSelect;
+export type PractitionerTimeOffRow = typeof practitionerTimeOff.$inferSelect;
 export type ClinicSettingsRow = typeof clinicSettings.$inferSelect;

@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { bookings, slots } from '@/db/schema';
 import { isUniqueViolation } from '../errors';
 import { loadClinicSettings } from '../settings';
-import { findBookableSlot } from '../slots/queries';
+import { findBookableSlot, isSlotInTimeOff } from '../slots/queries';
 import type { BookingDependencies } from './book';
 import { BookingError } from './errors';
 import { findBookingForPatient, isUuid, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
@@ -44,6 +44,9 @@ export async function rescheduleBooking(
       throw new BookingError('slot_not_found');
     }
     assertSlotBookable(target.startsAt, now, settings);
+    if (await isSlotInTimeOff(tx, target)) {
+      throw new BookingError('slot_in_time_off');
+    }
     try {
       await tx
         .update(bookings)

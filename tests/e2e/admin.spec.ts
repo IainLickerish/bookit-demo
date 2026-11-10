@@ -37,7 +37,7 @@ test.afterEach(async ({ context }, testInfo) => {
 
 test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
   test('admin pages and reports refuse unauthenticated and patient access', async ({ page }) => {
-    for (const route of ['/admin', '/admin/settings']) {
+    for (const route of ['/admin', '/admin/settings', '/admin/time-off']) {
       await page.goto(route);
       await expect(page).toHaveURL(/\/auth\/sign-in$/);
     }
@@ -47,7 +47,7 @@ test.describe('BookIt admin journeys (REQ-18.1-01 REQ-18.1-03)', () => {
       expect(await response.text()).toBe('Sign-in required');
     }
     await signIn(page, loadState().patient1);
-    for (const route of ['/admin', '/admin/settings']) {
+    for (const route of ['/admin', '/admin/settings', '/admin/time-off']) {
       await page.goto(route);
       await expect(page).toHaveURL(/\/bookings$/);
     }
