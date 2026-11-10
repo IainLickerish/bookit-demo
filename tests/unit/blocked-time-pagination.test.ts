@@ -5,7 +5,9 @@ import * as schema from '@/db/schema';
 import { blockedTimePage, listBlockedTime } from '@/server/admin/blocked-time';
 
 function databaseWithRows(results: unknown[][][]) {
-  const query = vi.fn(async (_config: { text: string }, _values: unknown[]) => ({ rows: results.shift() ?? [] }));
+  const query = vi.fn<(config: { text: string }, values: unknown[]) => Promise<{ rows: unknown[][] }>>(async () => ({
+    rows: results.shift() ?? [],
+  }));
   const db = drizzle({ client: { query } as unknown as Pool, schema });
   return { db, query };
 }
