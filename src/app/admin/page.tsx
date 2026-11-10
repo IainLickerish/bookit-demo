@@ -37,6 +37,11 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           Clinic settings
         </Link>
       </p>
+      <p>
+        <Link href="/admin/blocked-time" prefetch={false} className="underline">
+          Blocked time
+        </Link>
+      </p>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
         <label>
           Practitioner

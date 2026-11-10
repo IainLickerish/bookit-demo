@@ -7,7 +7,7 @@ import { isUniqueViolation } from '../errors';
 import { composeConfirmation } from '../notifications/confirmation';
 import { deliverEmail, type MailSettings } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
-import { findBookableSlot } from '../slots/queries';
+import { findBookableSlot, lockSlotPractitioner } from '../slots/queries';
 import { findUserById } from '../users';
 import { BookingError } from './errors';
 import { findBookingForPatient, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
@@ -35,6 +35,7 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     if (!patient || patient.role !== 'patient') {
       throw new BookingError('not_a_patient');
     }
+    await lockSlotPractitioner(tx, request.slotId);
     const slot = await findBookableSlot(tx, request.slotId);
     if (!slot) {
       throw new BookingError('slot_not_found');
