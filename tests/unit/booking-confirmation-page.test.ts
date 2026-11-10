@@ -25,6 +25,7 @@ describe('booking confirmation clinic phone', () => {
   it('shows the saved clinic number and a call link after booking', async () => {
     const html = await renderPage('booked');
     expect(html).toContain('Booking confirmed.');
+    expect(html).toContain('data-testid="notice">Booking confirmed.</p>');
     expect(html).toContain('Need to change your appointment? Call Test Physio Clinic on');
     expect(html).toContain('href="tel:+442079460123"');
     expect(html).toContain('+44 (20) 7946 0123');
