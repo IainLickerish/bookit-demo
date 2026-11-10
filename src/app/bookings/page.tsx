@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
+import { calendarLinks } from '@/server/bookings/calendar';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
@@ -43,7 +44,30 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <details>
+            <summary className="button-secondary cursor-pointer">Add to calendar</summary>
+            <ul className="space-y-2 p-2">
+              <li>
+                <a href={calendarLinks(booking, settings).google} target="_blank" rel="noreferrer">
+                  Google Calendar
+                </a>
+              </li>
+              <li>
+                <a href={calendarLinks(booking, settings).outlook} target="_blank" rel="noreferrer">
+                  Outlook
+                </a>
+              </li>
+              <li>
+                <a href={`/bookings/${booking.id}/calendar`} download>
+                  Apple Calendar / download calendar file
+                </a>
+              </li>
+            </ul>
+            <p className="max-w-xs text-sm text-slate-600">
+              After moving an appointment, replace the old entry in your calendar with the new time.
+            </p>
+          </details>
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}

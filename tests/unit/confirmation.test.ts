@@ -87,6 +87,18 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
     expect(email.text).not.toContain('7700');
   });
 
+  it('attaches the appointment calendar without patient contact details', () => {
+    const email = composeConfirmation({ booking: booking('+44 7700 900001'), patient, settings, from: TEST_MAIL_FROM });
+    expect(email.attachments).toHaveLength(1);
+    const attachment = email.attachments![0]!;
+    expect(attachment.filename).toBe('appointment.ics');
+    expect(attachment.contentType).toBe('text/calendar; charset=utf-8');
+    expect(attachment.content).toContain('DTSTART:20261022T093000Z');
+    expect(attachment.content).toContain('DTEND:20261022T101500Z');
+    expect(attachment.content).not.toContain('7700');
+    expect(attachment.content).not.toContain(patient.email);
+  });
+
   it('formats a stored phone by collapsing whitespace', () => {
     expect(formatPhone(' +44 7700\t900001 ')).toBe('+44 7700 900001');
   });

@@ -217,9 +217,15 @@ describe('rescheduling a booking (REQ-18.1-01)', () => {
     });
     expect(moved).toMatchObject({ slotId: target.id, status: 'confirmed', rescheduleCount: 1 });
     expect(moved.updatedAt.toISOString()).toBe('2026-10-20T07:05:00.000Z');
+    expect(mailer.sent).toHaveLength(2);
+    const attachment = mailer.sent[1]!.attachments![0]!;
+    expect(attachment.content).toContain('DTSTART:20261027T141500Z');
+    expect(attachment.content).toContain('DTEND:20261027T150000Z');
+    expect(attachment.content).toContain('SEQUENCE:1');
+    expect(attachment.content).toContain(`UID:${booking.id}@bookit.test`);
     expect((await slotsOn('2026-10-22')).map((s) => s.id)).toContain(original.id);
     expect((await slotsOn('2026-10-27')).map((s) => s.id)).not.toContain(target.id);
-    expect(logs.lines.at(-1)).toMatchObject({
+    expect(logs.lines.find((line) => line.event === 'booking.rescheduled')).toMatchObject({
       event: 'booking.rescheduled',
       from_slot_id: original.id,
       to_slot_id: target.id,
