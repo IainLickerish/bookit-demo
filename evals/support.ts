@@ -28,9 +28,17 @@ export async function sessionFor(browser: Browser, email: string): Promise<Page>
   return page;
 }
 
-/** A London calendar date, days from today, as YYYY-MM-DD. */
-// eslint-disable-next-line no-restricted-syntax -- evals drive a demo copy, which runs on the real clock
-export function londonDate(daysAhead: number, from = new Date()): string {
+/**
+ * The demo copy's "now". The factory runs evals on copies with a fixed date and fixed test data
+ * (EVAL_NOW), so every run sees the same days, times and screens; without it, the real clock.
+ */
+export function evalNow(): Date {
+  // eslint-disable-next-line no-restricted-syntax -- evals drive a demo copy, not BookIt's own clock
+  return process.env.EVAL_NOW ? new Date(process.env.EVAL_NOW) : new Date();
+}
+
+/** A London calendar date, days from the demo copy's "now", as YYYY-MM-DD. */
+export function londonDate(daysAhead: number, from = evalNow()): string {
   const day = new Date(from.getTime() + daysAhead * 86_400_000);
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(day);
 }
