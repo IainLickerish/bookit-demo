@@ -22,6 +22,41 @@ describe('clinic time zone helpers (REQ-18.1-01)', () => {
     expect(formatLocalTime(new Date('2026-10-26T09:00:00Z'), LONDON)).toBe('09:00');
   });
 
+  it('formats London slots across both clock changes using each appointment date', () => {
+    // Alternate winter and summer dates so a cached offset cannot pass.
+    for (const [instant, label] of [
+      ['2026-03-28T09:00:00Z', 'Sat, 28 Mar 2026, 09:00'],
+      ['2026-03-29T08:00:00Z', 'Sun, 29 Mar 2026, 09:00'],
+      ['2026-10-25T09:00:00Z', 'Sun, 25 Oct 2026, 09:00'],
+      ['2026-10-24T08:00:00Z', 'Sat, 24 Oct 2026, 09:00'],
+      ['2027-03-28T08:00:00Z', 'Sun, 28 Mar 2027, 09:00'],
+    ] as const) {
+      const slot = new Date(instant);
+      expect(formatSlot(slot, LONDON)).toBe(label);
+      expect(slot.toISOString()).toBe(instant.replace('Z', '.000Z'));
+    }
+  });
+
+  it('formats the exact clock-change instants and local dates around midnight', () => {
+    for (const [instant, label] of [
+      ['2026-03-29T00:59:00Z', 'Sun, 29 Mar 2026, 00:59'],
+      ['2026-03-29T01:00:00Z', 'Sun, 29 Mar 2026, 02:00'],
+      ['2026-10-25T00:59:00Z', 'Sun, 25 Oct 2026, 01:59'],
+      ['2026-10-25T01:00:00Z', 'Sun, 25 Oct 2026, 01:00'],
+      ['2026-07-01T23:30:00Z', 'Thu, 2 Jul 2026, 00:30'],
+    ] as const) {
+      expect(formatSlot(new Date(instant), LONDON)).toBe(label);
+    }
+  });
+
+  it('keeps cached slot formatters separate for each clinic time zone', () => {
+    const slot = new Date('2026-07-01T23:30:00Z');
+    expect(formatSlot(slot, LONDON)).toBe('Thu, 2 Jul 2026, 00:30');
+    expect(formatSlot(slot, 'UTC')).toBe('Wed, 1 Jul 2026, 23:30');
+    expect(formatSlot(slot, 'Asia/Kolkata')).toBe('Thu, 2 Jul 2026, 05:00');
+    expect(formatSlot(slot, LONDON)).toBe('Thu, 2 Jul 2026, 00:30');
+  });
+
   it('converts local times to UTC on both sides of the October 2026 clock change', () => {
     expect(zonedTimeToUtc('2026-10-23', '09:00', LONDON)?.toISOString()).toBe('2026-10-23T08:00:00.000Z');
     expect(zonedTimeToUtc('2026-10-26', '09:00', LONDON)?.toISOString()).toBe('2026-10-26T09:00:00.000Z');
