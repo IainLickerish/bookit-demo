@@ -1,4 +1,14 @@
-import { expect, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
+
+export async function step<T>(page: Page, name: string, body: () => Promise<T>): Promise<T> {
+  return test.step(name, async () => {
+    const result = await body();
+    const path = test.info().outputPath(`step-${test.info().attachments.length + 1}.jpg`);
+    await page.screenshot({ path, type: 'jpeg', quality: 70 });
+    await test.info().attach(`step: ${name}`, { path, contentType: 'image/jpeg' });
+    return result;
+  });
+}
 
 /** The seeded Acme Physio accounts in a demo copy. They share the demo password. */
 export const PATIENT_1 = 'patient1@patients.acmephysio.test';
@@ -24,7 +34,9 @@ export async function signIn(page: Page, email: string): Promise<void> {
 /** A new browser session signed in as this person. */
 export async function sessionFor(browser: Browser, email: string): Promise<Page> {
   const page = await (await browser.newContext()).newPage();
-  await signIn(page, email);
+  await step(page, email === ADMIN ? 'Sign in as clinic staff' : 'Sign in as a client', async () => {
+    await signIn(page, email);
+  });
   return page;
 }
 
