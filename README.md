@@ -188,6 +188,10 @@ The eight articles for [Acme](docs/user-guide/acme/01-getting-started.md) and
 rescheduling, confirmations, administration, CSV export and accounts.
 Tenant settings are in `tenants/acme.json` and `tenants/beacon.json`.
 
+[Blocked time](docs/blocked-time.md) explains how staff record absences, review
+affected bookings and restore availability, including the database change and
+what a developer needs to do to undo it.
+
 Article 08 intentionally retains `/account/reset-password` under the owner's
 DEF-05 baseline instruction. The working password-reset route is owned by the
 separate password-reset change. Expected fixes and deliberate-defect tests live
