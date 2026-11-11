@@ -1,6 +1,6 @@
 # Privacy and security policy
 
-Owner: Iain Lickerish · Last reviewed: 2026-11-11 · Applies to: BookIt
+Owner: Iain Lickerish · Last reviewed: 11 November 2026 · Applies to: BookIt
 
 In one line: How people's data is protected.
 
