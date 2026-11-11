@@ -12,4 +12,6 @@ Each booking has at most one delivery attempt, recorded before contacting the em
 
 The existing email setup applies: configure `BOOKIT_SMTP_URL`, `BOOKIT_MAIL_FROM` and `BOOKIT_PUBLIC_URL` for the clinic. Without SMTP, reminders are left pending. As elsewhere in this demo product, sender and recipient addresses must use `.test` domains.
 
+Email connections, greetings and inactive connections time out after three seconds. A stalled email server therefore releases the booking and clinic settings locks promptly, so clients can change bookings and staff can save settings. A timed out reminder keeps its recorded delivery attempt and is not retried.
+
 Migration 0002 adds a reminder switch to clinic settings, initially on, and a nullable delivery attempt time to each booking. Existing bookings are eligible when they enter the reminder window. To undo the feature, switch reminders off first and stop the updated server. Roll back the application, then drop `booking.reminder_attempted_at` and `clinic_settings.reminders_enabled`. Dropping these columns loses the reminder history, so re-enabling the feature after that could send another reminder for a booking that has already had one.

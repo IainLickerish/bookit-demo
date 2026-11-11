@@ -87,7 +87,8 @@ export async function sendDueReminders(deps: ReminderDependencies): Promise<void
     if (!claim) continue;
 
     // Keep changes to the booking and settings behind these locks until SMTP
-    // finishes. Recheck after claiming in case a move or cancellation won the gap.
+    // finishes (the SMTP transport times out if the server stalls). Recheck
+    // after claiming in case a move or cancellation won the gap.
     await deps.db.transaction(async (tx) => {
       await tx.select({ id: clinicSettings.id }).from(clinicSettings).where(eq(clinicSettings.id, 1)).for('share');
       const settings = await loadClinicSettings(tx);

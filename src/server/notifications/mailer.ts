@@ -44,7 +44,16 @@ export const disabledMailer: Mailer = {
 
 /** Sends through an SMTP server such as Mailpit (`smtp://mailpit:1025`). */
 export function createSmtpMailer(url: string): Mailer {
-  const transport = nodemailer.createTransport(url);
+  // Use transport timeouts, rather than racing the promise: Nodemailer closes
+  // the SMTP connection on timeout, so delivery cannot continue after failure.
+  // Reminder delivery holds database locks while it checks the current booking.
+  const transport = nodemailer.createTransport({
+    url,
+    dnsTimeout: 3_000,
+    connectionTimeout: 3_000,
+    greetingTimeout: 3_000,
+    socketTimeout: 3_000,
+  });
   return {
     kind: 'smtp',
     async send(email) {
