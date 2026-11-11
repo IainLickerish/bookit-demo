@@ -1,4 +1,3 @@
-# The owner must approve any change to what is checked (behaviour evals), how checks run, and the product's policies.
+# The owner must approve any change to what is checked (behaviour evals) and how checks run.
 /evals/ @IainLickerish
 /.github/ @IainLickerish
-/docs/policies/ @IainLickerish
