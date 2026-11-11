@@ -77,6 +77,15 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
     expect(email.text).not.toContain('Contact phone');
   });
 
+  it.each([null, ''])('leaves the phone line out for %j when contact details are enabled', (phone) => {
+    const email = composeConfirmation({ booking: booking(phone), patient, settings, from: TEST_MAIL_FROM });
+    expect(email.text).not.toContain('Contact phone');
+    expect(email.text).toContain('When: Thu, 22 Oct 2026, 10:30 (Europe/London)');
+    expect(email.text).toContain('With: Pat Physio');
+    expect(email.text).toContain(`Booking reference: ${booking(phone).id}`);
+    expect(email.text).toContain('To cancel or reschedule, sign in to BookIt and open My bookings.');
+  });
+
   it('leaves the phone line out when the clinic turns contact details off', () => {
     const email = composeConfirmation({
       booking: booking('+44 7700 900001'),

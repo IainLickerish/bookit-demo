@@ -38,8 +38,8 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
     `With: ${booking.practitionerName}`,
     `Booking reference: ${booking.id}`,
   ];
-  if (settings.includeContactInConfirmation) {
-    lines.push(`Contact phone: ${formatPhone(booking.phone!)}`);
+  if (settings.includeContactInConfirmation && booking.phone) {
+    lines.push(`Contact phone: ${formatPhone(booking.phone)}`);
   }
   lines.push('', 'To cancel or reschedule, sign in to BookIt and open My bookings.', '', settings.clinicName);
   return {
