@@ -17,14 +17,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const [settings, user] = await Promise.all([loadClinicSettings(getDatabase()), currentUser()]);
   return (
     <html lang="en-GB">
-      <body className="min-h-screen bg-slate-50 text-slate-900">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
-            <Link href="/" prefetch={false} className="font-semibold" data-testid="clinic-name">
+      <body>
+        <header className="site-header" data-testid="site-header">
+          <div className="page-shell site-header-inner">
+            <Link href="/" prefetch={false} className="clinic-name" data-testid="clinic-name">
               {settings.clinicName}
             </Link>
             {user ? (
-              <nav aria-label="Main" className="flex items-center gap-4 text-sm">
+              <nav aria-label="Main" className="site-nav">
                 {user.role === 'patient' ? (
                   <>
                     <Link href="/slots" prefetch={false} data-testid="nav-book">
@@ -40,7 +40,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   </Link>
                 )}
                 <form action={signOut}>
-                  <button type="submit" className="underline" data-testid="sign-out">
+                  <button type="submit" className="text-link" data-testid="sign-out">
                     Sign out
                   </button>
                 </form>
@@ -48,7 +48,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             ) : null}
           </div>
         </header>
-        <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
+        <main className="page-shell page-content" data-testid="main-content">
+          {children}
+        </main>
       </body>
     </html>
   );
