@@ -1,13 +1,12 @@
-# BookIt CI (plan 2.5, T-29, F-01, F-38). Every job is read-only except `publish`, which runs only on pushes to the
-# default branch, checks out no code and pushes the image that `image` built and verified. Pushes to `sa/**` start
-# nothing; pull requests from `sa/**` or from a bot wait for approval of the secret-free `agent-ci` environment, except
-# the owner's Software Factory, whose changes are built sealed, checked and reviewed before they reach a pull request,
-# and which waits for these checks before telling the owner a change is ready.
+# BookIt CI (plan 2.5, T-29, F-38). Every job is read-only except `publish`, which runs only on pushes to the default
+# branch, checks out no code and pushes the image that `image` built and verified. A change is checked once, on its pull
+# request; only the default branch runs on push. Nothing here holds a secret, so pull requests, including the Software
+# Factory's, run without waiting for an approval; the owner still merges every change.
 name: ci
 
 on:
   push:
-    branches-ignore: ['sa/**']
+    branches: [main]
   pull_request:
 
 permissions:
@@ -18,22 +17,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
 
 jobs:
-  # F-01: SupportAgents' App opens pull requests from sa/** branches. Their code runs only after the Tech Lead approves
-  # this environment, which holds no secrets and no cloud trust.
-  agent-approval:
-    if: >-
-      github.event_name == 'pull_request' && github.event.pull_request.user.login != 'iain-software-factory[bot]' &&
-      (startsWith(github.head_ref, 'sa/') || github.event.pull_request.user.type == 'Bot')
-    runs-on: ubuntu-24.04
-    permissions: {}
-    environment: agent-ci
-    steps:
-      - run: echo "Tech Lead approved CI for this agent pull request."
-
   test:
     name: test
-    needs: agent-approval
-    if: ${{ !cancelled() && (needs.agent-approval.result == 'success' || needs.agent-approval.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -65,6 +50,11 @@ jobs:
       - run: bun run test:e2e
         env:
           CI: 'true'
+      # The owner's key flows, on a copy of BookIt with test data and a fixed date: the same checks the Software
+      # Factory runs, run here independently of it.
+      - run: bun run test:key-flows
+        env:
+          CI: 'true'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
@@ -73,14 +63,13 @@ jobs:
             test-results/
             !test-results/local/**
             playwright-report/
+            eval-results/
           if-no-files-found: warn
           retention-days: 14
 
   # F-38: build the image with its commit and build ID, run it, and fail unless /api/version reports exactly this
   # commit. On default-branch pushes the verified image is handed to `publish` as an artifact.
   image:
-    needs: agent-approval
-    if: ${{ !cancelled() && (needs.agent-approval.result == 'success' || needs.agent-approval.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:

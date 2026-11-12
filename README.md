@@ -18,11 +18,15 @@ bun run format:check
 bun run test
 bun x playwright install chromium
 bun x playwright test
+bun run test:key-flows
 ```
 
 Vitest uses disposable PostgreSQL containers and local SMTP/Sentry fixtures.
 Playwright also builds the Docker image and starts two isolated Compose projects
-for the tenant journeys. First runs download pinned base images; tests never use
+for the tenant checks. The owner's key flows (`evals/`) are the product's browser
+checks of what it must always do: `bun run test:key-flows` starts a Compose copy
+with the Acme test data and a fixed date and runs them, as CI and the Software
+Factory do. First runs download pinned base images; tests never use
 a live model, hosted Sentry or a real email service. Container test projects are
 stopped afterwards, preserving their volumes and sanitised evidence for review.
 Raw local test credentials remain private under ignored `test-results/` paths.

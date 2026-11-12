@@ -1,18 +1,19 @@
 # CI, deployment and demo reset
 
 BookIt's GitHub Actions workflows make sure code written by an agent never reaches an environment unless a person
-merged it (plan 2.5, F-01, F-38, F-41, HC-02). This page says what each workflow does and what the owner sets up once.
+merged it (plan 2.5, F-38, F-41, HC-02). This page says what each workflow does and what the owner sets up once.
 
 ## `ci` (`.github/workflows/ci.yml`)
 
-| Job              | Runs on                                                        | Permissions                               | What it does                                                                                                                                                                         |
-| ---------------- | -------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `agent-approval` | Pull requests from `sa/**` branches or opened by a bot         | none                                      | Waits for approval of the `agent-ci` environment, which holds no secrets (F-01).                                                                                                     |
-| `test`           | Every push except `sa/**`, every pull request (after approval) | read                                      | Typecheck, lint, formatting, unit (including actionlint), integration and browser tests. This is the **required check `test`** for the `default-branch` ruleset.                     |
-| `image`          | Same as `test`                                                 | read                                      | Builds the image with `GIT_COMMIT`, `BUILD_ID` and `BOOKIT_IMAGE`, runs it with Compose and fails unless `/api/version` reports exactly the built commit (F-38).                     |
-| `publish`        | Pushes to the default branch only                              | packages, id-token and attestations write | Checks out nothing. Pushes the image `image` verified as `ghcr.io/<owner>/bookit-demo:<sha>`, records its digest in the run summary and attests that `ci` built it from that commit. |
+| Job       | Runs on                                              | Permissions                               | What it does                                                                                                                                                                                                                                             |
+| --------- | ---------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test`    | Every pull request, and pushes to the default branch | read                                      | Typecheck, lint, formatting, unit (including actionlint), integration and tenant tests, then the owner's key flows (`evals/`) on a Compose copy with test data and a fixed date. This is the **required check `test`** for the `default-branch` ruleset. |
+| `image`   | Same as `test`                                       | read                                      | Builds the image with `GIT_COMMIT`, `BUILD_ID` and `BOOKIT_IMAGE`, runs it with Compose and fails unless `/api/version` reports exactly the built commit (F-38).                                                                                         |
+| `publish` | Pushes to the default branch only                    | packages, id-token and attestations write | Checks out nothing. Pushes the image `image` verified as `ghcr.io/<owner>/bookit-demo:<sha>`, records its digest in the run summary and attests that `ci` built it from that commit.                                                                     |
 
-A push to an `sa/**` branch starts no workflow. Every job runs on a fresh GitHub-hosted runner. No job reads a
+A change is checked once, on its pull request; pushes to other branches start nothing. Pull requests, including the
+Software Factory's, run straight away: no job holds a secret, and the owner still merges every change. Every job runs
+on a fresh GitHub-hosted runner. No job reads a
 repository secret. Only `publish`, which runs no repository code, can request a cloud identity token.
 
 ## `deploy` (`.github/workflows/deploy.yml`)
@@ -32,7 +33,7 @@ The `check` job refuses, with the reason in the log:
 - a SHA without a published image;
 - an image whose build attestation is not from `ci` on the default branch for that SHA.
 
-The `deploy` job runs in the `staging` or `production` environment. Production waits for the Tech Lead's approval. The
+The `deploy` job runs in the `staging` or `production` environment. Production waits for the owner's approval. The
 job then:
 
 1. assumes `BOOKIT_DEPLOYER_ROLE` through GitHub OIDC;
@@ -41,33 +42,29 @@ job then:
 3. waits until `https://<host>/api/version` reports the SHA, the deployment ID, the product and the environment.
 
 The instance's `static.env`, written by Terraform, sets `BOOKIT_PRODUCT`, `BOOKIT_TENANT` and `BOOKIT_ENV` (F-39). No
-step checks out or runs repository code. SupportAgents' GitHub App has no Actions permission, so it cannot start
+step checks out or runs repository code. The Software Factory's GitHub app has no Actions write permission, so it cannot start
 `deploy` (HC-02).
 
 ## Owner setup (once)
 
-The agents' token cannot push workflow files, so the owner pushes this branch and merges its pull request. After the
-merge, in the repository's **Settings**:
+Only the owner merges changes to workflow files. In the repository's **Settings**:
 
-1. **Environments → New environment `agent-ci`.**
-   - Add yourself (the Tech Lead) as a **required reviewer**.
-   - Add no secrets and no variables.
-2. **Environments → `staging`.**
+1. **Environments → `staging`.**
    - Set **Deployment branches and tags** to **Selected branches**, then add the rule `main` only.
    - Add no secrets.
-3. **Environments → `production`.**
+2. **Environments → `production`.**
    - Use the same branch rule as `staging`.
    - Add yourself as a **required reviewer**.
    - Tick **Prevent self-review** only if someone other than the person who starts deployments also reviews them.
-4. **Secrets and variables → Actions → Variables.** Create these repository variables:
+3. **Secrets and variables → Actions → Variables.** Create these repository variables:
    - `BOOKIT_PRODUCTS`: `acme beacon`;
    - `BOOKIT_DEPLOYER_ROLE`: the `role_arn` of `bookit-deployer` from the Terraform `deployer_roles` output;
    - `BOOKIT_AWS_REGION`: the Terraform `region`;
    - `BOOKIT_DEMO_DOMAIN`: the Terraform `demo_domain`.
-5. **OIDC subject template.** Follow `infra/aws/README.md`, "After applying", step 1.
-6. **Image package.** After the first `publish` run, open the package `bookit-demo` under your GitHub profile's
+4. **OIDC subject template.** Follow `infra/aws/README.md`, "After applying", step 1.
+5. **Image package.** After the first `publish` run, open the package `bookit-demo` under your GitHub profile's
    **Packages**. Set it to **Public** so the instances can pull it without credentials (`infra/aws/README.md`, step 4).
-7. **Required check.** Follow SupportAgents setup guide M1-02 Part F, and add the check named **`test`**.
+6. **Required check.** In **Rules → Rulesets**, the default branch's ruleset requires the status check **`test`**.
 
 The deploy workflow cannot work until the AWS demo account exists (setup guide M1-05). Use `dry_run` to try the checks
 before then: the checks need only the published image and its attestation.

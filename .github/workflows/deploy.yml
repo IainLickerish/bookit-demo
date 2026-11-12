@@ -1,6 +1,6 @@
 # BookIt deploy (plan 2.5, F-38, F-39, F-41, HC-02). A person dispatches it from the default branch; the `staging` and
-# `production` environments accept deployments only from that branch, and production needs the Tech Lead's approval.
-# No step checks out or runs repository code. SupportAgents' App has no Actions write permission, so it cannot start
+# `production` environments accept deployments only from that branch, and production needs the owner's approval.
+# No step checks out or runs repository code. The Software Factory's app has no Actions write permission, so it cannot start
 # this workflow. With `dry_run` the checks run and nothing is deployed.
 name: deploy
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { E2E_COMMIT, serverLogLines } from './support';
 
-// Runs after booking.spec.ts against the same local test-clock server.
+// Runs against the local test-clock server that global-setup.ts starts.
 test.describe('BookIt operational endpoints (REQ-18.1-05, REQ-18.1-01)', () => {
   test('GET /api/version reports the build and the local container, uncached', async ({ request }) => {
     const response = await request.get('/api/version');

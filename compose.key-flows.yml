@@ -1,0 +1,18 @@
+# Added to compose.yml for key flow copies only (scripts/key-flows.sh, and the Software Factory): BookIt's test clock,
+# frozen at a fixed date (the file in BOOKIT_CLOCK_DIR), so the seeded test data and every run are exactly the same.
+services:
+  migrate:
+    environment:
+      BOOKIT_TEST_CLOCK: /clock/clock.json
+    volumes:
+      - ${BOOKIT_CLOCK_DIR:?Set the clock folder}:/clock:ro
+  seed:
+    environment:
+      BOOKIT_TEST_CLOCK: /clock/clock.json
+    volumes:
+      - ${BOOKIT_CLOCK_DIR:?Set the clock folder}:/clock:ro
+  bookit:
+    environment:
+      BOOKIT_TEST_CLOCK: /clock/clock.json
+    volumes:
+      - ${BOOKIT_CLOCK_DIR:?Set the clock folder}:/clock:ro

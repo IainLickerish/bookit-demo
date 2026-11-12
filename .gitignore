@@ -5,6 +5,7 @@ out/
 next-env.d.ts
 *.tsbuildinfo
 test-results/
+eval-results/
 playwright-report/
 blob-report/
 coverage/
