@@ -17,7 +17,8 @@ export const PATIENT_3 = 'patient3@patients.acmephysio.test';
 export const ADMIN = 'admin@acmephysio.test';
 export const PRACTITIONER = 'Alex Physiotherapist';
 
-const password = (): string => {
+/** The password every seeded account shares in a demo copy. */
+export const demoPassword = (): string => {
   const value = process.env.EVAL_PASSWORD;
   if (!value) throw new Error('Set EVAL_PASSWORD to the demo password');
   return value;
@@ -26,7 +27,7 @@ const password = (): string => {
 export async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/auth/sign-in');
   await page.getByTestId('sign-in-email').fill(email);
-  await page.getByTestId('sign-in-password').fill(password());
+  await page.getByTestId('sign-in-password').fill(demoPassword());
   await page.getByTestId('sign-in-submit').click();
   await expect(page).not.toHaveURL(/\/auth\/sign-in/);
 }
@@ -123,4 +124,28 @@ export async function mailTo(address: string): Promise<{ Subject: string; ID: st
   const res = await fetch(`${base}/api/v1/search?query=${encodeURIComponent(`to:"${address}"`)}`);
   expect(res.ok, 'the demo mail inbox answers').toBe(true);
   return ((await res.json()) as { messages: { Subject: string; ID: string }[] }).messages;
+}
+
+/**
+ * The link in the newest password reset email to this address that is not one of `seen` (the IDs of emails already
+ * read), once it arrives. Only its path is kept, so it opens in this demo copy whatever its public address.
+ */
+export async function resetLink(address: string, seen: string[] = []): Promise<{ path: string; id: string }> {
+  const base = process.env.EVAL_MAIL_URL ?? 'http://localhost:8025';
+  let found = { path: '', id: '' };
+  await expect
+    .poll(
+      async () => {
+        const message = (await mailTo(address)).find(
+          (m) => /^Reset your .* password$/.test(m.Subject) && !seen.includes(m.ID),
+        );
+        if (!message) return '';
+        const text = ((await (await fetch(`${base}/api/v1/message/${message.ID}`)).json()) as { Text: string }).Text;
+        found = { path: /\/auth\/reset-password\/[A-Za-z0-9_-]+/.exec(text)?.[0] ?? '', id: message.ID };
+        return found.path;
+      },
+      { message: 'a password reset email arrives', timeout: 20_000 },
+    )
+    .not.toBe('');
+  return found;
 }

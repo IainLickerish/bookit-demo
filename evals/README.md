@@ -9,9 +9,12 @@ owner's explicit yes. The owner is the code owner of this folder (`.github/CODEO
 The factory runs them on demo copies with fixed test data and a fixed date (`EVAL_NOW`, matching BookIt's test
 clock), so every run sees exactly the same days, times and screens and any difference is a real change.
 
-Run against a demo copy (Acme Physio, seeded accounts sharing one password):
+These are BookIt's only browser checks of its user journeys. GitHub runs them too, in the required `test` check,
+so they are also checked independently of the factory. To run them yourself on a fresh copy (Docker needed):
 
 ```sh
-EVAL_BASE_URL=http://localhost:4101 EVAL_MAIL_URL=http://localhost:8025 EVAL_PASSWORD=... \
-  bun x playwright test -c evals
+bun run test:key-flows
 ```
+
+Each check writes its steps with `step()` from `support.ts`, which screenshots the end of each step for the owner's
+storyboard. A check that changes shared state (a password, a clinic setting) puts it back before it ends.

@@ -23,7 +23,7 @@ export interface E2eState {
   patient2: string;
 }
 
-export function loadState(): E2eState {
+function loadState(): E2eState {
   return JSON.parse(readFileSync(STATE_FILE, 'utf8')) as E2eState;
 }
 
@@ -42,13 +42,6 @@ export async function signIn(page: Page, email: string): Promise<void> {
   await expect(page).toHaveURL(/\/bookings$/);
 }
 
-export async function showDay(page: Page, practitioner: string, date: string): Promise<void> {
-  await page.getByTestId('practitioner-select').selectOption({ label: practitioner });
-  await page.getByTestId('date-input').fill(date);
-  await page.getByTestId('show-slots').click();
-  await expect(page.getByTestId('date-input')).toHaveValue(date);
-}
-
 export async function query<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
   const client = new Client(loadState().databaseUrl);
   await client.connect();
@@ -57,26 +50,6 @@ export async function query<T extends Record<string, unknown>>(sql: string, para
   } finally {
     await client.end();
   }
-}
-
-export interface ReceivedMail {
-  from: string;
-  to: string[];
-  raw: string;
-}
-
-/** The text of a received message, with quoted-printable soft line breaks and escapes undone. */
-export function mailText(raw: string): string {
-  return raw
-    .replace(/=\r?\n/g, '')
-    .replace(/=([0-9A-F]{2})/g, (_match, hex: string) => String.fromCharCode(parseInt(hex, 16)));
-}
-
-export function receivedMail(): ReceivedMail[] {
-  return readFileSync(loadState().mailLog, 'utf8')
-    .split('\n')
-    .filter((line) => line !== '')
-    .map((line) => JSON.parse(line) as ReceivedMail);
 }
 
 export function serverLogLines(): Record<string, unknown>[] {
