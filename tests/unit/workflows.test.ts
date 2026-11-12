@@ -38,11 +38,11 @@ describe('M0-34b workflow lint (actionlint)', () => {
   });
 });
 
-describe('M0-34b F-01 F-38 ci.yml: only default-branch pushes publish images', () => {
+describe('M0-34b F-38 ci.yml: only default-branch pushes publish images', () => {
   const { workflow, text } = ci;
 
-  it('ignores sa/** pushes and never uses pull_request_target', () => {
-    expect(workflow.on.push).toEqual({ 'branches-ignore': ['sa/**'] });
+  it('runs on push only for the default branch, so a change is checked once, and never uses pull_request_target', () => {
+    expect(workflow.on.push).toEqual({ branches: ['main'] });
     expect(Object.keys(workflow.on).sort()).toEqual(['pull_request', 'push']);
     expect(text).not.toContain('pull_request_target');
     expect(workflow.permissions).toEqual({ contents: 'read' });
@@ -78,17 +78,15 @@ describe('M0-34b F-01 F-38 ci.yml: only default-branch pushes publish images', (
     expect(text).not.toMatch(/secrets\./);
   });
 
-  it('holds agent pull requests until the secret-free agent-ci environment is approved', () => {
-    const gate = workflow.jobs['agent-approval']!;
-    expect(gate.environment).toBe('agent-ci');
-    expect(gate.permissions).toEqual({});
-    expect(gate.if).toContain("startsWith(github.head_ref, 'sa/')");
-    expect(gate.if).toContain("github.event.pull_request.user.type == 'Bot'");
+  it('checks every pull request straight away, with no approval to wait for and no environment', () => {
+    expect(Object.keys(workflow.jobs).sort()).toEqual(['image', 'publish', 'test']);
     for (const name of ['test', 'image']) {
       const job = workflow.jobs[name]!;
-      expect(job.needs).toBe('agent-approval');
-      expect(job.if).toContain("needs.agent-approval.result == 'success' || needs.agent-approval.result == 'skipped'");
+      expect(job.needs, name).toBeUndefined();
+      expect(job.if, name).toBeUndefined();
     }
+    for (const [name, job] of Object.entries(workflow.jobs))
+      expect((job as { environment?: unknown }).environment, name).toBeUndefined();
   });
 
   it('fails the image job unless /api/version reports exactly the built commit (F-38)', () => {
