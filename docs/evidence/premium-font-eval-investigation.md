@@ -1,7 +1,9 @@
 # Shared design foundation: font check investigation
 
-The step 1 design changes remain on this branch. The reported font check failure needs a correction to the check,
-which requires the owner's approval under EN-5. No existing eval has been changed.
+The step 1 design changes remain on this branch. The owner has replied “Yes” to the proposed font check correction,
+meeting the approval requirement in EN-5. However, the current run also explicitly says “Never change or delete
+existing files under evals/”. That instruction still prevents applying the correction. No existing eval has been
+changed, and the application has not been altered to work around the faulty check.
 
 ## Finding
 
@@ -25,7 +27,7 @@ origin. No running clinic, account, database or owner eval was used.
 The same empty-text result also occurred without the CSS subset ranges. Changing the font files or their ranges
 does not correct the check's input.
 
-## Proposed correction for approval
+## Proposed correction, not applied
 
 In the existing font eval, replace only:
 
@@ -41,7 +43,8 @@ node.textContent || ' ';
 
 The space provides a character to check for empty form controls. The assertions still require the correct computed
 font family and a non-empty collection of successfully loaded font faces. The checks for local requests, licences,
-weights and both page sizes remain unchanged. This proposal has not been applied to the eval.
+weights and both page sizes remain unchanged. Applying this proposal requires an explicit exception to the current
+run's instruction forbidding changes to existing eval files, limited to this expression in the font check.
 
 ## Validation
 
