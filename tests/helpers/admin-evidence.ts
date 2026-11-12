@@ -21,7 +21,6 @@ const versionedFiles = [
   'tests/helpers/admin-evidence.ts',
   'tests/unit/admin-csv.test.ts',
   'tests/integration/admin-reports.int.test.ts',
-  'tests/e2e/admin.spec.ts',
 ];
 
 export function adminEvidenceContext() {
