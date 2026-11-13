@@ -117,82 +117,106 @@ function checkEmail(email: { Text: string; Attachments?: unknown[] | null }, app
   else expect(email.Text).not.toContain('Contact phone:');
 }
 
+// These three journeys retain copying, clock changes, mail, privacy and failure checks together.
+test.setTimeout(120_000);
+
 test('Clients can copy calendar details after booking or moving and from upcoming bookings in My bookings.', async ({
   page,
+  browser,
   context,
 }) => {
-  await step(page, 'Sign in and allow calendar details to be copied', async () => {
+  const date = londonDate(24);
+  const appointment = await step(page, 'Sign in on a phone and book a free session', async () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await signIn(page, PATIENT_2);
+    return book(page, date);
   });
-  const appointment = await step(page, 'Book a free session and see its confirmation', async () =>
-    book(page, londonDate(24)),
-  );
-  await step(page, 'Open Add to calendar after booking and copy the details', async () => {
-    const details = await openDetails(page, appointment);
-    await copyAndCheck(page, details);
-    expect(details).toContain(`Start: ${appointment.when}`);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  });
-  await step(page, 'Copy using a browser without the newer clipboard controls', async () => {
-    const details = await page.getByTestId('calendar-details').inputValue();
-    await page.evaluate(() => {
-      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+  const staff = await browser.newPage();
+  try {
+    const before = await step(staff, 'Find the confirmed session in the clinic diary', async () => {
+      await signIn(staff, ADMIN);
+      await staff.goto('/admin');
+      await staff.getByTestId('admin-date').fill(date);
+      await staff.getByTestId('admin-filter').click();
+      const row = staff.getByTestId('admin-booking-row').filter({ hasText: appointment.when });
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText('Confirmed');
+      await expect(staff.getByTestId('add-to-calendar')).toHaveCount(0);
+      return row.innerText();
     });
-    try {
-      await page.getByTestId('copy-calendar-details').press('Enter');
-      await expect(page.getByTestId('calendar-copy-result')).toHaveText('Calendar details copied.');
-      await expect(page.getByTestId('copy-calendar-details')).toBeFocused();
-    } finally {
-      await page.evaluate(() => Reflect.deleteProperty(navigator, 'clipboard'));
-    }
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(details);
-  });
-  const moved = await step(page, 'Move the session and copy the new calendar details', async () => {
-    const moved = await move(page, appointment);
-    const details = await openDetails(page, moved);
-    await copyAndCheck(page, details);
-    expect(details).toContain(`Start: ${moved.when}`);
-    expect(details).not.toContain(`Start: ${appointment.when}`);
-    return moved;
-  });
-  await step(page, 'Return to My bookings later and copy the same current details', async () => {
-    await page.getByTestId('calendar-back').click();
-    await page.reload();
-    const details = await openDetails(page, moved);
-    await copyAndCheck(page, details);
-    expect(details).toContain(`Start: ${moved.when}`);
-  });
-});
-
-test('Calendar details match the saved clinic, practitioner, UK time and duration in winter and summer.', async ({
-  page,
-}) => {
-  await step(page, 'Sign in as a client', async () => signIn(page, PATIENT_2));
-  for (const summer of [false, true]) {
-    const appointment = await step(page, `Book a session in UK ${summer ? 'summer' : 'winter'} time`, async () =>
-      book(page, dateInPeriod(summer, 35)),
-    );
-    await step(
+    const path = await step(page, 'Open Add to calendar and copy with both browser copy controls', async () => {
+      const details = await openDetails(page, appointment);
+      await copyAndCheck(page, details);
+      expect(details).toContain(`Start: ${appointment.when}`);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await expect(page.getByTestId('calendar-update-help')).toContainText('update or remove the existing event');
+      await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+      });
+      try {
+        await page.getByTestId('copy-calendar-details').press('Enter');
+        await expect(page.getByTestId('calendar-copy-result')).toHaveText('Calendar details copied.');
+        await expect(page.getByTestId('copy-calendar-details')).toBeFocused();
+      } finally {
+        await page.evaluate(() => Reflect.deleteProperty(navigator, 'clipboard'));
+      }
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(details);
+      return new URL(page.url()).pathname;
+    });
+    await step(page, 'Return later and copy again without changing the booking or clinic diary', async () => {
+      await page.getByTestId('calendar-back').click();
+      await page.reload();
+      const row = bookingRow(page, 'upcoming-bookings', appointment.when);
+      await expect(row).toHaveAttribute('data-booking-id', appointment.id);
+      await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
+      const details = await openDetails(page, appointment);
+      await copyAndCheck(page, details);
+      await copyAndCheck(page, details);
+      await staff.reload();
+      await expect(staff.getByTestId('admin-booking-row').filter({ hasText: appointment.when })).toHaveText(before);
+      await expect(staff.getByTestId('admin-settings-link')).toBeVisible();
+      await expect(staff.getByTestId('add-to-calendar')).toHaveCount(0);
+    });
+    const moved = await step(
       page,
-      `Reload the saved ${summer ? 'summer' : 'winter'} session and check all calendar details`,
+      'Move the session and see the new time and manual calendar update reminder',
       async () => {
-        await page.reload();
-        const details = await openDetails(page, appointment);
-        expect(details).toBe(
-          [
-            `Title: Acme Physio with ${PRACTITIONER}`,
-            'Clinic: Acme Physio',
-            `With: ${PRACTITIONER}`,
-            `Start: ${ukWhen(new Date(appointment.startsAt))}`,
-            `End: ${ukWhen(new Date(new Date(appointment.startsAt).getTime() + 45 * 60_000))}`,
-            `Time zone: Europe/London (${summer ? 'BST' : 'GMT'})`,
-            'Duration: 45 minutes',
-          ].join('\n'),
-        );
+        const moved = await move(page, appointment);
+        await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
+        const details = await openDetails(page, moved);
+        await copyAndCheck(page, details);
+        expect(details).toContain(`Start: ${moved.when}`);
+        expect(details).not.toContain(`Start: ${appointment.when}`);
+        expect(await slotOffered(page, date, appointment.slotId)).toBe(true);
+        return moved;
       },
     );
+    await step(page, 'Reopen the original calendar page and copy the saved new time', async () => {
+      await page.goto(path);
+      await page.reload();
+      const details = await page.getByTestId('calendar-details').inputValue();
+      await copyAndCheck(page, details);
+      expect(details).toContain(`Start: ${moved.when}`);
+      expect(details).not.toContain(`Start: ${appointment.when}`);
+      await expect(page.getByTestId('calendar-update-help')).toContainText('update or remove the existing event');
+      await page.getByTestId('calendar-back').click();
+      await page.reload();
+      expect(await openDetails(page, moved)).toBe(details);
+    });
+    await step(page, 'Cancel the session and see that its calendar summary is no longer offered', async () => {
+      await page.goto('/bookings');
+      await bookingRow(page, 'upcoming-bookings', moved.when).getByTestId('cancel-booking').click();
+      const row = bookingRow(page, 'other-bookings', moved.when);
+      await expect(row.getByTestId('booking-status')).toHaveText('Cancelled');
+      await expect(row.getByTestId('add-to-calendar')).toHaveCount(0);
+      await page.goto(path);
+      await expect(page.getByTestId('not-found')).toBeVisible();
+      await expect(page.getByTestId('calendar-details')).toHaveCount(0);
+    });
+  } finally {
+    await staff.close();
   }
 });
 
@@ -200,24 +224,38 @@ test('Booking and move emails include current calendar details without attachmen
   page,
 }) => {
   await step(page, 'Sign in as a client who has no phone on file', async () => signIn(page, PATIENT_2));
-  for (const [index, phone] of ['', '+44 7700 900123'].entries()) {
-    const appointment = await step(
+  for (const summer of [false, true]) {
+    const phone = summer ? '+44 7700 900123' : '';
+    const { appointment, before } = await step(
       page,
-      `Book ${phone ? 'with an optional phone' : 'without a phone'} and read the calendar details in the email`,
+      `Book a UK ${summer ? 'summer session with an optional phone' : 'winter session without a phone'}`,
       async () => {
         const before = new Set((await mailTo(PATIENT_2)).map((m) => m.ID));
-        const appointment = await book(page, londonDate(26 + index), phone);
-        checkEmail(
-          await receivedEmail(PATIENT_2, before, `Booking confirmed: ${appointment.when}`),
-          appointment,
-          phone,
-        );
-        return appointment;
+        const appointment = await book(page, dateInPeriod(summer, 35), phone);
+        return { appointment, before };
       },
     );
+    await step(page, `Check the saved ${summer ? 'summer' : 'winter'} calendar details and booking email`, async () => {
+      await page.reload();
+      const details = await openDetails(page, appointment);
+      expect(details).toBe(
+        [
+          `Title: Acme Physio with ${PRACTITIONER}`,
+          'Clinic: Acme Physio',
+          `With: ${PRACTITIONER}`,
+          `Start: ${ukWhen(new Date(appointment.startsAt))}`,
+          `End: ${ukWhen(new Date(new Date(appointment.startsAt).getTime() + 45 * 60_000))}`,
+          `Time zone: Europe/London (${summer ? 'BST' : 'GMT'})`,
+          'Duration: 45 minutes',
+        ].join('\n'),
+      );
+      const email = await receivedEmail(PATIENT_2, before, `Booking confirmed: ${appointment.when}`);
+      checkEmail(email, appointment, phone);
+      expect(email.Text).toContain(details);
+    });
     await step(
       page,
-      `Move the session ${phone ? 'with a phone' : 'without a phone'} and read the updated email`,
+      `Move the ${summer ? 'summer' : 'winter'} session and read its current calendar details by email`,
       async () => {
         const before = new Set((await mailTo(PATIENT_2)).map((m) => m.ID));
         const moved = await move(page, appointment);
@@ -225,10 +263,26 @@ test('Booking and move emails include current calendar details without attachmen
         checkEmail(email, moved, phone);
         expect(email.Text).not.toContain(`Start: ${appointment.when}`);
         expect(email.Text).toContain('update or remove the existing calendar event yourself');
+        expect(email.Text).toContain(await openDetails(page, moved));
       },
     );
   }
 });
+
+async function checkManualCopy(page: Page, details: string) {
+  await page.getByTestId('copy-calendar-details').click();
+  await expect(page.getByTestId('calendar-copy-result')).toContainText(
+    'Copy the selected text yourself, or type the details into your calendar.',
+  );
+  const field = page.getByTestId('calendar-details');
+  await expect(field).toBeFocused();
+  expect(
+    await field.evaluate((element: HTMLTextAreaElement) =>
+      element.value.slice(element.selectionStart, element.selectionEnd),
+    ),
+  ).toBe(details);
+  await expect(page.getByTestId('calendar-manual-help')).toBeVisible();
+}
 
 test('Only the booking client can retrieve their calendar summary, which excludes their personal contact details and private links.', async ({
   page,
@@ -238,14 +292,33 @@ test('Only the booking client can retrieve their calendar summary, which exclude
     await signIn(page, PATIENT_2);
     return book(page, londonDate(28), '+44 7700 900123');
   });
-  const path = await step(page, 'Open your own calendar summary and see only event details', async () => {
+  const path = await step(page, 'See only event details and a manual alternative when copying is refused', async () => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: () => Promise.reject(new Error('Copying is unavailable')) },
+      });
+      Object.defineProperty(document, 'execCommand', { configurable: true, value: () => false });
+    });
     const details = await openDetails(page, appointment);
     expect(details).toContain('Clinic: Acme Physio');
     expect(details).not.toMatch(/900123|Łukasz|Wiśniewski|@|https?:|\/bookings|reset-password|token/i);
     expect(details).not.toContain(appointment.id);
+    await page.reload();
+    await checkManualCopy(page, details);
     return new URL(page.url()).pathname;
   });
   const other = await browser.newPage();
+  let originalChaos: unknown;
+  let restoreMail = false;
+  const setChaos = async (value: unknown) => {
+    const response = await fetch(`${mailBase()}/api/v1/chaos`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(value),
+    });
+    expect(response.ok, 'the local demo inbox accepts the test delivery setting').toBe(true);
+  };
   try {
     await step(other, 'Try opening that calendar summary while signed out', async () => {
       await other.goto(path);
@@ -267,72 +340,12 @@ test('Only the booking client can retrieve their calendar summary, which exclude
       await expect(other.getByTestId('admin-home')).toBeVisible();
       await expect(other.getByTestId('calendar-details')).toHaveCount(0);
     });
-    await step(page, 'Cancel your booking and see that its calendar summary is no longer offered', async () => {
-      await page.goto('/bookings');
-      await bookingRow(page, 'upcoming-bookings', appointment.when).getByTestId('cancel-booking').click();
-      await expect(bookingRow(page, 'other-bookings', appointment.when).getByTestId('add-to-calendar')).toHaveCount(0);
-      await page.goto(path);
-      await expect(page.getByTestId('not-found')).toBeVisible();
-      await expect(page.getByTestId('calendar-details')).toHaveCount(0);
-    });
-  } finally {
-    await other.close();
-  }
-});
-
-test('Moved bookings show the new time, and clients understand that existing calendar entries need manual updates.', async ({
-  page,
-}) => {
-  const appointment = await step(page, 'Sign in and book a session', async () => {
-    await signIn(page, PATIENT_2);
-    return book(page, londonDate(29));
-  });
-  const path = await step(page, 'Open its calendar details and read the guidance about later changes', async () => {
-    await openDetails(page, appointment);
-    await expect(page.getByTestId('calendar-update-help')).toContainText('update or remove the existing event');
-    await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
-    return new URL(page.url()).pathname;
-  });
-  const moved = await step(page, 'Move the session and see its new confirmed time and calendar reminder', async () => {
-    const moved = await move(page, appointment);
-    await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
-    return moved;
-  });
-  await step(
-    page,
-    'Reopen the original calendar page and see the new time with the manual update reminder',
-    async () => {
-      await page.goto(path);
-      await page.reload();
-      const details = await page.getByTestId('calendar-details').inputValue();
-      expect(details).toContain(`Start: ${moved.when}`);
-      expect(details).not.toContain(`Start: ${appointment.when}`);
-      await expect(page.getByTestId('calendar-update-help')).toContainText('update or remove the existing event');
-    },
-  );
-});
-
-test('Failed email delivery preserves the confirmed booking, and failed copying offers a useful manual alternative.', async ({
-  page,
-}) => {
-  // The local demo inbox rejects SMTP, exercising the real saved-booking path.
-  // compose.yml enables this facility on the fictional local inbox.
-  const original: unknown = await step(page, 'Sign in before booking a session', async () => {
-    await signIn(page, PATIENT_2);
-    const response = await fetch(`${mailBase()}/api/v1/chaos`);
-    expect(response.ok, 'the local demo inbox allows controlled delivery failures').toBe(true);
-    return response.json() as Promise<unknown>;
-  });
-  const setChaos = async (value: unknown) => {
-    const response = await fetch(`${mailBase()}/api/v1/chaos`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(value),
-    });
-    expect(response.ok, 'the local demo inbox accepts the test delivery setting').toBe(true);
-  };
-  try {
-    const appointment = await step(page, 'Confirm a session while email delivery is unavailable', async () => {
+    const withoutMail = await step(page, 'Confirm a session while email delivery is unavailable', async () => {
+      // The fictional local inbox rejects SMTP, exercising the real saved-booking path.
+      const response = await fetch(`${mailBase()}/api/v1/chaos`);
+      expect(response.ok, 'the local demo inbox allows controlled delivery failures').toBe(true);
+      originalChaos = await response.json();
+      restoreMail = true;
       await setChaos({ Sender: { ErrorCode: 550, Probability: 100 } });
       const before = new Set((await mailTo(PATIENT_2)).map((m) => m.ID));
       const appointment = await book(page, londonDate(30));
@@ -340,102 +353,28 @@ test('Failed email delivery preserves the confirmed booking, and failed copying 
       expect((await mailTo(PATIENT_2)).filter((m) => !before.has(m.ID))).toHaveLength(0);
       return appointment;
     });
-    const moved = await step(
-      page,
-      'Move the session while email remains unavailable and reload its saved confirmation',
-      async () => {
-        const before = new Set((await mailTo(PATIENT_2)).map((m) => m.ID));
-        const moved = await move(page, appointment);
-        expect((await mailTo(PATIENT_2)).filter((m) => !before.has(m.ID))).toHaveLength(0);
-        await page.reload();
-        await expect(bookingRow(page, 'upcoming-bookings', moved.when).getByTestId('booking-status')).toHaveText(
-          'Confirmed',
-        );
-        return moved;
-      },
-    );
-    await step(page, 'Try copying when your browser refuses and see the manual alternative', async () => {
-      await page.addInitScript(() => {
-        Object.defineProperty(navigator, 'clipboard', {
-          configurable: true,
-          value: { writeText: () => Promise.reject(new Error('Copying is unavailable')) },
-        });
-        Object.defineProperty(document, 'execCommand', { configurable: true, value: () => false });
-      });
+    await step(page, 'Move without email and retrieve the saved new time even when copying fails', async () => {
+      const before = new Set((await mailTo(PATIENT_2)).map((m) => m.ID));
+      const moved = await move(page, withoutMail);
+      expect((await mailTo(PATIENT_2)).filter((m) => !before.has(m.ID))).toHaveLength(0);
+      await page.reload();
+      await expect(bookingRow(page, 'upcoming-bookings', moved.when).getByTestId('booking-status')).toHaveText(
+        'Confirmed',
+      );
       const details = await openDetails(page, moved);
       await page.reload();
-      await page.getByTestId('copy-calendar-details').click();
-      await expect(page.getByTestId('calendar-copy-result')).toContainText(
-        'Copy the selected text yourself, or type the details into your calendar.',
-      );
-      const field = page.getByTestId('calendar-details');
-      await expect(field).toBeFocused();
-      expect(
-        await field.evaluate((element: HTMLTextAreaElement) =>
-          element.value.slice(element.selectionStart, element.selectionEnd),
-        ),
-      ).toBe(details);
-      await expect(page.getByTestId('calendar-manual-help')).toBeVisible();
+      await checkManualCopy(page, details);
       expect(details).toContain(`Start: ${moved.when}`);
     });
   } finally {
-    await step(page, 'Restore normal email delivery for the other client journeys', async () => setChaos(original));
-  }
-});
-
-test('Existing owner journeys keep working, and copying changes no stored bookings or staff features.', async ({
-  page,
-  browser,
-  context,
-}) => {
-  const appointment = await step(page, 'Sign in and book a session', async () => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await signIn(page, PATIENT_2);
-    return book(page, londonDate(31));
-  });
-  const staff = await browser.newPage();
-  try {
-    const before = await step(staff, 'Find the confirmed session in the clinic diary', async () => {
-      await signIn(staff, ADMIN);
-      await staff.goto('/admin');
-      await staff.getByTestId('admin-date').fill(londonDate(31));
-      await staff.getByTestId('admin-filter').click();
-      const row = staff.getByTestId('admin-booking-row').filter({ hasText: appointment.when });
-      await expect(row).toHaveCount(1);
-      await expect(row).toContainText('Confirmed');
-      await expect(staff.getByTestId('add-to-calendar')).toHaveCount(0);
-      return row.innerText();
-    });
-    await step(page, 'Copy calendar details twice and see that the session is still confirmed', async () => {
-      const details = await openDetails(page, appointment);
-      await copyAndCheck(page, details);
-      await copyAndCheck(page, details);
-      await page.getByTestId('calendar-back').click();
-      await page.reload();
-      const row = bookingRow(page, 'upcoming-bookings', appointment.when);
-      await expect(row).toHaveAttribute('data-booking-id', appointment.id);
-      await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
-    });
-    await step(staff, 'Reload the clinic diary and see the same booking and staff controls', async () => {
-      await staff.reload();
-      await expect(staff.getByTestId('admin-booking-row').filter({ hasText: appointment.when })).toHaveText(before);
-      await expect(staff.getByTestId('admin-settings-link')).toBeVisible();
-      await expect(staff.getByTestId('add-to-calendar')).toHaveCount(0);
-    });
-    const moved = await step(page, 'Move the session after copying and see the original time become free', async () => {
-      const moved = await move(page, appointment);
-      expect(await slotOffered(page, londonDate(31), appointment.slotId)).toBe(true);
-      return moved;
-    });
-    await step(page, 'Cancel the moved session and see it leave upcoming bookings', async () => {
-      await page.goto('/bookings');
-      await bookingRow(page, 'upcoming-bookings', moved.when).getByTestId('cancel-booking').click();
-      await expect(bookingRow(page, 'other-bookings', moved.when).getByTestId('booking-status')).toHaveText(
-        'Cancelled',
-      );
-      await expect(bookingRow(page, 'other-bookings', moved.when).getByTestId('add-to-calendar')).toHaveCount(0);
-    });
-  } finally {
-    await staff.close();
+    try {
+      if (restoreMail) {
+        await step(page, 'Restore normal email delivery for the other client journeys', async () =>
+          setChaos(originalChaos),
+        );
+      }
+    } finally {
+      await other.close();
+    }
   }
 });
