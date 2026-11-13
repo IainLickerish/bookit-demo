@@ -32,13 +32,17 @@ export default async function ResetPasswordPage({
   );
   if (!usable) {
     return (
-      <section className="max-w-sm">
-        <h1>Reset your password</h1>
+      <section className="card card-narrow" data-testid="account-card">
+        <header className="page-header">
+          <h1>Reset your password</h1>
+        </header>
         <p role="alert" className="alert" data-testid="reset-password-invalid">
           This reset link has expired or has already been used.
         </p>
         <p>
-          <Link href={FORGOT_PASSWORD_PATH}>Request a new link</Link>
+          <Link href={FORGOT_PASSWORD_PATH} className="text-link" data-testid="request-new-link">
+            Request a new link
+          </Link>
         </p>
       </section>
     );
@@ -46,8 +50,10 @@ export default async function ResetPasswordPage({
   const error = single((await searchParams).error);
   const message = error !== undefined && Object.hasOwn(ERRORS, error) ? ERRORS[error] : null;
   return (
-    <section className="max-w-sm">
-      <h1>Choose a new password</h1>
+    <section className="card card-narrow" data-testid="account-card">
+      <header className="page-header">
+        <h1>Choose a new password</h1>
+      </header>
       {message ? (
         <p role="alert" className="alert" data-testid="reset-password-error">
           {message}

@@ -6,8 +6,10 @@ import { requestPasswordResetAction } from '../password-reset-actions';
 export default async function ForgotPasswordPage({ searchParams }: { searchParams: SearchParams }) {
   const sent = single((await searchParams).sent) === '1';
   return (
-    <section className="max-w-sm">
-      <h1>Reset your password</h1>
+    <section className="card card-narrow" data-testid="account-card">
+      <header className="page-header">
+        <h1>Reset your password</h1>
+      </header>
       {sent ? (
         <p role="status" className="notice" data-testid="forgot-password-sent">
           If an account uses that email address, we have sent it a link to reset the password. The link works for{' '}
@@ -28,7 +30,9 @@ export default async function ForgotPasswordPage({ searchParams }: { searchParam
         </button>
       </form>
       <p className="mt-4">
-        <Link href="/auth/sign-in">Back to sign in</Link>
+        <Link href="/auth/sign-in" className="text-link" data-testid="back-to-sign-in">
+          Back to sign in
+        </Link>
       </p>
     </section>
   );

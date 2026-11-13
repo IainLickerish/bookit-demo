@@ -13,8 +13,10 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
   const error = single(query.error);
   const passwordReset = single(query.notice) === 'password_reset';
   return (
-    <section className="max-w-sm">
-      <h1>Sign in</h1>
+    <section className="card card-narrow" data-testid="account-card">
+      <header className="page-header">
+        <h1>Sign in</h1>
+      </header>
       {passwordReset ? (
         <p role="status" className="notice" data-testid="sign-in-notice">
           Your password has been changed. Sign in with your new password.
@@ -45,7 +47,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
         </button>
       </form>
       <p className="mt-4">
-        <Link href={FORGOT_PASSWORD_PATH} data-testid="forgot-password-link">
+        <Link href={FORGOT_PASSWORD_PATH} className="text-link" data-testid="forgot-password-link">
           Forgot your password?
         </Link>
       </p>
