@@ -39,6 +39,9 @@ No cancellation emails are sent at this stage. Arrange contact with affected
 clients using your clinic's existing process.
 
 Open a block under **Saved blocks** to revisit its time, reason and cancelled
-bookings. A block with no affected bookings says so. Only your clinic's staff can
+bookings. Saved blocks appear 20 at a time, newest first. Choose **View older
+blocks** to reach earlier entries, or **View newest blocks** to return to the start.
+An older block can also be reopened from its saved link. A block with no affected
+bookings says so. Only your clinic's staff can
 create or view these blocks. This page does not offer editing or removal of saved
 blocks.

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { formatSlot } from '@/lib/time';
 import { listAdminPractitioners } from '@/server/admin/bookings';
-import { listBlockedTime, listBlockCancellations } from '@/server/admin/blocked-time';
+import { getBlockedTime, listBlockedTime, listBlockCancellations } from '@/server/admin/blocked-time';
 import { requireAdmin } from '@/server/admin/context';
 import { loadClinicSettings } from '@/server/settings';
 import { BLOCKED_TIME_MESSAGES, single, type SearchParams } from '../../messages';
@@ -11,13 +11,15 @@ import { BlockForm } from './block-form';
 export default async function BlockedTimePage({ searchParams }: { searchParams: SearchParams }) {
   const staff = await requireAdmin();
   const db = getDatabase();
-  const [settings, practitioners, blocks, params] = await Promise.all([
+  const params = await searchParams;
+  const before = single(params.before);
+  const [settings, practitioners, history, selected] = await Promise.all([
     loadClinicSettings(db),
     listAdminPractitioners(db),
-    listBlockedTime(db, staff.id),
-    searchParams,
+    listBlockedTime(db, staff.id, before),
+    getBlockedTime(db, staff.id, single(params.block)),
   ]);
-  const selected = blocks.find((block) => block.id === single(params.block));
+  const { blocks, nextCursor } = history;
   const cancellations = selected ? await listBlockCancellations(db, staff.id, selected.id) : [];
   const beacon = process.env.BOOKIT_TENANT === 'beacon';
   return (
@@ -79,7 +81,7 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
             {blocks.map((block) => (
               <li key={block.id} data-testid="block-list-row">
                 <Link
-                  href={`/admin/blocked-time?block=${block.id}`}
+                  href={`/admin/blocked-time?block=${block.id}${before ? `&before=${encodeURIComponent(before)}` : ''}`}
                   prefetch={false}
                   className="underline"
                   data-testid="block-open"
@@ -96,6 +98,25 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
             No time is blocked yet. Choose a practitioner and times above to review a block.
           </p>
         )}
+        {before || nextCursor ? (
+          <nav aria-label="Saved blocks pages" className="mt-6 flex flex-wrap gap-6" data-testid="block-pages">
+            {before ? (
+              <Link href="/admin/blocked-time" prefetch={false} className="underline" data-testid="block-newest">
+                View newest blocks
+              </Link>
+            ) : null}
+            {nextCursor ? (
+              <Link
+                href={`/admin/blocked-time?before=${nextCursor}`}
+                prefetch={false}
+                className="underline"
+                data-testid="block-older"
+              >
+                View older blocks
+              </Link>
+            ) : null}
+          </nav>
+        ) : null}
       </section>
     </section>
   );

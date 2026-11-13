@@ -10,12 +10,15 @@ import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { blockedCancellations, blockedPeriods, bookings, slots } from '@/db/schema';
 import {
+  BLOCKED_TIME_PAGE_SIZE,
   confirmBlockedTime,
+  getBlockedTime,
   listBlockCancellations,
   listBlockedTime,
   reviewBlockedTime,
 } from '@/server/admin/blocked-time';
 import { bookSlot } from '@/server/bookings/book';
+import { lockDiary } from '@/server/bookings/diary-lock';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { isSlotFree, listAvailableSlots } from '@/server/slots/queries';
@@ -56,6 +59,72 @@ async function confirm(input = values()) {
   return { id, checked };
 }
 
+/** Queue each real transaction in PostgreSQL, in a known order, before opening the gate. */
+async function queuedDiaryRace(jobs: (() => Promise<unknown>)[]) {
+  let release!: () => void;
+  let ready!: () => void;
+  const held = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const holder = database.db.transaction(async (tx) => {
+    await lockDiary(tx);
+    ready();
+    await gate;
+  });
+  const pending: Promise<PromiseSettledResult<unknown>>[] = [];
+  try {
+    await Promise.race([held, holder]);
+    for (const [index, job] of jobs.entries()) {
+      // Attach a rejection handler immediately, including during barrier failure cleanup.
+      pending.push(
+        job().then(
+          (value) => ({ status: 'fulfilled' as const, value }),
+          (reason: unknown) => ({ status: 'rejected' as const, reason }),
+        ),
+      );
+      await expect
+        .poll(
+          async () => {
+            const result = await database.db.execute(sql`
+          select count(*)::int as waiting from pg_locks
+          where locktype = 'advisory' and classid = 0 and objid = 781204
+            and objsubid = 1 and not granted
+            and database = (select oid from pg_database where datname = current_database())
+        `);
+            return result.rows[0]!.waiting;
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(index + 1);
+    }
+  } finally {
+    release();
+    await holder;
+    await Promise.all(pending);
+  }
+  return Promise.all(pending);
+}
+
+async function expectNoConfirmedOverlap() {
+  const overlapping = await database.db
+    .select({ bookingId: bookings.id, blockId: blockedPeriods.id })
+    .from(bookings)
+    .innerJoin(slots, eq(slots.id, bookings.slotId))
+    .innerJoin(
+      blockedPeriods,
+      and(
+        eq(blockedPeriods.practitionerId, slots.practitionerId),
+        sql`${slots.startsAt} < ${blockedPeriods.endsAt}`,
+        sql`${slots.endsAt} > ${blockedPeriods.startsAt}`,
+      ),
+    )
+    .where(eq(bookings.status, 'confirmed'));
+  expect(overlapping).toEqual([]);
+}
+
 beforeAll(async () => {
   database = await startTestDatabase();
   foreign = await startTestDatabase();
@@ -79,7 +148,7 @@ describe('staff blocked time and cancellations', () => {
     expect((await findBookingForPatient(database.db, clinic.patient1.id, booking.id))?.status).toBe('confirmed');
     const id = randomUUID();
     await confirmBlockedTime(database.db, clock, clinic.admin.id, values(), id, checked.snapshot);
-    expect(await listBlockedTime(database.db, clinic.admin.id)).toHaveLength(1);
+    expect((await listBlockedTime(database.db, clinic.admin.id)).blocks).toHaveLength(1);
     expect(await listBlockCancellations(database.db, clinic.admin.id, id)).toMatchObject([{ id: booking.id }]);
     expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toMatchObject({
       status: 'cancelled',
@@ -144,6 +213,7 @@ describe('staff blocked time and cancellations', () => {
         confirmBlockedTime(database.db, clock, staffId, values(), randomUUID(), '0'.repeat(64)),
       ).rejects.toMatchObject({ code: 'not_staff' });
       await expect(listBlockedTime(database.db, staffId)).rejects.toMatchObject({ code: 'not_staff' });
+      await expect(getBlockedTime(database.db, staffId, randomUUID())).rejects.toMatchObject({ code: 'not_staff' });
       await expect(listBlockCancellations(database.db, staffId, randomUUID())).rejects.toMatchObject({
         code: 'not_staff',
       });
@@ -155,7 +225,7 @@ describe('staff blocked time and cancellations', () => {
       }),
     ).rejects.toMatchObject({ code: 'invalid' });
     await confirm();
-    expect(await listBlockedTime(foreign.db, foreignClinic.admin.id)).toHaveLength(0);
+    expect((await listBlockedTime(foreign.db, foreignClinic.admin.id)).blocks).toHaveLength(0);
   });
 
   it('rejects invalid ranges without changing existing bookings', async () => {
@@ -184,64 +254,184 @@ describe('staff blocked time and cancellations', () => {
     expect(other.length).toBeGreaterThan(0);
   });
 
-  it('serialises a block with concurrent bookings and moves, retaining a failed move at its original time', async () => {
-    const target = await targetSlot();
-    const free = await listAvailableSlots(database.db, {
-      practitionerId: clinic.practitioners.weekdays,
-      after: new Date('2026-10-23T07:00:00Z'),
-      until: new Date('2026-10-23T18:00:00Z'),
+  it('pages through tied creation times without gaps and directly reopens an older block with its cancellations', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: (await targetSlot()).id });
+    const older = await confirm();
+    const newerIds = Array.from({ length: BLOCKED_TIME_PAGE_SIZE * 2 }, () => randomUUID());
+    await database.db.insert(blockedPeriods).values(
+      newerIds.map((id) => ({
+        id,
+        practitionerId: clinic.practitioners.weekdays,
+        startsAt: older.checked.startsAt,
+        endsAt: older.checked.endsAt,
+        createdAt: new Date(clock.now().getTime() + 1),
+        createdBy: clinic.admin.id,
+        reason: 'Later saved block',
+      })),
+    );
+    const first = await listBlockedTime(database.db, clinic.admin.id);
+    expect(first.blocks).toHaveLength(BLOCKED_TIME_PAGE_SIZE);
+    expect(first.blocks.map((block) => block.id)).not.toContain(older.id);
+    expect(await getBlockedTime(database.db, clinic.admin.id, older.id)).toMatchObject({
+      id: older.id,
+      reason: 'Training',
     });
-    const original = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: free[0]!.id });
-    const checked = await reviewBlockedTime(database.db, clock, clinic.admin.id, values());
-    // Hold the diary lock until all competing operations are queued.
-    let release!: () => void;
-    let ready!: () => void;
-    const held = new Promise<void>((resolve) => {
-      ready = resolve;
-    });
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const { lockDiary } = await import('@/server/bookings/diary-lock');
-    const holder = database.db.transaction(async (tx) => {
-      await lockDiary(tx);
-      ready();
-      await gate;
-    });
-    await held;
-    const block = confirmBlockedTime(database.db, clock, clinic.admin.id, values(), randomUUID(), checked.snapshot);
-    const move = rescheduleBooking(deps(), {
-      patientId: clinic.patient1.id,
-      bookingId: original.id,
-      newSlotId: target.id,
-    });
-    const book = bookSlot(deps(), { patientId: clinic.patient2.id, slotId: target.id });
-    // Either the reviewed block saves first, or changed impact requires another review.
-    release();
-    await holder;
-    const results = await Promise.allSettled([block, move, book]);
-    const saved = results[0]!.status === 'fulfilled';
-    if (saved) {
-      expect(results.slice(1)).toMatchObject([
-        { status: 'rejected', reason: { code: 'slot_blocked' } },
-        { status: 'rejected', reason: { code: 'slot_blocked' } },
-      ]);
-      expect((await findBookingForPatient(database.db, clinic.patient1.id, original.id))?.slotId).toBe(original.slotId);
-    } else {
-      expect(results[0]).toMatchObject({ status: 'rejected', reason: { code: 'changed' } });
-      await confirm();
+    expect(await listBlockCancellations(database.db, clinic.admin.id, older.id)).toMatchObject([{ id: booking.id }]);
+    const second = await listBlockedTime(database.db, clinic.admin.id, first.nextCursor!);
+    const last = await listBlockedTime(database.db, clinic.admin.id, second.nextCursor!);
+    expect(second.blocks).toHaveLength(BLOCKED_TIME_PAGE_SIZE);
+    expect(last.blocks.map((block) => block.id)).toEqual([older.id]);
+    expect(last.nextCursor).toBeNull();
+    const allIds = [...first.blocks, ...second.blocks, ...last.blocks].map((block) => block.id);
+    expect(new Set(allIds).size).toBe(newerIds.length + 1);
+    expect(allIds.slice(0, -1)).toEqual(newerIds.sort().reverse());
+    for (const invalid of ['not-an-id', randomUUID()]) {
+      expect(await getBlockedTime(database.db, clinic.admin.id, invalid)).toBeNull();
+      expect(await listBlockedTime(database.db, clinic.admin.id, invalid)).toEqual(first);
     }
-    expect(
-      await database.db
-        .select()
-        .from(bookings)
-        .where(and(eq(bookings.slotId, target.id), eq(bookings.status, 'confirmed'))),
-    ).toHaveLength(0);
-    expect(await isSlotFree(database.db, target.id)).toBe(false);
-    await expect(bookSlot(deps(), { patientId: clinic.patient2.id, slotId: target.id })).rejects.toMatchObject({
-      code: 'slot_blocked',
-    });
+    expect(await getBlockedTime(foreign.db, foreignClinic.admin.id, older.id)).toBeNull();
   });
+
+  const operations = ['block A', 'block B', 'book', 'move'] as const;
+  type Operation = (typeof operations)[number];
+  function permutations(items: readonly Operation[]): Operation[][] {
+    return items.length
+      ? items.flatMap((item) => permutations(items.filter((other) => other !== item)).map((rest) => [item, ...rest]))
+      : [[]];
+  }
+
+  it.each(permutations(operations).map((order) => [order.join(', '), order] as const))(
+    'serialises two overlapping blocks, a booking and a move in queued save order: %s',
+    async (_name, order) => {
+      const targets = await listAvailableSlots(database.db, {
+        practitionerId: clinic.practitioners.weekdays,
+        after: new Date('2026-10-22T07:00:00Z'),
+        until: new Date('2026-10-22T12:00:00Z'),
+      });
+      const originals = await listAvailableSlots(database.db, {
+        practitionerId: clinic.practitioners.weekdays,
+        after: new Date('2026-10-23T07:00:00Z'),
+        until: new Date('2026-10-23T18:00:00Z'),
+      });
+      const original = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: originals[0]!.id });
+      const affected = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: targets[2]!.id });
+      const inputs = {
+        'block A': { ...values(), start: '2026-10-22T09:00', end: '2026-10-22T12:00' },
+        'block B': { ...values(), start: '2026-10-22T09:10', end: '2026-10-22T12:10' },
+      };
+      const ids = { 'block A': randomUUID(), 'block B': randomUUID() };
+      const reviews = {
+        'block A': await reviewBlockedTime(database.db, clock, clinic.admin.id, inputs['block A']),
+        'block B': await reviewBlockedTime(database.db, clock, clinic.admin.id, inputs['block B']),
+      };
+      const jobs = {
+        'block A': () =>
+          confirmBlockedTime(
+            database.db,
+            clock,
+            clinic.admin.id,
+            inputs['block A'],
+            ids['block A'],
+            reviews['block A'].snapshot,
+          ),
+        'block B': () =>
+          confirmBlockedTime(
+            database.db,
+            clock,
+            clinic.admin.id,
+            inputs['block B'],
+            ids['block B'],
+            reviews['block B'].snapshot,
+          ),
+        book: () => bookSlot(deps(), { patientId: clinic.patient2.id, slotId: targets[0]!.id }),
+        move: () =>
+          rescheduleBooking(deps(), {
+            patientId: clinic.patient1.id,
+            bookingId: original.id,
+            newSlotId: targets[1]!.id,
+          }),
+      };
+      const results = await queuedDiaryRace(order.map((name) => jobs[name]));
+      const blockFirst = order[0] === 'block A' || order[0] === 'block B';
+      const savedId = blockFirst ? ids[order[0] as 'block A' | 'block B'] : null;
+      for (const [index, name] of order.entries()) {
+        const result = results[index]!;
+        if (name === 'block A' || name === 'block B') {
+          expect(result).toMatchObject(
+            ids[name] === savedId
+              ? { status: 'fulfilled', value: savedId }
+              : { status: 'rejected', reason: { code: 'changed' } },
+          );
+        } else {
+          expect(result).toMatchObject(
+            blockFirst ? { status: 'rejected', reason: { code: 'slot_blocked' } } : { status: 'fulfilled' },
+          );
+        }
+      }
+      // Inspect the persisted race result before any new review or confirmation.
+      expect((await database.db.select().from(blockedPeriods)).map((block) => block.id)).toEqual(
+        savedId ? [savedId] : [],
+      );
+      expect(await database.db.select().from(blockedCancellations)).toEqual(
+        savedId ? [{ blockId: savedId, bookingId: affected.id }] : [],
+      );
+      expect(await findBookingForPatient(database.db, clinic.patient2.id, affected.id)).toMatchObject({
+        status: blockFirst ? 'cancelled' : 'confirmed',
+        cancelledAt: blockFirst ? clock.now() : null,
+      });
+      expect(await findBookingForPatient(database.db, clinic.patient1.id, original.id)).toMatchObject({
+        status: 'confirmed',
+        slotId: blockFirst ? original.slotId : targets[1]!.id,
+        rescheduleCount: blockFirst ? 0 : 1,
+      });
+      const persisted = await database.db.select().from(bookings);
+      expect(persisted.filter((booking) => booking.slotId === targets[0]!.id)).toHaveLength(blockFirst ? 0 : 1);
+      await expectNoConfirmedOverlap();
+    },
+  );
+
+  it.each([false, true])(
+    'preserves each cancellation history when both overlapping blocks save, reverse order: %s',
+    async (reverse) => {
+      const targets = await listAvailableSlots(database.db, {
+        practitionerId: clinic.practitioners.weekdays,
+        after: new Date('2026-10-22T07:00:00Z'),
+        until: new Date('2026-10-22T12:00:00Z'),
+      });
+      const affected = [
+        await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: targets[0]!.id }),
+        await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: targets[2]!.id }),
+      ];
+      const inputs = [
+        { ...values(), start: '2026-10-22T09:00', end: '2026-10-22T10:00' },
+        { ...values(), start: '2026-10-22T09:45', end: '2026-10-22T11:00' },
+      ];
+      const ids = [randomUUID(), randomUUID()];
+      const reviews = await Promise.all(
+        inputs.map((input) => reviewBlockedTime(database.db, clock, clinic.admin.id, input)),
+      );
+      const jobs = inputs.map(
+        (input, index) => () =>
+          confirmBlockedTime(database.db, clock, clinic.admin.id, input, ids[index]!, reviews[index]!.snapshot),
+      );
+      if (reverse) jobs.reverse();
+      expect(await queuedDiaryRace(jobs)).toEqual(
+        jobs.map((_, index) => ({ status: 'fulfilled', value: ids[reverse ? 1 - index : index] })),
+      );
+      expect(await database.db.select().from(blockedPeriods)).toHaveLength(2);
+      expect(await database.db.select().from(blockedCancellations)).toEqual(
+        expect.arrayContaining(ids.map((blockId, index) => ({ blockId, bookingId: affected[index]!.id }))),
+      );
+      expect(await database.db.select().from(blockedCancellations)).toHaveLength(2);
+      expect(await database.db.select().from(bookings).where(eq(bookings.status, 'confirmed'))).toHaveLength(0);
+      for (const [index, id] of ids.entries()) {
+        expect(await listBlockCancellations(database.db, clinic.admin.id, id)).toMatchObject([
+          { id: affected[index]!.id },
+        ]);
+      }
+      await expectNoConfirmedOverlap();
+    },
+  );
 });
 
 it('upgrades a populated previous database without changing its bookings', async () => {
@@ -283,7 +473,7 @@ it('upgrades a populated previous database without changing its bookings', async
       practitionerId: previous.practitioners.weekdays,
     });
     await confirmBlockedTime(handle.db, clock, previous.admin.id, checked.values, randomUUID(), checked.snapshot);
-    expect(await listBlockedTime(handle.db, previous.admin.id)).toHaveLength(1);
+    expect((await listBlockedTime(handle.db, previous.admin.id)).blocks).toHaveLength(1);
   } finally {
     await handle.pool.end();
     await container.stop();

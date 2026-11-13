@@ -1,0 +1,1 @@
+CREATE INDEX "blocked_period_history_idx" ON "blocked_period" USING btree ("created_at","id");

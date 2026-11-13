@@ -28,6 +28,7 @@ async function reviewBlock(page: Page, date: string, start: string, end: string,
 
 // Distinct days keep these saved blocks away from the other owner journeys.
 test('Staff can review affected bookings before confirming a practitioner’s blocked time.', async ({ browser }) => {
+  test.setTimeout(180_000);
   const date = londonDate(23);
   const client = await sessionFor(browser, PATIENT_1);
   const when = await step(client, 'Book a session that staff will need to cancel', async () => {
@@ -53,11 +54,38 @@ test('Staff can review affected bookings before confirming a practitioner’s bl
     await client.reload();
     await expect(bookingRow(client, 'other-bookings', when)).toContainText('Cancelled');
   });
-  await step(staff, 'Reopen the saved block and see its cancellations', async () => {
+  const savedLink = staff.url();
+  await step(staff, 'Save enough time away to fill more than one page of history', async () => {
+    for (let index = 1; index <= 20; index++) {
+      await reviewBlock(staff, date, '09:00', '17:00', `History entry ${index}`);
+      await staff.getByTestId('block-confirm').click();
+      await expect(staff.getByTestId('block-saved')).toBeVisible();
+    }
+  });
+  await step(staff, 'Open an older block directly, then revisit the original cancellations', async () => {
     await staff.goto('/admin/blocked-time');
-    await staff.getByTestId('block-list-row').filter({ hasText: 'Training day' }).getByTestId('block-open').click();
-    await expect(staff.getByTestId('block-detail')).toContainText(when);
+    await expect(staff.getByTestId('block-list-row')).toHaveCount(20);
+    await staff.getByTestId('block-older').click();
+    const olderRow = staff.getByTestId('block-list-row').first();
+    const olderReason = (await olderRow.locator('p').textContent())!;
+    await olderRow.getByTestId('block-open').click();
+    await expect(staff.getByTestId('block-detail')).toContainText(olderReason);
+    const olderLink = new URL(staff.url());
+    olderLink.searchParams.delete('before');
+    await staff.getByTestId('block-newest').click();
+    await expect(staff.getByTestId('block-list-row')).toHaveCount(20);
+    await expect(
+      staff.getByTestId('block-list-row').filter({ has: staff.getByText(olderReason, { exact: true }) }),
+    ).toHaveCount(0);
+    await staff.goto(olderLink.toString());
+    await expect(staff.getByTestId('block-detail')).toContainText(olderReason);
+    await expect(
+      staff.getByTestId('block-list-row').filter({ has: staff.getByText(olderReason, { exact: true }) }),
+    ).toHaveCount(0);
+    await staff.goto(savedLink);
     await expect(staff.getByTestId('block-detail')).toContainText('Training day');
+    await expect(staff.getByTestId('block-cancelled-booking')).toContainText(when);
+    await expect(staff.getByTestId('block-cancelled-booking')).toContainText('Cancelled');
   });
   await step(client, 'Check that clients and visitors cannot view the clinic’s blocked-time page', async () => {
     await client.goto(staff.url());

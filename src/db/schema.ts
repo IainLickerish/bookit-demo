@@ -164,6 +164,7 @@ export const blockedPeriods = pgTable(
   },
   (t) => [
     index('blocked_period_practitioner_idx').on(t.practitionerId, t.startsAt),
+    index('blocked_period_history_idx').on(t.createdAt, t.id),
     check('blocked_period_ends_after_start', sql`"ends_at" > "starts_at"`),
     check('blocked_period_reason_length', sql`length("reason") <= 300`),
   ],

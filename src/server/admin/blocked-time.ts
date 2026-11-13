@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, asc, desc, eq, gt, inArray, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database, Executor } from '@/db/client';
 import { blockedCancellations, blockedPeriods, bookings, practitioners, slots, users } from '@/db/schema';
@@ -150,20 +150,49 @@ export async function confirmBlockedTime(
   });
 }
 
+export const BLOCKED_TIME_PAGE_SIZE = 20;
+const blockDetails = {
+  id: blockedPeriods.id,
+  practitionerName: practitioners.name,
+  startsAt: blockedPeriods.startsAt,
+  endsAt: blockedPeriods.endsAt,
+  reason: blockedPeriods.reason,
+};
+
 /** This executor belongs to the current clinic; callers cannot select another tenant. */
-export async function listBlockedTime(db: Executor, staffId: string) {
+export async function listBlockedTime(db: Executor, staffId: string, before?: string) {
   await assertStaff(db, staffId);
-  return db
-    .select({
-      id: blockedPeriods.id,
-      practitionerName: practitioners.name,
-      startsAt: blockedPeriods.startsAt,
-      endsAt: blockedPeriods.endsAt,
-      reason: blockedPeriods.reason,
-    })
+  const [cursor] = z.uuid().safeParse(before).success
+    ? await db.select().from(blockedPeriods).where(eq(blockedPeriods.id, before!))
+    : [];
+  const rows = await db
+    .select(blockDetails)
     .from(blockedPeriods)
     .innerJoin(practitioners, eq(practitioners.id, blockedPeriods.practitionerId))
-    .orderBy(desc(blockedPeriods.createdAt), desc(blockedPeriods.id));
+    .where(
+      cursor
+        ? sql`(${blockedPeriods.createdAt}, ${blockedPeriods.id}) < (${cursor.createdAt}, ${cursor.id})`
+        : undefined,
+    )
+    .orderBy(desc(blockedPeriods.createdAt), desc(blockedPeriods.id))
+    .limit(BLOCKED_TIME_PAGE_SIZE + 1);
+  const blocks = rows.slice(0, BLOCKED_TIME_PAGE_SIZE);
+  return {
+    blocks,
+    nextCursor: rows.length > BLOCKED_TIME_PAGE_SIZE ? blocks.at(-1)!.id : null,
+  };
+}
+
+/** Reopening a saved block does not depend on the page of history currently shown. */
+export async function getBlockedTime(db: Executor, staffId: string, blockId: string | undefined) {
+  await assertStaff(db, staffId);
+  if (!z.uuid().safeParse(blockId).success) return null;
+  const [block] = await db
+    .select(blockDetails)
+    .from(blockedPeriods)
+    .innerJoin(practitioners, eq(practitioners.id, blockedPeriods.practitionerId))
+    .where(eq(blockedPeriods.id, blockId!));
+  return block ?? null;
 }
 
 export async function listBlockCancellations(db: Executor, staffId: string, blockId: string) {
