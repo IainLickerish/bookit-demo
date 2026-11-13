@@ -63,38 +63,51 @@ Existing demo databases do not need replacement or reseeding from scratch.
 
 ## Verification in this workspace
 
-The EN-2 requirement for passing runtime checks remains unresolved. This round
-again confirmed that Docker and Compose are unavailable, no Docker socket is
-mounted, and user namespaces are denied. Installing Chromium with dependencies
-fails because this workspace cannot become root. Downloading Chromium alone
-fails with HTTP 403 from the network proxy. No check has been weakened or marked
-to skip these requirements.
+Verification repeated on 13 November 2026, starting from commit `255ada3`,
+with Node 24.22.2, Bun 1.4.4 and actionlint 1.7.12. The branch already contained
+the cancellation pagination and index requested by the reviewer. This round
+reviewed that implementation and reran checks; it made no further application,
+migration or test changes.
 
-`bun install --frozen-lockfile`, type checking, lint, formatting and all 147 unit
-tests pass. All 20 owner checks load with `--list --forbid-only`, including the
-three new checks in `evals/10-blocked-time.eval.ts`. The 11 repository browser
-checks also load. Listing does not establish that a browser journey passes.
-Owner checks were not executed, following the factory's instruction to leave
-execution against its already-running copy to the factory.
+| Check                                                                           | Result                                                                                   |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `bun install --frozen-lockfile`                                                 | Passed.                                                                                  |
+| `bun run typecheck`                                                             | Passed.                                                                                  |
+| `bun run lint`                                                                  | Passed.                                                                                  |
+| `bun run format:check`                                                          | Passed.                                                                                  |
+| `bun run test:unit`                                                             | All 147 tests passed.                                                                    |
+| `node node_modules/@playwright/test/cli.js test -c evals/ --list --forbid-only` | All 20 owner checks loaded, including this branch's three new checks.                    |
+| `bun run test:integration`                                                      | Failed: 24 passed, 7 failed and 88 not run after setup failures.                         |
+| `bun x playwright test`                                                         | Failed in PostgreSQL setup before any browser journey ran: no working container runtime. |
+| `bun x playwright install --with-deps chromium`                                 | Failed because dependency installation requires root access.                             |
+| `bun x playwright install chromium`                                             | Failed after download attempts returned HTTP 403.                                        |
 
-`bun run test:integration` and `bun x playwright test` were attempted again.
-The integration run reports 24 passed, 7 failed and 88 not run after setup
-failures. The passing checks cover operational behaviour, not blocked time.
-The browser suite fails during PostgreSQL setup with “Could not find a working
-container runtime strategy”, before any journey runs. All 37 new blocked-time
-integration checks are unable to run because PostgreSQL setup fails, including
-both clinic upgrades, forced rollback, concurrent saves and cancellation pages.
-Operational script checks also fail because `jq` is missing. The earlier round
-compared these infrastructure failures with an unchanged `sf-base` worktree and
-recorded matching outcomes for existing suites. That comparison is not proof
-that the new behaviour works.
+Docker and Compose are unavailable, no Docker socket is mounted, and creating a
+user namespace fails with “Operation not permitted”. There is no local
+PostgreSQL installation. These prevent running the unchanged container-based
+checks here; no test has been weakened or marked to skip these requirements.
+The owner checks were listed only, following the factory's instruction to leave
+execution against its already-running copy to the factory. Listing checks does
+not establish that a browser journey passes.
+
+`bun run test:integration` completed in 127 seconds with a failing exit status.
+All 37 blocked-time checks were unable to run because container setup failed,
+including both clinic upgrades, forced rollback, concurrent requests and
+cancellation pagination. The passing tests cover operational behaviour, not
+blocked time. Operational script tests also fail because `jq` is missing. The
+previous round recorded matching infrastructure failures in an unchanged
+`sf-base` worktree; this round does not claim those failures verify the new work.
+All 11 repository browser checks also load with `--list --forbid-only`, but none
+ran. The existing owner checks and `.github/` remain identical to `sf-base`.
 
 Before approval or merging, EN-2 still requires passing integration and browser
 suites in an environment with Docker, Compose, `jq` and Chromium, plus execution
 of the owner checks by the factory. EN-6 also requires checking recovery in that
 environment. Neither migration safety, atomic cancellation nor simultaneous
-request safety has been verified against PostgreSQL here. The recovery procedure
-above has not been rehearsed in this workspace.
+request safety has been verified against PostgreSQL here. Both clinic upgrades,
+forced rollback, all 24 concurrent save orders and every cancellation page still
+need passing runtime results. The recovery procedure above has not been
+rehearsed in this workspace. This verification gap remains an approval blocker.
 
 The three new owner checks cover review and confirmation, reopening saved blocks
 and paged cancellations, access restrictions, changed impact, retained invalid
