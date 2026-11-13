@@ -204,7 +204,15 @@ test('Clients and signed-out visitors cannot download bookings, even through the
       async () => {
         await signInToClinic(staff, clinic);
         await staff.goto('/admin');
-        expect((await downloadBookings(staff)).map((row) => row[1])).toContain(downloadedName(EXPORT_CLIENTS[2]!));
+        const rows = await downloadBookings(staff);
+        expect(rows.map((row) => row[1])).toContain(downloadedName(EXPORT_CLIENTS[2]!));
+        const ownPractitioners = clinic.tenant.practitioners.map((practitioner) => practitioner.name);
+        const otherClinic = clinics[1 - index]!;
+        expect(rows.some((row) => row[2] === clinic.tenant.practitioners[0]!.name)).toBe(true);
+        for (const row of rows) {
+          expect(ownPractitioners).toContain(row[2]);
+          expect(row[2]).not.toBe(otherClinic.tenant.practitioners[0]!.name);
+        }
       },
     );
     const client = await clinicPage(browser, clinic);
