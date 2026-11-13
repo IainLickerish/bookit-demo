@@ -1,12 +1,30 @@
-import { expect, test } from '@playwright/test';
-import { bookingDownloadChecks } from '../../evals/csv-checks';
+import { expect } from '@playwright/test';
+import { test } from '../../evals/10-unicode-booking-downloads.eval';
 import { buildComposeImage, COMPOSE_CLOCK, type ComposeTenant } from '../helpers/compose';
 import { prepareExportClinic } from '../helpers/export-clinic';
 
-// The same public journeys also run with fictional combined accents, other alphabets,
-// CSV delimiters and formula-like names, in both clinics and with two practitioners.
+// Import the owner journeys and supply fresh fictional copies with combined accents,
+// other alphabets, CSV delimiters, formula-like names and two practitioners in both clinics.
 const clinics: ComposeTenant[] = [];
-test.use({ trace: 'off' });
+test.use({
+  trace: 'off',
+  clinics: async ({ browser }, provideClinics) => {
+    expect(browser.isConnected()).toBe(true);
+    await provideClinics(
+      clinics.map((clinic) => ({
+        name: clinic.tenant.tenant,
+        now: process.env.EVAL_NOW ?? COMPOSE_CLOCK,
+        label: clinic.tenant.settings.clinicName,
+        domain: clinic.tenant.domain,
+        url: clinic.url,
+        accounts: clinic.accounts,
+        clients: clinic.tenant.accounts.filter((account) => account.role === 'patient').map((account) => account.name),
+        practitioners: clinic.tenant.practitioners.map((practitioner) => practitioner.name),
+      })),
+    );
+  },
+});
+
 test.beforeAll(async () => {
   test.setTimeout(900_000);
   if (process.env.BOOKIT_COMPOSE_SKIP_BUILD !== '1') {
@@ -23,26 +41,3 @@ test.afterAll(async () => {
   test.setTimeout(300_000);
   await Promise.all(clinics.map((clinic) => clinic.stop()));
 });
-
-test.afterEach(async ({ browser }) => {
-  for (const context of browser.contexts()) await context.close();
-});
-
-for (const check of bookingDownloadChecks) {
-  test(check.title, async ({ browser }) => {
-    test.setTimeout(180_000);
-    await check.run(
-      browser,
-      clinics.map((clinic) => ({
-        name: clinic.tenant.tenant,
-        now: process.env.EVAL_NOW ?? COMPOSE_CLOCK,
-        label: clinic.tenant.settings.clinicName,
-        domain: clinic.tenant.domain,
-        url: clinic.url,
-        accounts: clinic.accounts,
-        clients: clinic.tenant.accounts.filter((account) => account.role === 'patient').map((account) => account.name),
-        practitioners: clinic.tenant.practitioners.map((practitioner) => practitioner.name),
-      })),
-    );
-  });
-}

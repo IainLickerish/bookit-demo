@@ -208,6 +208,8 @@ its Unicode names and DST reference slots so those defects remain reproducible.
 CSV downloads preserve Unicode names. The companion owner checks in
 `evals/10-unicode-booking-downloads.eval.ts` use the supplied demo copy, `EVAL_NOW`
 and `EVAL_PASSWORD`, without building containers or accessing its database.
+The seven new checks keep their helpers in the same file so they also load on
+the comparison branch, with each acceptance point as its exact test title.
 Set `EVAL_SECOND_CLINIC_URL` to include a second supplied clinic with the same demo
 password. The same checks run in `tests/e2e/unicode-booking-downloads.spec.ts`
 against fresh Acme and Beacon copies with fictional combined accents, other
