@@ -1,0 +1,5 @@
+﻿"Booking ID","Patient","Practitioner","Start (UTC)","End (UTC)","Status","Late cancellation","Phone"
+"fictional-booking-1","Zoë Brontë","Alex Physiotherapist","2026-10-25T09:00:00.000Z","2026-10-25T09:45:00.000Z","confirmed","no","'+44 7700 900001"
+"fictional-booking-2","Zoë Brontë","Alex Physiotherapist","2026-10-25T10:00:00.000Z","2026-10-25T10:45:00.000Z","confirmed","no",""
+"fictional-booking-3","'=架空, ""Δοκιμή""
+عميل تجريبي","Alex Physiotherapist","2026-10-25T11:00:00.000Z","2026-10-25T11:45:00.000Z","confirmed","no",""

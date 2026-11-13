@@ -1,8 +1,18 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { prepareComposeTenant, type ComposeTenant } from '../tests/helpers/compose';
-import { evalNow, signIn } from './support';
+import { signIn } from './support';
+
+/** A supplied demo copy. Owner checks never build, seed or reach into its database. */
+export interface ExportClinic {
+  name: 'acme' | 'beacon';
+  now: string;
+  label: string;
+  domain: string;
+  url: string;
+  accounts: Record<string, string>;
+  clients: string[];
+  practitioners: string[];
+}
 
 export const CSV_HEADINGS = [
   'Booking ID',
@@ -15,50 +25,26 @@ export const CSV_HEADINGS = [
   'Phone',
 ];
 
-// These names exist only in the two fresh export-check copies, never in the normal demo seed.
-// The second uses decomposed accents. The third exercises other alphabets, CSV quoting and formula protection.
-export const EXPORT_CLIENTS = ['Zoë Brontë', 'Zoe\u0308 Bronte\u0308', '=架空, "Δοκιμή"\nعميل تجريبي'];
+// The existing CSV safety rule marks formula-like values as spreadsheet text.
+export const downloadedName = (name: string): string =>
+  /^[\s\u0000-\u001f]*[=+\-@]/u.test(name) || /^[\t\r\n]/u.test(name) ? `'${name}` : name;
 
-// Only the formula-like fixture name needs the existing spreadsheet text prefix.
-export const downloadedName = (name: string): string => (name === EXPORT_CLIENTS[2] ? `'${name}` : name);
-
-/** Reuse the existing isolated Compose fixture, supplying only fictional export test data. */
-export async function prepareExportClinic(name: 'acme' | 'beacon'): Promise<ComposeTenant> {
-  const clinic = await prepareComposeTenant(name);
-  for (const [index, account] of clinic.tenant.accounts.filter((account) => account.role === 'patient').entries()) {
-    account.name = EXPORT_CLIENTS[index]!;
-  }
-  clinic.tenant.practitioners.push({ ...clinic.tenant.practitioners[0]!, name: 'Robin Export Test' });
-  const tenantFile = path.join(clinic.directory, `${name}.json`);
-  writeFileSync(tenantFile, JSON.stringify(clinic.tenant));
-  writeFileSync(clinic.clockFile, JSON.stringify({ now: evalNow().toISOString() }));
-  const overrideFile = path.join(clinic.directory, 'compose.override.json');
-  const override = JSON.parse(readFileSync(overrideFile, 'utf8')) as {
-    services: Record<string, { volumes?: string[] }>;
-  };
-  for (const service of ['seed', 'bookit']) {
-    override.services[service]!.volumes!.push(`${tenantFile}:/app/tenants/${name}.json:ro`);
-  }
-  writeFileSync(overrideFile, JSON.stringify(override));
-  return clinic;
-}
-
-export async function clinicPage(browser: Browser, clinic: ComposeTenant): Promise<Page> {
+export async function clinicPage(browser: Browser, clinic: ExportClinic): Promise<Page> {
   // Each clinic's context has its own origin and cookies, even though both hosts are loopback.
   const context = await browser.newContext({ baseURL: clinic.url });
   return context.newPage();
 }
 
-export async function signInToClinic(page: Page, clinic: ComposeTenant, localPart = 'admin'): Promise<void> {
-  const email = clinic.tenant.accounts.find((account) => account.email.startsWith(`${localPart}@`))!.email;
+export async function signInToClinic(page: Page, clinic: ExportClinic, localPart = 'admin'): Promise<void> {
+  const email = localPart === 'admin' ? `admin@${clinic.domain}` : `${localPart}@patients.${clinic.domain}`;
   await signIn(page, email, clinic.accounts[email]);
 }
 
 export async function bookExportBooking(
   page: Page,
-  clinic: ComposeTenant,
+  clinic: ExportClinic,
   date: string,
-  practitioner = clinic.tenant.practitioners[0]!.name,
+  practitioner = clinic.practitioners[0]!,
   phone = '',
 ): Promise<{ id: string; when: string }> {
   await page.goto('/slots');

@@ -206,10 +206,17 @@ must pass both on this baseline and after each expected fix. The tenant seed kee
 its Unicode names and DST reference slots so those defects remain reproducible.
 
 CSV downloads preserve Unicode names. The companion owner checks in
-`evals/10-unicode-booking-downloads.eval.ts` reuse the Compose browser fixtures to
-start fresh Acme and Beacon copies with `EVAL_NOW`, fictional names with combined
-accents and other alphabets, and a second practitioner. They leave the normal
-demo's records and the existing owner checks alone. These checks need Docker,
-Compose and Chromium, like the other container browser tests. The existing staff
-key flow stays unchanged; its companion also downloads a file before saving and
-restoring a clinic setting.
+`evals/10-unicode-booking-downloads.eval.ts` use the supplied demo copy, `EVAL_NOW`
+and `EVAL_PASSWORD`, without building containers or accessing its database.
+Set `EVAL_SECOND_CLINIC_URL` to include a second supplied clinic with the same demo
+password. The same checks run in `tests/e2e/unicode-booking-downloads.spec.ts`
+against fresh Acme and Beacon copies with fictional combined accents, other
+alphabets, CSV delimiters, formula-like names and a second practitioner. That
+fixture matrix needs Docker, Compose and Chromium. Normal tenant seeds and
+existing owner checks remain unchanged. The staff key flow's companion downloads
+a filtered file before saving and restoring a clinic setting (PR-3, PR-15, EN-5).
+For the spreadsheet review, open [the fictional example](docs/evidence/unicode-bookings.csv)
+as UTF-8 CSV. It was made with the export writer and the browser matrix's fictional
+names. Check that accents and other alphabets remain readable, the third client's
+comma, quotes and line break stay in the Patient field, and its leading equals
+sign stays text (PR-21, PS-7).
