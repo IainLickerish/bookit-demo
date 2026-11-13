@@ -24,10 +24,10 @@ export const demoPassword = (): string => {
   return value;
 };
 
-export async function signIn(page: Page, email: string): Promise<void> {
+export async function signIn(page: Page, email: string, password = demoPassword()): Promise<void> {
   await page.goto('/auth/sign-in');
   await page.getByTestId('sign-in-email').fill(email);
-  await page.getByTestId('sign-in-password').fill(demoPassword());
+  await page.getByTestId('sign-in-password').fill(password);
   await page.getByTestId('sign-in-submit').click();
   await expect(page).not.toHaveURL(/\/auth\/sign-in/);
 }

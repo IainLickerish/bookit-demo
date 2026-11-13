@@ -91,7 +91,7 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="border-t" data-testid="admin-booking-row">
+                  <tr key={row.id} className="border-t" data-testid="admin-booking-row" data-booking-id={row.id}>
                     <td className="py-3">{row.patientName}</td>
                     <td>{row.practitionerName}</td>
                     <td>{formatSlot(row.startsAt, settings.timeZone)}</td>

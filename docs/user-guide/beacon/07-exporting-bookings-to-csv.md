@@ -8,7 +8,7 @@ audience: admin
 # Downloading Beacon Dental bookings
 
 From **Clinic bookings** at `/admin`, apply the filters you need and choose
-**Export CSV**. Open the downloaded file as UTF-8 in your spreadsheet. It contains
+**Export filtered bookings (CSV)**. Open the downloaded `bookings.csv` file as UTF-8 in your spreadsheet. It contains
 the appointments matching those filters, including names with accented letters.
 
 The file handles commas, quotes and line breaks inside fields. Formula-like
