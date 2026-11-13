@@ -9,9 +9,10 @@ async function expectTypeface(page: Page, testId: string, family: 'Fraunces' | '
   expect(
     await element.evaluate(async (node, name) => {
       const style = getComputedStyle(node);
+      // Empty form controls still need a character to exercise font loading.
       const fonts = await document.fonts.load(
         `${style.fontWeight} ${style.fontSize} "${name}"`,
-        node.textContent ?? '',
+        node.textContent || ' ',
       );
       return fonts.length > 0 && fonts.every((font) => font.status === 'loaded');
     }, family),

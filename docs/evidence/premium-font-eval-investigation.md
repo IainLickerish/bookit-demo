@@ -1,9 +1,8 @@
 # Shared design foundation: font check investigation
 
-The step 1 design changes remain on this branch. The owner has replied “Yes” to the proposed font check correction,
-meeting the approval requirement in EN-5. However, the current run also explicitly says “Never change or delete
-existing files under evals/”. That instruction still prevents applying the correction. No existing eval has been
-changed, and the application has not been altered to work around the faulty check.
+The step 1 design changes remain on this branch. The owner accepted the proposed font check correction. The
+current run explicitly permits fixing evals added on this branch, so the correction is now applied under EN-5.
+Checks inherited from `sf-base` are unchanged. The application has not been altered to work around the faulty check.
 
 ## Finding
 
@@ -27,9 +26,9 @@ origin. No running clinic, account, database or owner eval was used.
 The same empty-text result also occurred without the CSS subset ranges. Changing the font files or their ranges
 does not correct the check's input.
 
-## Proposed correction, not applied
+## Applied correction
 
-In the existing font eval, replace only:
+In the font eval added by this branch, the only change replaces:
 
 ```ts
 node.textContent ?? '';
@@ -43,8 +42,7 @@ node.textContent || ' ';
 
 The space provides a character to check for empty form controls. The assertions still require the correct computed
 font family and a non-empty collection of successfully loaded font faces. The checks for local requests, licences,
-weights and both page sizes remain unchanged. Applying this proposal requires an explicit exception to the current
-run's instruction forbidding changes to existing eval files, limited to this expression in the font check.
+weights and both page sizes remain unchanged. The check still fails if the font is absent or fails to load.
 
 ## Validation
 
