@@ -8,6 +8,10 @@ import { loadTenant, tenantSchema } from '@/server/seed/tenant';
 import { clockChangeReferenceStarts, validatePasswords } from '@/server/seed/seed';
 
 describe('REQ-18.2-01 tenant configuration boundaries', () => {
+  it.each(['acme', 'beacon'] as const)('keeps %s compatible with its pre-blocked-time seed configuration', (name) => {
+    const baseline = tenantSchema.parse(JSON.parse(readFileSync(`tests/fixtures/seed-baseline/${name}.json`, 'utf8')));
+    expect(loadTenant(name)).toEqual(baseline);
+  });
   it('creates private caller credentials without printing values or overwriting a previous set', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'bookit-private-credentials-'));
     const run = () => spawnSync('bun', ['scripts/local-credentials.ts', 'acme', directory], { encoding: 'utf8' });

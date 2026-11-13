@@ -1,14 +1,23 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, writeFile, copyFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { createDatabase } from '@/db/client';
-import { MIGRATIONS_FOLDER, runMigrations } from '@/db/migrate';
-import { randomUUID } from 'node:crypto';
+import { MIGRATIONS_FOLDER } from '@/db/migrate';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { blockedCancellations, blockedPeriods, bookings, slots } from '@/db/schema';
+import {
+  blockedCancellations,
+  blockedPeriods,
+  bookings,
+  clinicSettings,
+  practitioners,
+  slots,
+  users,
+} from '@/db/schema';
 import {
   BLOCKED_TIME_PAGE_SIZE,
   confirmBlockedTime,
@@ -21,6 +30,8 @@ import { bookSlot } from '@/server/bookings/book';
 import { lockDiary } from '@/server/bookings/diary-lock';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
+import { assertSeedIdentity, seedTenant } from '@/server/seed/seed';
+import { loadTenant, tenantSchema } from '@/server/seed/tenant';
 import { isSlotFree, listAvailableSlots } from '@/server/slots/queries';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
@@ -434,49 +445,83 @@ describe('staff blocked time and cancellations', () => {
   );
 });
 
-it('upgrades a populated previous database without changing its bookings', async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'bookit-block-upgrade-'));
-  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('bookit_upgrade').start();
-  const url = container.getConnectionUri();
-  const handle = createDatabase(url);
-  try {
-    await mkdir(path.join(directory, 'meta'));
-    const journal = JSON.parse(await readFile(path.join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8')) as {
-      entries: { tag: string }[];
-    };
-    journal.entries = journal.entries.slice(0, 2);
-    await writeFile(path.join(directory, 'meta/_journal.json'), JSON.stringify(journal));
-    for (const entry of journal.entries)
-      await copyFile(path.join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), path.join(directory, `${entry.tag}.sql`));
-    await migrate(handle.db, { migrationsFolder: directory });
-    const previous = await seedClinic(handle.db, clock, { settings: { slotHorizonDays: 7 } });
-    const [slot] = await handle.db.select().from(slots);
-    await handle.db.insert(bookings).values({
-      id: randomUUID(),
-      patientId: previous.patient1.id,
-      slotId: slot!.id,
-      status: 'confirmed',
-      lateCancellation: false,
-      phone: null,
-      rescheduleCount: 0,
-      createdAt: clock.now(),
-      updatedAt: clock.now(),
-      cancelledAt: null,
-    });
-    const before = await handle.db.select().from(bookings);
-    await runMigrations(url);
-    expect(await handle.db.select().from(bookings)).toEqual(before);
-    expect(await handle.db.select().from(blockedPeriods)).toHaveLength(0);
-    expect(await handle.db.select().from(blockedCancellations)).toHaveLength(0);
-    const checked = await reviewBlockedTime(handle.db, clock, previous.admin.id, {
-      ...values(),
-      practitionerId: previous.practitioners.weekdays,
-    });
-    await confirmBlockedTime(handle.db, clock, previous.admin.id, checked.values, randomUUID(), checked.snapshot);
-    expect((await listBlockedTime(handle.db, previous.admin.id)).blocks).toHaveLength(1);
-  } finally {
-    await handle.pool.end();
-    await container.stop();
-    await rm(directory, { recursive: true, force: true });
-  }
-});
+// These snapshots are the shipped configurations before blocked time was added.
+// Using a generic clinic fixture would miss deployment's seed fingerprint check.
+it.each(['acme', 'beacon'] as const)(
+  'upgrades the existing %s clinic through normal migration and seeding without losing activity',
+  async (name) => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'bookit-block-upgrade-'));
+    const container = await new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('bookit_upgrade').start();
+    const url = container.getConnectionUri();
+    const handle = createDatabase(url);
+    try {
+      const baseline = tenantSchema.parse(
+        JSON.parse(await readFile(path.resolve('tests/fixtures/seed-baseline', `${name}.json`), 'utf8')),
+      );
+      const passwords = Object.fromEntries(
+        baseline.accounts.map((account) => [account.email, randomBytes(24).toString('base64url')]),
+      );
+      await mkdir(path.join(directory, 'meta'));
+      const journal = JSON.parse(await readFile(path.join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8')) as {
+        entries: { tag: string }[];
+      };
+      journal.entries = journal.entries.slice(0, 2);
+      await writeFile(path.join(directory, 'meta/_journal.json'), JSON.stringify(journal));
+      for (const entry of journal.entries)
+        await copyFile(path.join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), path.join(directory, `${entry.tag}.sql`));
+      await migrate(handle.db, { migrationsFolder: directory });
+      await seedTenant(handle.db, clock, { tenant: baseline, environment: 'staging', passwords });
+      // Preserve activity as well as seeded records and account credentials.
+      await handle.db.update(clinicSettings).set({ clinicName: `${baseline.settings.clinicName} reception` });
+      const before = {
+        bookings: await handle.db.select().from(bookings),
+        users: await handle.db.select().from(users),
+        slots: await handle.db.select().from(slots),
+        practitioners: await handle.db.select().from(practitioners),
+        settings: await handle.db.select().from(clinicSettings),
+      };
+      const passwordFile = path.join(directory, 'accounts.json');
+      const clockFile = path.join(directory, 'clock.json');
+      await writeFile(passwordFile, JSON.stringify(passwords), { mode: 0o600 });
+      await writeFile(clockFile, JSON.stringify({ now: clock.now().toISOString() }));
+      const env: NodeJS.ProcessEnv = {
+        NODE_ENV: 'test',
+        PATH: process.env.PATH,
+        DATABASE_URL: url,
+        BOOKIT_TENANT: name,
+        BOOKIT_PRODUCT: baseline.product,
+        BOOKIT_ENV: 'staging',
+        BOOKIT_SEED_PASSWORDS_FILE: passwordFile,
+        BOOKIT_TEST_CLOCK: clockFile,
+        BOOKIT_BUILD_ALLOW_TEST_CLOCK: 'true',
+      };
+      const migration = spawnSync('bun', ['run', 'db:migrate'], { env, encoding: 'utf8', timeout: 30_000 });
+      expect(migration.status, migration.stderr).toBe(0);
+      const seed = spawnSync('bun', ['run', 'seed'], { env, encoding: 'utf8', timeout: 30_000 });
+      expect(seed.status, seed.stderr).toBe(0);
+      expect(seed.stdout).toContain('"outcome":"unchanged"');
+      expect(loadTenant(name)).toEqual(baseline);
+      await expect(assertSeedIdentity(handle.db, name, 'staging')).resolves.toBeUndefined();
+      expect(await handle.db.select().from(bookings)).toEqual(before.bookings);
+      expect(await handle.db.select().from(users)).toEqual(before.users);
+      expect(await handle.db.select().from(slots)).toEqual(before.slots);
+      expect(await handle.db.select().from(practitioners)).toEqual(before.practitioners);
+      expect(await handle.db.select().from(clinicSettings)).toEqual(before.settings);
+      for (const booking of before.bookings)
+        expect(await findBookingForPatient(handle.db, booking.patientId, booking.id)).toMatchObject(booking);
+      expect(await handle.db.select().from(blockedPeriods)).toHaveLength(0);
+      expect(await handle.db.select().from(blockedCancellations)).toHaveLength(0);
+      const admin = before.users.find((user) => user.role === 'admin')!;
+      const checked = await reviewBlockedTime(handle.db, clock, admin.id, {
+        ...values(),
+        practitionerId: before.practitioners[0]!.id,
+      });
+      await confirmBlockedTime(handle.db, clock, admin.id, checked.values, randomUUID(), checked.snapshot);
+      expect((await listBlockedTime(handle.db, admin.id)).blocks).toHaveLength(1);
+    } finally {
+      await handle.pool.end();
+      await container.stop();
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);

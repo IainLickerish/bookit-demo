@@ -263,6 +263,34 @@ for (const tenant of ['acme', 'beacon'] as const) {
   }) => {
     const clinic = tenant === 'acme' ? acme : beacon;
     const otherClinic = tenant === 'acme' ? beacon : acme;
+    // Add a second practitioner only to this disposable test project, after normal seeding.
+    const fixture = await clinic.command([
+      'exec',
+      '-T',
+      'bookit',
+      'bun',
+      '-e',
+      `
+        import { readFileSync } from 'node:fs';
+        import { createDatabase } from './src/db/client';
+        import { createFileClock } from './src/lib/clock';
+        import { createPractitioner } from './src/server/practitioners';
+        import { ensureSlotsThroughHorizon } from './src/server/slots/ensure';
+        const url = new URL('postgresql://bookit@db:5432/bookit');
+        url.password = readFileSync(process.env.BOOKIT_DB_PASSWORD_FILE, 'utf8').trim();
+        const handle = createDatabase(url.toString());
+        const clock = createFileClock('/clock/now.json');
+        try {
+          await createPractitioner(handle.db, clock, {
+            name: process.env.BOOKIT_TENANT === 'acme' ? 'Sam Physiotherapist' : 'Robin Dentist',
+            bio: 'Fictional practitioner for blocked-time checks',
+            workingDays: [1, 2, 3, 4, 5, 6, 7], workdayStart: '09:00', workdayEnd: '17:00',
+          });
+          await ensureSlotsThroughHorizon(handle.db, clock);
+        } finally { await handle.pool.end(); }
+      `,
+    ]);
+    expect(fixture.code).toBe(0);
     const clientContext = await signIn(browser, clinic, 'patient1');
     const staffContext = await signIn(browser, clinic, 'admin');
     const otherContext = await signIn(browser, otherClinic, 'admin');

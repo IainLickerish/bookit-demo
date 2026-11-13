@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "tenant": "acme",
+  "product": "ACME",
+  "client": "ACMEPHYSIO",
+  "domain": "acmephysio.test",
+  "allowedSenderDomains": ["acmephysio.test"],
+  "mailFrom": "noreply@acmephysio.test",
+  "branding": { "practitionerLabel": "physiotherapist", "welcome": "Book sessions with your physiotherapist" },
+  "settings": {
+    "clinicName": "Acme Physio",
+    "timeZone": "Europe/London",
+    "lateCancellationHours": 24,
+    "includeContactInConfirmation": true,
+    "slotHorizonDays": 220,
+    "sessionMinutes": 45,
+    "maxReschedulesPerBooking": 3
+  },
+  "supportHours": "Monday to Friday 09:00 to 17:30, Europe/London",
+  "tone": "Formal, concise",
+  "contacts": [
+    { "name": "Alice Archer", "title": "Practice Manager", "role": "contact", "email": "alice@acmephysio.test" },
+    { "name": "Adam Ashdown", "title": "Director", "role": "approver", "email": "adam.ashdown@acmephysio.test" }
+  ],
+  "endpoints": {
+    "staging": "http://localhost:4101",
+    "production": "http://localhost:4102",
+    "inbound": "acme@support.supportagents.test"
+  },
+  "accounts": [
+    {
+      "email": "patient1@patients.acmephysio.test",
+      "name": "Zoë Brontë",
+      "role": "patient",
+      "phone": "+44 7700 900001"
+    },
+    { "email": "patient2@patients.acmephysio.test", "name": "Łukasz Wiśniewski", "role": "patient", "phone": null },
+    { "email": "patient3@patients.acmephysio.test", "name": "Siobhán Ó Briain", "role": "patient", "phone": null },
+    { "email": "admin@acmephysio.test", "name": "Acme Demo Admin", "role": "admin", "phone": null }
+  ],
+  "practitioners": [
+    {
+      "name": "Alex Physiotherapist",
+      "bio": "Acme physiotherapy and rehabilitation",
+      "workingDays": [1, 2, 3, 4, 5, 6, 7],
+      "workdayStart": "09:00",
+      "workdayEnd": "17:00"
+    }
+  ]
+}
