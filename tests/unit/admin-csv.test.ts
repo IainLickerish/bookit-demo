@@ -3,6 +3,57 @@ import { parseBookingFilters } from '@/server/admin/bookings';
 import { adminSettingsInput } from '@/server/admin/settings';
 import { bookingsCsv, csvField } from '@/server/export/csv';
 import { adminLogEvidence } from '../helpers/admin-evidence';
+import type { AdminBooking } from '@/server/admin/bookings';
+
+const unicodeBooking: AdminBooking = {
+  id: 'booking-unicode',
+  patientName: 'Zoë Brontë',
+  practitionerId: 'p1',
+  practitionerName: 'Pat',
+  startsAt: new Date('2026-10-25T09:00:00Z'),
+  endsAt: new Date('2026-10-25T09:45:00Z'),
+  status: 'confirmed',
+  lateCancellation: false,
+  phone: null,
+};
+
+describe('Unicode booking exports', () => {
+  it.each(['Zoë Brontë', 'Siobhán Ó Briain', 'Zoe\u0308 Bronte\u0308', '架空 花子', 'Δοκιμή Πελάτη', 'عميل تجريبي'])(
+    'preserves the original UTF-8 letters and combining marks in %s',
+    (patientName) => {
+      const row = { ...unicodeBooking, patientName };
+      const response = new Response(bookingsCsv([row]));
+      return response.arrayBuffer().then((buffer) => {
+        const bytes = Buffer.from(buffer);
+        expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+        expect(bytes.toString('utf8')).toBe(
+          '\uFEFF"Booking ID","Patient","Practitioner","Start (UTC)","End (UTC)","Status","Late cancellation","Phone"\r\n' +
+            `"booking-unicode","${patientName}","Pat","2026-10-25T09:00:00.000Z","2026-10-25T09:45:00.000Z","confirmed","no",""\r\n`,
+        );
+        expect(row).toEqual({ ...unicodeBooking, patientName });
+      });
+    },
+  );
+
+  it('keeps Unicode, delimiters and formula protection together without changing row order or optional phones', () => {
+    const rows = [
+      { ...unicodeBooking, patientName: 'Zoë, "架空"\r\nZoe\u0308', phone: '+44 7700 900001' },
+      {
+        ...unicodeBooking,
+        id: 'booking-2',
+        patientName: '=架空+1',
+        status: 'cancelled' as const,
+        lateCancellation: true,
+      },
+    ];
+    const before = structuredClone(rows);
+    const csv = bookingsCsv(rows);
+    expect(csv).toContain('"Zoë, ""架空""\r\nZoe\u0308"');
+    expect(csv).toContain('"\'+44 7700 900001"\r\n"booking-2","\'=架空+1"');
+    expect(csv).toContain('"cancelled","yes",""\r\n');
+    expect(rows).toEqual(before);
+  });
+});
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
   it('writes a BOM, RFC 4180 quotes and CRLF records with embedded newlines', () => {

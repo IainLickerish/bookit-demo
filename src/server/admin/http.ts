@@ -1,7 +1,7 @@
 import type { BookingDependencies } from '@/server/bookings/book';
 import { findSessionUser } from '@/server/auth/session';
 import { loadClinicSettings } from '@/server/settings';
-import { bookingsCsv, ExportEncodingError } from '@/server/export/csv';
+import { bookingsCsv } from '@/server/export/csv';
 import { reportError } from '@/server/error-reporting';
 import { listAdminBookings, parseBookingFilters } from './bookings';
 import { UnknownReportTypeError } from './report-type';
@@ -64,7 +64,6 @@ export async function adminReportResponse(
         : { bookings: rows };
     return Response.json(data, { headers: privateHeaders });
   } catch (error) {
-    if (error instanceof ExportEncodingError) reportError(error, { operation: 'admin.export' });
     if (error instanceof UnknownReportTypeError) reportError(error, { operation: 'admin.report' });
     // Database/provider exceptions may include bound personal data. Do not log them.
     deps.log.error({ event: 'admin.report_failed' }, 'Admin report unavailable');
