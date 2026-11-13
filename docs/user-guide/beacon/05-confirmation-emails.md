@@ -22,7 +22,7 @@ After booking or moving, choose **Add to calendar** beside the confirmed appoint
 in **My bookings**. Choose **Copy calendar details**. If copying is unavailable,
 select and copy the visible details yourself, or type them into your calendar.
 The booking and move emails include these same details as text, without an attachment.
-The calendar summary contains the clinic, practitioner, start, end, time zone and
+The calendar summary contains the clinic, clinician, start, end, time zone and
 duration. It leaves out your contact details and private booking links.
 
 - In Google Calendar, choose **Create**, then **Event**.
@@ -33,5 +33,5 @@ In each calendar, enter the title, start and end shown. Use the stated time zone
 (`Europe/London` for UK bookings), so winter and summer times stay correct. Save
 the event. Copying details does not create an event automatically.
 
-If you move a appointment, update your existing calendar event to the new time yourself.
+If you move an appointment, update your existing calendar event to the new time yourself.
 If you cancel, remove the event yourself. BookIt does not update your calendar.

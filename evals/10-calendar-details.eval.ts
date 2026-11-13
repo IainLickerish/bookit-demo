@@ -14,6 +14,16 @@ import {
   step,
 } from './support';
 
+// Factory demos may use a private HTTP hostname instead of localhost. Give
+// that test origin the same Clipboard API support as a local browser demo.
+test.use({
+  launchOptions: {
+    args: [
+      `--unsafely-treat-insecure-origin-as-secure=${new URL(process.env.EVAL_BASE_URL ?? 'http://localhost:4101').origin}`,
+    ],
+  },
+});
+
 interface Appointment {
   id: string;
   when: string;
@@ -76,6 +86,7 @@ function ukWhen(instant: Date): string {
 }
 
 async function copyAndCheck(page: Page, details: string): Promise<void> {
+  await page.bringToFront();
   await page.getByTestId('copy-calendar-details').focus();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('calendar-copy-result')).toContainText('Calendar details copied.');
@@ -123,6 +134,20 @@ test('Clients can copy calendar details after booking or moving and from upcomin
     await copyAndCheck(page, details);
     expect(details).toContain(`Start: ${appointment.when}`);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+  await step(page, 'Copy using a browser without the newer clipboard controls', async () => {
+    const details = await page.getByTestId('calendar-details').inputValue();
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    });
+    try {
+      await page.getByTestId('copy-calendar-details').press('Enter');
+      await expect(page.getByTestId('calendar-copy-result')).toHaveText('Calendar details copied.');
+      await expect(page.getByTestId('copy-calendar-details')).toBeFocused();
+    } finally {
+      await page.evaluate(() => Reflect.deleteProperty(navigator, 'clipboard'));
+    }
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(details);
   });
   const moved = await step(page, 'Move the session and copy the new calendar details', async () => {
     const moved = await move(page, appointment);
@@ -238,7 +263,8 @@ test('Only the booking client can retrieve their calendar summary, which exclude
       await other.getByTestId('sign-out').click();
       await signIn(other, ADMIN);
       await other.goto(path);
-      await expect(other).not.toHaveURL(path);
+      await expect(other).toHaveURL(new URL('/', other.url()).href);
+      await expect(other.getByTestId('admin-home')).toBeVisible();
       await expect(other.getByTestId('calendar-details')).toHaveCount(0);
     });
     await step(page, 'Cancel your booking and see that its calendar summary is no longer offered', async () => {
@@ -290,7 +316,7 @@ test('Failed email delivery preserves the confirmed booking, and failed copying 
   page,
 }) => {
   // The local demo inbox rejects SMTP, exercising the real saved-booking path.
-  // compose.key-flows.yml enables this test facility only in fixed-clock copies.
+  // compose.yml enables this facility on the fictional local inbox.
   const original: unknown = await step(page, 'Sign in before booking a session', async () => {
     await signIn(page, PATIENT_2);
     const response = await fetch(`${mailBase()}/api/v1/chaos`);
@@ -334,6 +360,7 @@ test('Failed email delivery preserves the confirmed booking, and failed copying 
           configurable: true,
           value: { writeText: () => Promise.reject(new Error('Copying is unavailable')) },
         });
+        Object.defineProperty(document, 'execCommand', { configurable: true, value: () => false });
       });
       const details = await openDetails(page, moved);
       await page.reload();

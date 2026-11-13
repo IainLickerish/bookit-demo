@@ -2,20 +2,14 @@
 
 import { useRef, useState } from 'react';
 import { CALENDAR_MESSAGES } from '@/app/messages';
+import { copyText } from '@/lib/clipboard';
 
 export function CopyCalendarDetails({ details }: { details: string }) {
   const field = useRef<HTMLTextAreaElement>(null);
   const [result, setResult] = useState<'copied' | 'failed' | null>(null);
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(details);
-      setResult('copied');
-    } catch {
-      setResult('failed');
-      field.current?.focus();
-      field.current?.select();
-    }
+    if (field.current) setResult((await copyText(field.current)) ? 'copied' : 'failed');
   }
 
   return (
