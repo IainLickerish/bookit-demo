@@ -9,7 +9,10 @@ to the bookings it cancelled. Existing data changes only when staff explicitly
 confirm a block. Those bookings become cancelled, with the application clock's
 cancellation time and no late-client-cancellation flag. Migration
 `0003_remarkable_cammi.sql` adds an index for browsing saved blocks a page at a
-time, without changing any records.
+time, without changing any records. Migration `0004_brave_ultron.sql` adds
+`blocked_cancellation_block_idx` on `blocked_cancellation.block_id` for reopening
+a block's cancellation history. It changes no records. All three migrations are
+additive; no applied migration has been edited.
 
 The integration checks cover a newly migrated database, upgrading a database
 containing a confirmed booking, rollback after a cancellation-link write fails,
@@ -25,6 +28,17 @@ result. They compare all existing bookings, accounts, slots, practitioners and
 staff-edited settings and read each booking through the client booking query.
 They also check that blocked time works after the upgrade. The rollback check
 compares the booking and both new tables after a forced failure.
+
+Saved cancellations are read 20 at a time, ordered by their session start and
+booking reference. A continuation must belong to the selected block in the
+current clinic. Invalid or unrelated references return the first page. The
+confirmation still reviews and cancels the complete affected set, regardless of
+page size. Integration checks require 41 cancellations to save together and remain
+reachable across three pages, check equal start times, unrelated references and
+the new index. Both clinics have browser journeys covering 21 cancellations,
+reloading a later page, returning to the first page and keeping the history
+position. The first new owner check books and cancels 21 sessions through the
+normal client and staff screens, then follows every saved cancellation page.
 
 There is no automatic undo. Do not delete a saved block to undo its cancellations,
 and do not restore bookings without checking for competing bookings and other
@@ -49,43 +63,43 @@ Existing demo databases do not need replacement or reseeding from scratch.
 
 ## Verification in this workspace
 
-The required EN-2 runtime verification remains incomplete. There is no Docker
-executable or socket in this workspace, and user namespaces are denied, preventing
-rootless Docker setup. Integration and browser commands were run on this branch
-and on an unchanged `sf-base` worktree. Both fail to start PostgreSQL checks and
-browser journeys because there is no working container runtime. This does not
-establish that those journeys pass.
+The EN-2 requirement for passing runtime checks remains unresolved. This round
+again confirmed that Docker and Compose are unavailable, no Docker socket is
+mounted, and user namespaces are denied. Installing Chromium with dependencies
+fails because this workspace cannot become root. Downloading Chromium alone
+fails with HTTP 403 from the network proxy. No check has been weakened or marked
+to skip these requirements.
 
-The branch integration run reports 24 passed, 7 failed and 86 not run after
-setup failures. The baseline reports 24 passed, 7 failed and 51 not run.
-Comparing the reports shows identical suite and test outcomes for every existing
-suite. The 35 additional blocked-time tests could not run because their database
-setup failed. The two passing suites cover operational endpoints and start-up
-refusals; they do not verify saved blocked time or concurrent diary changes.
+`bun install --frozen-lockfile`, type checking, lint, formatting and all 147 unit
+tests pass. All 20 owner checks load with `--list --forbid-only`, including the
+three new checks in `evals/10-blocked-time.eval.ts`. The 11 repository browser
+checks also load. Listing does not establish that a browser journey passes.
+Owner checks were not executed, following the factory's instruction to leave
+execution against its already-running copy to the factory.
 
-The integration suites also encounter the missing `jq` tool in operational
-script checks. Attempts to obtain it from GitHub and Debian were refused by the
-workspace network proxy. Installing Chromium with system dependencies fails
-because the workspace cannot become root; a browser-only download is also
-refused by the proxy. No check was weakened to bypass these requirements.
+`bun run test:integration` and `bun x playwright test` were attempted again.
+The integration run reports 24 passed, 7 failed and 88 not run after setup
+failures. The passing checks cover operational behaviour, not blocked time.
+The browser suite fails during PostgreSQL setup with “Could not find a working
+container runtime strategy”, before any journey runs. All 37 new blocked-time
+integration checks are unable to run because PostgreSQL setup fails, including
+both clinic upgrades, forced rollback, concurrent saves and cancellation pages.
+Operational script checks also fail because `jq` is missing. The earlier round
+compared these infrastructure failures with an unchanged `sf-base` worktree and
+recorded matching outcomes for existing suites. That comparison is not proof
+that the new behaviour works.
 
-Installation, type checking, lint, formatting and all 147 unit tests pass.
-All 20 owner checks load successfully, including the three new checks. Owner checks are listed here, not executed, following
-the factory's instruction to run them against its full, already-running demo.
-Before merging, EN-2 requires a Linux environment with Docker, Compose, `jq` and
-Chromium to pass the integration and browser suites and all owner checks. This
-includes the corrected upgrade scenarios for both clinics. The recovery procedure
+Before approval or merging, EN-2 still requires passing integration and browser
+suites in an environment with Docker, Compose, `jq` and Chromium, plus execution
+of the owner checks by the factory. EN-6 also requires checking recovery in that
+environment. Neither migration safety, atomic cancellation nor simultaneous
+request safety has been verified against PostgreSQL here. The recovery procedure
 above has not been rehearsed in this workspace.
 
-There are three new owner checks in `evals/10-blocked-time.eval.ts`. They cover
-review and confirmation, reopening saved cancellations, access restrictions,
-changed impact, retained invalid entries and stale booking and move screens.
-Invalid-entry checks have been combined with the changed-impact journey, using
-the original demo practitioner. The Compose browser journeys retain the extra
-coverage for switching between two practitioners after repeated invalid reviews
-in each clinic, using isolated fixtures. No owner check from `sf-base` is changed.
-
-The blocked-time owner checks wait for the requested history page and selected
-block before reading their details. This avoids comparing a reason read from
-the previous page with a block opened on the next page during navigation. The
-same checks still require the saved details and cancellation history to match.
+The three new owner checks cover review and confirmation, reopening saved blocks
+and paged cancellations, access restrictions, changed impact, retained invalid
+entries and stale booking and move screens. The original demo accounts and
+practitioner remain unchanged. The Compose journeys also cover both clinics'
+words and retaining the chosen practitioner through repeated invalid reviews.
+No owner check from `sf-base` has changed. Only this branch's new blocked-time
+check has been extended to cover cancellation pages.
