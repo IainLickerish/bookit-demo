@@ -193,7 +193,7 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     const before = await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
     expect(before).toMatchObject({ late: false, booking: { status: 'cancelled', lateCancellation: false } });
     const replacement = await bookSlot(deps, { patientId: clinic.patient2.id, slotId: slot.id });
-    clock.advanceMinutes(1 / 60_000);
+    clock.set(new Date(slot.startsAt.getTime() - hours * 3_600_000));
     const boundary = await cancelBooking(deps, { patientId: clinic.patient2.id, bookingId: replacement.id });
     expect(boundary).toMatchObject({ late: false, booking: { status: 'cancelled', lateCancellation: false } });
     expect((await slotsOn('2026-10-23')).map((row) => row.id)).toContain(slot.id);
@@ -204,7 +204,7 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
     await database.db.execute(sql`
       create function reject_cancellation() returns trigger language plpgsql as $$
-      begin raise exception 'Test cancellation save failure'; end $$
+      begin raise exception 'Test cancellation save failure'; end; $$
     `);
     await database.db.execute(sql`
       create trigger reject_cancellation after update on booking
