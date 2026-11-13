@@ -147,6 +147,38 @@ export const bookings = pgTable(
   ],
 );
 
+export const blockedPeriods = pgTable(
+  'blocked_period',
+  {
+    id: uuid('id').primaryKey(),
+    practitionerId: uuid('practitioner_id')
+      .notNull()
+      .references(() => practitioners.id),
+    startsAt: instant('starts_at').notNull(),
+    endsAt: instant('ends_at').notNull(),
+    reason: text('reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: instant('created_at').notNull(),
+  },
+  (t) => [
+    index('blocked_period_practitioner_idx').on(t.practitionerId, t.startsAt),
+    check('blocked_period_ends_after_start', sql`"ends_at" > "starts_at"`),
+    check('blocked_period_reason_length', sql`length("reason") <= 300`),
+  ],
+);
+
+// Retain the link to cancellations made by a block, independently of later blocks.
+export const blockedCancellations = pgTable('blocked_cancellation', {
+  bookingId: uuid('booking_id')
+    .primaryKey()
+    .references(() => bookings.id),
+  blockId: uuid('block_id')
+    .notNull()
+    .references(() => blockedPeriods.id),
+});
+
 export const clinicSettings = pgTable(
   'clinic_settings',
   {

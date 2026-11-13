@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, lte, notExists, sql } from 'drizzle-orm';
 import type { Executor } from '@/db/client';
-import { bookings, practitioners, slots } from '@/db/schema';
+import { blockedPeriods, bookings, practitioners, slots } from '@/db/schema';
 import { isUuid } from '../bookings/queries';
 
 export interface SlotView {
@@ -33,7 +33,14 @@ export async function listActivePractitioners(db: Executor): Promise<Practitione
     .orderBy(asc(practitioners.name), asc(practitioners.id));
 }
 
-/** A slot of an active practitioner, whether or not it is booked. */
+const noBlockedPeriod = notExists(
+  sql`(select 1 from ${blockedPeriods}
+    where ${blockedPeriods.practitionerId} = ${slots.practitionerId}
+      and ${blockedPeriods.startsAt} < ${slots.endsAt}
+      and ${blockedPeriods.endsAt} > ${slots.startsAt})`,
+);
+
+/** A slot of an active practitioner, whether or not it is available. */
 export async function findBookableSlot(db: Executor, slotId: string): Promise<SlotView | null> {
   if (!isUuid(slotId)) {
     return null;
@@ -50,6 +57,12 @@ const noConfirmedBooking = notExists(
   sql`(select 1 from ${bookings} where ${bookings.slotId} = ${slots.id} and ${bookings.status} = 'confirmed')`,
 );
 
+/** Must be checked after taking the diary lock for booking and moving. */
+export async function isSlotBlocked(db: Executor, slotId: string): Promise<boolean> {
+  const [row] = await db.select({ clear: noBlockedPeriod }).from(slots).where(eq(slots.id, slotId));
+  return row !== undefined && !row.clear;
+}
+
 export async function isSlotFree(db: Executor, slotId: string): Promise<boolean> {
   if (!isUuid(slotId)) {
     return false;
@@ -57,7 +70,7 @@ export async function isSlotFree(db: Executor, slotId: string): Promise<boolean>
   const [row] = await db
     .select({ id: slots.id })
     .from(slots)
-    .where(and(eq(slots.id, slotId), noConfirmedBooking));
+    .where(and(eq(slots.id, slotId), noConfirmedBooking, noBlockedPeriod));
   return row !== undefined;
 }
 
@@ -85,6 +98,7 @@ export async function listAvailableSlots(db: Executor, query: AvailableSlotsQuer
         gt(slots.startsAt, query.after),
         lte(slots.startsAt, query.until),
         noConfirmedBooking,
+        noBlockedPeriod,
       ),
     )
     .orderBy(asc(slots.startsAt));

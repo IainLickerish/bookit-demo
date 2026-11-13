@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { bookings, slots } from '@/db/schema';
 import { loadClinicSettings } from '../settings';
 import type { BookingDependencies } from './book';
+import { lockDiary } from './diary-lock';
 import { BookingError } from './errors';
 import { findBookingForPatient, isUuid, type BookingView } from './queries';
 import { isLateCancellation } from './rules';
@@ -26,6 +27,7 @@ export async function cancelBooking(
   }
   const now = deps.clock.now();
   const result = await deps.db.transaction(async (tx) => {
+    await lockDiary(tx);
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
       .select({ status: bookings.status, startsAt: slots.startsAt })

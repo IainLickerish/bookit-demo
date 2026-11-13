@@ -2,8 +2,9 @@ import { and, eq } from 'drizzle-orm';
 import { bookings, slots } from '@/db/schema';
 import { isUniqueViolation } from '../errors';
 import { loadClinicSettings } from '../settings';
-import { findBookableSlot } from '../slots/queries';
+import { findBookableSlot, isSlotBlocked } from '../slots/queries';
 import type { BookingDependencies } from './book';
+import { lockDiary } from './diary-lock';
 import { BookingError } from './errors';
 import { findBookingForPatient, isUuid, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
 import { assertReschedulable, assertSlotBookable } from './rules';
@@ -23,6 +24,7 @@ export async function rescheduleBooking(
   }
   const now = deps.clock.now();
   const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
+    await lockDiary(tx);
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
       .select({
@@ -43,6 +45,7 @@ export async function rescheduleBooking(
     if (!target) {
       throw new BookingError('slot_not_found');
     }
+    if (await isSlotBlocked(tx, target.id)) throw new BookingError('slot_blocked');
     assertSlotBookable(target.startsAt, now, settings);
     try {
       await tx

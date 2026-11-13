@@ -7,8 +7,9 @@ import { isUniqueViolation } from '../errors';
 import { composeConfirmation } from '../notifications/confirmation';
 import { deliverEmail, type MailSettings } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
-import { findBookableSlot } from '../slots/queries';
+import { findBookableSlot, isSlotBlocked } from '../slots/queries';
 import { findUserById } from '../users';
+import { lockDiary } from './diary-lock';
 import { BookingError } from './errors';
 import { findBookingForPatient, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
 import { assertSlotBookable, normalisePhone } from './rules';
@@ -30,6 +31,7 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
   const phone = normalisePhone(request.phone);
   const now = deps.clock.now();
   const { booking, confirmation } = await deps.db.transaction(async (tx) => {
+    await lockDiary(tx);
     const settings = await loadClinicSettings(tx);
     const patient = await findUserById(tx, request.patientId);
     if (!patient || patient.role !== 'patient') {
@@ -39,6 +41,7 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     if (!slot) {
       throw new BookingError('slot_not_found');
     }
+    if (await isSlotBlocked(tx, slot.id)) throw new BookingError('slot_blocked');
     assertSlotBookable(slot.startsAt, now, settings);
     const id = newId(deps.clock);
     try {
