@@ -22,6 +22,8 @@ future start and end in the clinic's time zone, and an optional reason of up to
 300 characters. Keep the reason brief, without personal or medical details.
 Times repeated or skipped when the clocks change cannot be used; choose another
 time. The end must be after the start.
+If the details are invalid, the page explains what to correct and keeps your
+physiotherapist, start, end and reason. Nothing is saved or cancelled.
 
 Choose **Review blocked time**. Check the physiotherapist, the start and end,
 and every affected session, including its client, time and duration. Any

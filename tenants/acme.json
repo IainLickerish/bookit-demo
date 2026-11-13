@@ -45,6 +45,13 @@
       "workingDays": [1, 2, 3, 4, 5, 6, 7],
       "workdayStart": "09:00",
       "workdayEnd": "17:00"
+    },
+    {
+      "name": "Sam Physiotherapist",
+      "bio": "Acme physiotherapy",
+      "workingDays": [1, 2, 3, 4, 5, 6, 7],
+      "workdayStart": "09:00",
+      "workdayEnd": "17:00"
     }
   ]
 }

@@ -271,6 +271,8 @@ for (const tenant of ['acme', 'beacon'] as const) {
       const staff = staffContext.pages()[0]!;
       const other = otherContext.pages()[0]!;
       await client.goto(`${clinic.url}/slots`);
+      const practitionerName = tenant === 'acme' ? 'Sam Physiotherapist' : 'Robin Dentist';
+      await client.getByTestId('practitioner-select').selectOption({ label: practitionerName });
       await client.getByTestId('date-input').fill('2026-11-10');
       await client.getByTestId('show-slots').click();
       await client.getByTestId('slot-link').first().click();
@@ -283,14 +285,31 @@ for (const tenant of ['acme', 'beacon'] as const) {
       await expect(
         staff.getByLabel(tenant === 'acme' ? 'Physiotherapist' : 'Clinician', { exact: true }),
       ).toBeVisible();
+      await expect(staff.getByTestId('block-practitioner').locator('option')).toHaveCount(2);
+      const [practitionerId] = await staff.getByTestId('block-practitioner').selectOption({ label: practitionerName });
+      expect(practitionerId).not.toBe(
+        await staff.getByTestId('block-practitioner').locator('option').first().getAttribute('value'),
+      );
+      const savedBlocks = await staff.getByTestId('block-list-row').count();
       await staff.getByTestId('block-start').fill('2026-11-10T09:00');
       await staff.getByTestId('block-end').fill('2026-11-10T08:00');
       await staff.getByTestId('block-reason').fill(`${tenant} training`);
       await staff.getByTestId('block-review').click();
-      await expect(staff.getByTestId('block-error')).toBeVisible();
+      await expect(staff.getByTestId('block-error')).toContainText('end after the start');
+      await expect(staff.getByTestId('block-practitioner')).toHaveValue(practitionerId!);
+      await expect(staff.getByTestId('block-start')).toHaveValue('2026-11-10T09:00');
+      await expect(staff.getByTestId('block-end')).toHaveValue('2026-11-10T08:00');
       await expect(staff.getByTestId('block-reason')).toHaveValue(`${tenant} training`);
+      await expect(staff.getByTestId('block-list-row')).toHaveCount(savedBlocks);
+      await expect(staff.getByTestId('block-preview')).toHaveCount(0);
+      await client.reload();
+      await expect(client.getByTestId('booking-row').filter({ hasText: when })).toHaveAttribute(
+        'data-status',
+        'confirmed',
+      );
       await staff.getByTestId('block-end').fill('2026-11-10T17:00');
       await staff.getByTestId('block-review').click();
+      await expect(staff.getByTestId('block-preview')).toContainText(practitionerName);
       await expect(staff.getByTestId('block-impact')).toContainText(tenant === 'acme' ? 'session' : 'appointment');
       await expect(staff.getByTestId('block-affected-booking')).toContainText(when);
       await staff.getByTestId('block-confirm').click();

@@ -34,9 +34,18 @@ booking against the current diary, then verify availability and booking status
 before reopening. Never edit an applied migration. The new migration is additive;
 no destructive recovery or live database change is performed by this build.
 
+The fictional clinic fixtures now contain two practitioners each so the browser
+checks can choose a practitioner other than the first option. Under EN-5 and
+PS-7, this uses made-up demo records only. It does not add practitioners to an
+existing database. The seed process refuses changed clinic configuration on an
+already seeded copy, so use a separate empty demo database for these fixtures.
+Keep any existing copy and its original configuration together; do not erase
+activity to run a check. Reverting the fixture change likewise needs its own
+empty demo copy, or the original matching database and configuration.
+
 ## Verification in this workspace
 
-Type checking, lint, formatting, all 145 unit tests and listing all 20 owner
+Type checking, lint, formatting, all 145 unit tests and listing all 21 owner
 checks passed. The PostgreSQL integration suite was attempted but could not
 start because this workspace has no container runtime. The browser suite also
 failed during setup for the same reason. Existing script integration checks
@@ -48,3 +57,9 @@ The blocked-time owner checks wait for the requested history page and selected
 block before reading their details. This avoids comparing a reason read from
 the previous page with a block opened on the next page during navigation. The
 same checks still require the saved details and cancellation history to match.
+
+The invalid-details owner check selects the second of two practitioners and
+checks that the practitioner, start, end and reason survive a rejected review.
+It then corrects only the end, checks that the intended practitioner's booking
+is shown, and reopens both lists to verify that no block or cancellation was
+saved. The existing browser journey exercises this rejection in both clinics.

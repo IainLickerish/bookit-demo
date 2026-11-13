@@ -42,8 +42,8 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
   it('creates both clinics atomically, with distinct settings, names, optional phone and a three-hour booking', async () => {
     const resultA = await seedTenant(a.db, clock, { tenant: acme, environment: 'staging', passwords: passwordsA });
     const resultB = await seedTenant(b.db, clock, { tenant: beacon, environment: 'staging', passwords: passwordsB });
-    expect(resultA).toMatchObject({ outcome: 'created', counts: { users: 4, practitioners: 1, bookings: 3 } });
-    expect(resultB).toMatchObject({ outcome: 'created', counts: { users: 4, practitioners: 1, bookings: 3 } });
+    expect(resultA).toMatchObject({ outcome: 'created', counts: { users: 4, practitioners: 2, bookings: 3 } });
+    expect(resultB).toMatchObject({ outcome: 'created', counts: { users: 4, practitioners: 2, bookings: 3 } });
     expect(resultA.counts.slots).toBeGreaterThan(2000);
     const rows = await a.db.select().from(users);
     expect(rows.map((row) => row.name)).toEqual(

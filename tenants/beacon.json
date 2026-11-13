@@ -45,6 +45,13 @@
       "workingDays": [1, 2, 3, 4, 5, 6, 7],
       "workdayStart": "09:00",
       "workdayEnd": "17:00"
+    },
+    {
+      "name": "Robin Dentist",
+      "bio": "Beacon preventive dentistry. BEACON-SEED-MARKER",
+      "workingDays": [1, 2, 3, 4, 5, 6, 7],
+      "workdayStart": "09:00",
+      "workdayEnd": "17:00"
     }
   ]
 }
