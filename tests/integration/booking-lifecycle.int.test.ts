@@ -1,12 +1,14 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings, practitioners } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot, type BookingDependencies } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { BookingError } from '@/server/bookings/errors';
+import { listAdminBookings } from '@/server/admin/bookings';
 import { findBookingForPatient, listBookingsForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
+import { saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots, type SlotView } from '@/server/slots/queries';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
@@ -150,6 +152,88 @@ describe('booking a slot (REQ-18.1-01)', () => {
 });
 
 describe('cancelling a booking (REQ-18.1-01)', () => {
+  it.each([24, 48, 6])('saves a late cancellation inside a %s-hour window and releases the time', async (hours) => {
+    await saveClinicSettings(database.db, clock, { ...clinic.settings, lateCancellationHours: hours });
+    const slot = await slotAt('2026-10-23', '09:00');
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
+    clock.set(new Date(slot.startsAt.getTime() - hours * 3_600_000 + 1));
+
+    const result = await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
+    expect(result).toMatchObject({ ok: true, late: true, booking: { status: 'cancelled', lateCancellation: true } });
+    const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+    expect(stored).toMatchObject({
+      status: 'cancelled',
+      lateCancellation: true,
+      cancelledAt: clock.now(),
+      updatedAt: clock.now(),
+    });
+    expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toMatchObject({
+      status: 'cancelled',
+      lateCancellation: true,
+    });
+    const cancelled = await listAdminBookings(database.db, { status: 'cancelled' }, clinic.settings.timeZone);
+    expect(cancelled.find((row) => row.id === booking.id)).toMatchObject({ lateCancellation: true });
+    const confirmed = await listAdminBookings(database.db, { status: 'confirmed' }, clinic.settings.timeZone);
+    expect(confirmed.map((row) => row.id)).not.toContain(booking.id);
+    expect((await slotsOn('2026-10-23')).map((row) => row.id)).toContain(slot.id);
+    const replacements = await Promise.allSettled(
+      [clinic.patient1, clinic.patient2].map((patient) => bookSlot(deps, { patientId: patient.id, slotId: slot.id })),
+    );
+    expect(replacements.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const refused = replacements.find((result) => result.status === 'rejected');
+    expect(refused?.status === 'rejected' && refused.reason).toMatchObject({ code: 'slot_unavailable' });
+    expect(logs.events().filter((event) => event === 'booking.cancelled')).toHaveLength(1);
+  });
+
+  it.each([24, 48, 6])('keeps cancellation ordinary at and before a %s-hour boundary', async (hours) => {
+    await saveClinicSettings(database.db, clock, { ...clinic.settings, lateCancellationHours: hours });
+    const slot = await slotAt('2026-10-23', '09:00');
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
+    clock.set(new Date(slot.startsAt.getTime() - hours * 3_600_000 - 1));
+    const before = await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
+    expect(before).toMatchObject({ late: false, booking: { status: 'cancelled', lateCancellation: false } });
+    const replacement = await bookSlot(deps, { patientId: clinic.patient2.id, slotId: slot.id });
+    clock.advanceMinutes(1 / 60_000);
+    const boundary = await cancelBooking(deps, { patientId: clinic.patient2.id, bookingId: replacement.id });
+    expect(boundary).toMatchObject({ late: false, booking: { status: 'cancelled', lateCancellation: false } });
+    expect((await slotsOn('2026-10-23')).map((row) => row.id)).toContain(slot.id);
+  });
+
+  it('rolls back a failed late cancellation without reporting success or releasing the time', async () => {
+    const slot = await slotAt('2026-10-20', '09:00');
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
+    await database.db.execute(sql`
+      create function reject_cancellation() returns trigger language plpgsql as $$
+      begin raise exception 'Test cancellation save failure'; end $$
+    `);
+    await database.db.execute(sql`
+      create trigger reject_cancellation after update on booking
+      for each row when (new.status = 'cancelled') execute function reject_cancellation()
+    `);
+    try {
+      await expect(cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id })).rejects.toThrow();
+      expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toEqual(booking);
+      expect((await slotsOn('2026-10-20')).map((row) => row.id)).not.toContain(slot.id);
+      expect(logs.events()).not.toContain('booking.cancelled');
+    } finally {
+      await database.db.execute(sql`drop trigger reject_cancellation on booking`);
+      await database.db.execute(sql`drop function reject_cancellation()`);
+    }
+  });
+
+  it('saves only one of two simultaneous late cancellations', async () => {
+    const booking = await bookSlot(deps, {
+      patientId: clinic.patient1.id,
+      slotId: (await slotAt('2026-10-20', '09:00')).id,
+    });
+    const results = await Promise.allSettled(
+      Array.from({ length: 2 }, () => cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id })),
+    );
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const refusal = results.find((result) => result.status === 'rejected');
+    expect(refusal?.status === 'rejected' && refusal.reason).toMatchObject({ code: 'booking_not_active' });
+  });
+
   it('cancels outside the late window without the late flag', async () => {
     const booking = await bookSlot(deps, {
       patientId: clinic.patient1.id,
