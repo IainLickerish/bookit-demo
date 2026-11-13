@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
 import { blockedTimeAction, type BlockFormState } from './actions';
 
 export function BlockForm({
@@ -18,7 +18,6 @@ export function BlockForm({
     values: { practitionerId: practitioners[0]?.id ?? '', start: '', end: '', reason: '' },
   };
   const [state, action, pending] = useActionState(blockedTimeAction, initial);
-  const [practitionerId, setPractitionerId] = useState(initial.values.practitionerId);
   const preview = state.preview;
   return (
     <form action={action} className="mt-6 space-y-4" aria-busy={pending} data-testid="block-form">
@@ -89,9 +88,10 @@ export function BlockForm({
           <label>
             {practitionerLabel}
             <select
+              // Actions reset the form. Remount with the returned selection as its reset default.
+              key={state.values.practitionerId}
               name="practitionerId"
-              value={practitionerId}
-              onChange={(event) => setPractitionerId(event.target.value)}
+              defaultValue={state.values.practitionerId}
               required
               data-testid="block-practitioner"
             >

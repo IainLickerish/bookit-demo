@@ -302,6 +302,21 @@ for (const tenant of ['acme', 'beacon'] as const) {
       await expect(staff.getByTestId('block-reason')).toHaveValue(`${tenant} training`);
       await expect(staff.getByTestId('block-list-row')).toHaveCount(savedBlocks);
       await expect(staff.getByTestId('block-preview')).toHaveCount(0);
+      const firstPractitionerId = await staff
+        .getByTestId('block-practitioner')
+        .locator('option')
+        .first()
+        .getAttribute('value');
+      for (const selectedId of [firstPractitionerId!, practitionerId!]) {
+        await staff.getByTestId('block-practitioner').selectOption(selectedId);
+        await staff.getByTestId('block-review').click();
+        await expect(staff.getByTestId('block-review')).toBeEnabled();
+        await expect(staff.getByTestId('block-practitioner')).toHaveValue(selectedId);
+        await expect(staff.getByTestId('block-error')).toBeVisible();
+        await expect(staff.getByTestId('block-start')).toHaveValue('2026-11-10T09:00');
+        await expect(staff.getByTestId('block-end')).toHaveValue('2026-11-10T08:00');
+        await expect(staff.getByTestId('block-reason')).toHaveValue(`${tenant} training`);
+      }
       await client.reload();
       await expect(client.getByTestId('booking-row').filter({ hasText: when })).toHaveAttribute(
         'data-status',
@@ -311,6 +326,14 @@ for (const tenant of ['acme', 'beacon'] as const) {
       await staff.getByTestId('block-review').click();
       await expect(staff.getByTestId('block-preview')).toContainText(practitionerName);
       await expect(staff.getByTestId('block-impact')).toContainText(tenant === 'acme' ? 'session' : 'appointment');
+      await expect(staff.getByTestId('block-affected-booking')).toContainText(when);
+      await staff.getByTestId('block-edit').click();
+      await expect(staff.getByTestId('block-practitioner')).toHaveValue(practitionerId!);
+      await expect(staff.getByTestId('block-start')).toHaveValue('2026-11-10T09:00');
+      await expect(staff.getByTestId('block-end')).toHaveValue('2026-11-10T17:00');
+      await expect(staff.getByTestId('block-reason')).toHaveValue(`${tenant} training`);
+      await staff.getByTestId('block-review').click();
+      await expect(staff.getByTestId('block-preview')).toContainText(practitionerName);
       await expect(staff.getByTestId('block-affected-booking')).toContainText(when);
       await staff.getByTestId('block-confirm').click();
       await expect(staff.getByTestId('block-saved')).toBeVisible();

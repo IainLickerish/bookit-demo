@@ -60,6 +60,10 @@ same checks still require the saved details and cancellation history to match.
 
 The invalid-details owner check selects the second of two practitioners and
 checks that the practitioner, start, end and reason survive a rejected review.
+It changes the practitioner between repeated invalid reviews, then checks both
+selections are retained after the action finishes. The selector uses the returned
+practitioner as its reset default, so the form's automatic reset cannot silently
+choose the first practitioner.
 It then corrects only the end, checks that the intended practitioner's booking
 is shown, and reopens both lists to verify that no block or cancellation was
 saved. The existing browser journey exercises this rejection in both clinics.

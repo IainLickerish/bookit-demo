@@ -48,6 +48,21 @@ test('Invalid block details show a useful error and retain entries without chang
     await expect(staff.getByTestId('block-preview')).toHaveCount(0);
     await expect(staff.getByTestId('block-saved')).toHaveCount(0);
   });
+  await step(staff, 'Change the physiotherapist and reject another invalid review without losing entries', async () => {
+    const [first] = await staff.getByTestId('block-practitioner').selectOption({ label: 'Alex Physiotherapist' });
+    await staff.getByTestId('block-review').click();
+    await expect(staff.getByTestId('block-review')).toBeEnabled();
+    await expect(staff.getByTestId('block-error')).toBeVisible();
+    await expect(staff.getByTestId('block-practitioner')).toHaveValue(first!);
+    await expect(staff.getByTestId('block-start')).toHaveValue(`${date}T09:00`);
+    await expect(staff.getByTestId('block-end')).toHaveValue(`${date}T08:00`);
+    await expect(staff.getByTestId('block-reason')).toHaveValue(reason);
+    await staff.getByTestId('block-practitioner').selectOption(history.selected);
+    await staff.getByTestId('block-review').click();
+    await expect(staff.getByTestId('block-review')).toBeEnabled();
+    await expect(staff.getByTestId('block-practitioner')).toHaveValue(history.selected);
+    await expect(staff.getByTestId('block-error')).toBeVisible();
+  });
   await step(staff, 'Correct only the end and review the intended physiotherapist without saving', async () => {
     await staff.getByTestId('block-end').fill(`${date}T17:00`);
     await staff.getByTestId('block-review').click();
