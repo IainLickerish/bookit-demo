@@ -15,3 +15,7 @@ Acme Physio allows up to **3 reschedules per booking**. The new time must be in
 the future and within the booking horizon. If a time is taken while you are
 choosing, your existing booking stays in place. Contact the clinic for help once
 you reach the reschedule limit.
+
+After moving, choose **Add to calendar** in **My bookings** for the new details.
+Your move confirmation email also includes the updated details as text. Update
+the existing event in your calendar yourself. BookIt does not update it for you.

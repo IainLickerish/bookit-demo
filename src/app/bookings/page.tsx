@@ -5,7 +5,7 @@ import { formatSlot } from '@/lib/time';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
-import { errorText, noticeText, single, type SearchParams } from '../messages';
+import { CALENDAR_MESSAGES, errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
 
 function statusText(booking: BookingView): string {
@@ -45,7 +45,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           <Link
             href={`/bookings/${booking.id}/calendar`}
             prefetch={false}
-            className="button-secondary mt-3"
+            className="button-secondary mt-3 inline-flex min-h-12 items-center"
             data-testid="add-to-calendar"
           >
             Add to calendar
@@ -79,6 +79,11 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       {notice ? (
         <p role="status" className="notice" data-testid="notice">
           {notice}
+        </p>
+      ) : null}
+      {single(params.notice) === 'rescheduled' ? (
+        <p className="notice" data-testid="calendar-update-help">
+          {CALENDAR_MESSAGES.manualUpdate}
         </p>
       ) : null}
       {error ? (

@@ -16,3 +16,7 @@ services:
       BOOKIT_TEST_CLOCK: /clock/clock.json
     volumes:
       - ${BOOKIT_CLOCK_DIR:?Set the clock folder}:/clock:ro
+  # Only test copies allow an eval to reject SMTP delivery, then restore normal mail.
+  mailpit:
+    environment:
+      MP_ENABLE_CHAOS: 'true'
