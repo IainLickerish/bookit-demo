@@ -65,14 +65,22 @@ test('Staff can review affected bookings before confirming a practitioner’s bl
   await step(staff, 'Open an older block directly, then revisit the original cancellations', async () => {
     await staff.goto('/admin/blocked-time');
     await expect(staff.getByTestId('block-list-row')).toHaveCount(20);
+    const firstLink = (await staff.getByTestId('block-open').first().getAttribute('href'))!;
+    const olderPage = (await staff.getByTestId('block-older').getAttribute('href'))!;
     await staff.getByTestId('block-older').click();
+    await expect(staff).toHaveURL(new URL(olderPage, staff.url()).toString());
+    // Client-side navigation can leave the previous rows visible until the new page arrives.
+    await expect(staff.getByTestId('block-open').first()).not.toHaveAttribute('href', firstLink);
     const olderRow = staff.getByTestId('block-list-row').first();
     const olderReason = (await olderRow.locator('p').textContent())!;
+    const selectedLink = (await olderRow.getByTestId('block-open').getAttribute('href'))!;
     await olderRow.getByTestId('block-open').click();
+    await expect(staff).toHaveURL(new URL(selectedLink, staff.url()).toString());
     await expect(staff.getByTestId('block-detail')).toContainText(olderReason);
     const olderLink = new URL(staff.url());
     olderLink.searchParams.delete('before');
     await staff.getByTestId('block-newest').click();
+    await expect(staff).toHaveURL(/\/admin\/blocked-time$/);
     await expect(staff.getByTestId('block-list-row')).toHaveCount(20);
     await expect(
       staff.getByTestId('block-list-row').filter({ has: staff.getByText(olderReason, { exact: true }) }),
@@ -144,6 +152,7 @@ test('Blocked slots cannot be booked or used for moves, including requests made 
       await bookingRow(mover, 'upcoming-bookings', originalWhen).getByTestId('reschedule-link').click();
       await mover.getByTestId('date-input').fill(date);
       await mover.getByTestId('show-slots').click();
+      await expect(mover).toHaveURL((url) => url.searchParams.get('date') === date);
       const targetId = (await mover.getByTestId('reschedule-to').first().getAttribute('data-slot-id'))!;
       return { originalWhen, targetId };
     },

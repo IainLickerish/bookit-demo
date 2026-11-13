@@ -38,6 +38,13 @@ no destructive recovery or live database change is performed by this build.
 
 Type checking, lint, formatting, all 145 unit tests and listing all 20 owner
 checks passed. The PostgreSQL integration suite was attempted but could not
-start because this workspace has no container runtime. The integration and
+start because this workspace has no container runtime. The browser suite also
+failed during setup for the same reason. Existing script integration checks
+also failed where they need the unavailable `jq` tool. The integration and
 browser journeys still need to run in the factory's full demo environment
 before merging, as required by EN-2. Owner checks were listed here, not run.
+
+The blocked-time owner checks wait for the requested history page and selected
+block before reading their details. This avoids comparing a reason read from
+the previous page with a block opened on the next page during navigation. The
+same checks still require the saved details and cancellation history to match.
