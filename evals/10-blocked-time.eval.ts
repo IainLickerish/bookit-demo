@@ -108,10 +108,57 @@ test('Staff can review affected bookings before confirming a practitioner’s bl
 test('Changed affected bookings require another review before anything is saved.', async ({ browser }) => {
   const date = londonDate(24);
   const client = await sessionFor(browser, PATIENT_2);
-  const free = await step(client, 'Choose a free session without booking it yet', async () =>
-    pickFreeSlot(client, date),
+  const invalidDate = londonDate(27);
+  const { free, retainedWhen } = await step(
+    client,
+    'Book a session on another day, then choose a free time',
+    async () => {
+      const retainedWhen = await bookSlot(client, (await pickFreeSlot(client, invalidDate)).id);
+      return { free: await pickFreeSlot(client, date), retainedWhen };
+    },
   );
   const staff = await sessionFor(browser, ADMIN);
+  await step(staff, 'Reject invalid details, retain every entry and correct the review without saving', async () => {
+    await staff.goto('/admin/blocked-time');
+    const [practitionerId] = await staff.getByTestId('block-practitioner').selectOption({ label: PRACTITIONER });
+    const history = await staff
+      .getByTestId('block-open')
+      .evaluateAll((links) => links.map((link) => link.getAttribute('href')));
+    await staff.getByTestId('block-start').fill(`${invalidDate}T09:00`);
+    await staff.getByTestId('block-end').fill(`${invalidDate}T08:00`);
+    await staff.getByTestId('block-reason').fill('Invalid details retention check');
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await staff.getByTestId('block-review').click();
+      await expect(staff.getByTestId('block-error')).toContainText('end after the start');
+      await expect(staff.getByTestId('block-review')).toBeEnabled();
+      await expect(staff.getByTestId('block-practitioner')).toHaveValue(practitionerId!);
+      await expect(staff.getByTestId('block-start')).toHaveValue(`${invalidDate}T09:00`);
+      await expect(staff.getByTestId('block-end')).toHaveValue(`${invalidDate}T08:00`);
+      await expect(staff.getByTestId('block-reason')).toHaveValue('Invalid details retention check');
+      await expect(staff.getByTestId('block-preview')).toHaveCount(0);
+      await expect(staff.getByTestId('block-saved')).toHaveCount(0);
+    }
+    await staff.getByTestId('block-end').fill(`${invalidDate}T17:00`);
+    await staff.getByTestId('block-review').click();
+    await expect(staff.getByTestId('block-preview')).toContainText(PRACTITIONER);
+    await expect(staff.getByTestId('block-affected-booking')).toHaveCount(1);
+    await expect(staff.getByTestId('block-affected-booking')).toContainText(retainedWhen);
+    await staff.getByTestId('block-edit').click();
+    await expect(staff.getByTestId('block-practitioner')).toHaveValue(practitionerId!);
+    await expect(staff.getByTestId('block-start')).toHaveValue(`${invalidDate}T09:00`);
+    await expect(staff.getByTestId('block-end')).toHaveValue(`${invalidDate}T17:00`);
+    await expect(staff.getByTestId('block-reason')).toHaveValue('Invalid details retention check');
+    await staff.reload();
+    expect(
+      await staff.getByTestId('block-open').evaluateAll((links) => links.map((link) => link.getAttribute('href'))),
+    ).toEqual(history);
+    await expect(
+      staff.getByTestId('block-list-row').filter({ hasText: 'Invalid details retention check' }),
+    ).toHaveCount(0);
+    await client.goto('/bookings');
+    await expect(bookingRow(client, 'upcoming-bookings', retainedWhen)).toContainText('Confirmed');
+    await expect(bookingRow(client, 'other-bookings', retainedWhen)).toHaveCount(0);
+  });
   await step(staff, 'Review a blocked day with no affected bookings', async () => {
     await reviewBlock(staff, date, '09:00', '17:00', 'Changed impact check');
     await expect(staff.getByTestId('block-impact')).toContainText('No confirmed sessions overlap');
