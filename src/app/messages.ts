@@ -24,3 +24,11 @@ export function errorText(code: string | undefined): string | null {
 }
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export const BLOCKED_TIME_MESSAGES = {
+  saved: 'Blocked time saved and affected bookings cancelled.',
+  invalid:
+    'Choose a practitioner and future times with the end after the start, and use up to 300 characters for the reason. Choose a different time if the clocks change.',
+  changed: 'The affected bookings or clinic time zone have changed. Review the details again before confirming.',
+  not_staff: 'Only clinic staff can manage blocked time. Please sign in with your clinic staff account.',
+} as const;

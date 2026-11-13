@@ -30,3 +30,205 @@
     @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
   }
 }
+
+/* Shared clinic theme for staff journeys, using the current design policy. */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/fonts/figtree-latin-ext-400-normal.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/fonts/figtree-latin-400-normal.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('/fonts/figtree-latin-ext-500-normal.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('/fonts/figtree-latin-500-normal.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('/fonts/figtree-latin-ext-600-normal.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('/fonts/figtree-latin-600-normal.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('/fonts/fraunces-latin-ext-500-normal.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('/fonts/fraunces-latin-500-normal.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+body:has(.clinic-page) {
+  background: #faf8f4;
+  color: #16241f;
+  font-family: 'Figtree', sans-serif;
+}
+body:has(.clinic-page) header {
+  border-color: #e6e1d8;
+}
+body:has(.clinic-page) header a {
+  color: #1d5c4b;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+body:has(.clinic-page) header div,
+body:has(.clinic-page) header nav {
+  flex-wrap: wrap;
+}
+body:has(.clinic-page) main {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+body:has(.clinic-page) [data-testid='clinic-name'],
+.clinic-page h1,
+.clinic-page h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.clinic-page {
+  font-size: 16px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+.clinic-page h1 {
+  font-size: 32px;
+}
+.clinic-page h2 {
+  font-size: 22px;
+  margin-top: 32px;
+}
+.clinic-page h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.clinic-page a {
+  color: #1d5c4b;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.clinic-page label,
+.clinic-page button {
+  font-size: 15px;
+  font-weight: 500;
+}
+.clinic-page input:not([type='hidden']),
+.clinic-page select {
+  min-height: 48px;
+  border: 1px solid #8c9792;
+  border-radius: 12px;
+  background: #fff;
+  color: #16241f;
+}
+.clinic-page .button,
+.clinic-page .button-secondary {
+  min-height: 48px;
+  border-radius: 999px;
+  padding: 12px 24px;
+}
+.clinic-page .button {
+  background: #1d5c4b;
+  color: #fff;
+}
+.clinic-page .button:hover {
+  background: #164a3c;
+}
+.clinic-page .button-secondary {
+  background: #fff;
+  color: #1d5c4b;
+  border-color: #8c9792;
+}
+.clinic-page .button-secondary:hover {
+  background: #f1eee8;
+}
+.clinic-page .notice {
+  background: #e9f1ec;
+  border-color: #1d5c4b;
+  color: #16241f;
+  border-radius: 12px;
+  font-size: 16px;
+}
+.clinic-page .alert {
+  background: #fcebe8;
+  border-color: #a8261b;
+  color: #a8261b;
+  border-radius: 12px;
+  font-size: 16px;
+}
+.clinic-page :focus-visible,
+body:has(.clinic-page) header :focus-visible {
+  outline: 2px solid #1d5c4b;
+  outline-offset: 3px;
+}
+.clinic-page button:disabled {
+  opacity: 0.65;
+}
+@media (max-width: 640px) {
+  .clinic-page h1 {
+    font-size: 28px;
+  }
+}
+
+@media (min-width: 640px) {
+  body:has(.clinic-page) main {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}

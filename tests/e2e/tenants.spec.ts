@@ -257,6 +257,61 @@ test('REQ-18.2-01 patient sees the three-hour appointment, rerun seed preserves 
   }
 });
 
+for (const tenant of ['acme', 'beacon'] as const) {
+  test(`${tenant} staff review and save blocked time with the clinic's words and isolated cancellations`, async ({
+    browser,
+  }) => {
+    const clinic = tenant === 'acme' ? acme : beacon;
+    const otherClinic = tenant === 'acme' ? beacon : acme;
+    const clientContext = await signIn(browser, clinic, 'patient1');
+    const staffContext = await signIn(browser, clinic, 'admin');
+    const otherContext = await signIn(browser, otherClinic, 'admin');
+    try {
+      const client = clientContext.pages()[0]!;
+      const staff = staffContext.pages()[0]!;
+      const other = otherContext.pages()[0]!;
+      await client.goto(`${clinic.url}/slots`);
+      await client.getByTestId('date-input').fill('2026-11-10');
+      await client.getByTestId('show-slots').click();
+      await client.getByTestId('slot-link').first().click();
+      const when = (await client.getByTestId('book-when').textContent())!.replace(/\s*\(.*\)\s*$/, '').trim();
+      await client.getByTestId('confirm-booking').click();
+      await expect(client.getByTestId('notice')).toHaveText('Booking confirmed.');
+
+      await staff.goto(`${clinic.url}/admin`);
+      await staff.getByTestId('admin-blocked-time-link').click();
+      await expect(
+        staff.getByLabel(tenant === 'acme' ? 'Physiotherapist' : 'Clinician', { exact: true }),
+      ).toBeVisible();
+      await staff.getByTestId('block-start').fill('2026-11-10T09:00');
+      await staff.getByTestId('block-end').fill('2026-11-10T08:00');
+      await staff.getByTestId('block-reason').fill(`${tenant} training`);
+      await staff.getByTestId('block-review').click();
+      await expect(staff.getByTestId('block-error')).toBeVisible();
+      await expect(staff.getByTestId('block-reason')).toHaveValue(`${tenant} training`);
+      await staff.getByTestId('block-end').fill('2026-11-10T17:00');
+      await staff.getByTestId('block-review').click();
+      await expect(staff.getByTestId('block-impact')).toContainText(tenant === 'acme' ? 'session' : 'appointment');
+      await expect(staff.getByTestId('block-affected-booking')).toContainText(when);
+      await staff.getByTestId('block-confirm').click();
+      await expect(staff.getByTestId('block-saved')).toBeVisible();
+      await staff.reload();
+      await expect(staff.getByTestId('block-cancelled-booking')).toContainText('Cancelled');
+      await client.reload();
+      await expect(client.getByTestId('booking-row').filter({ hasText: when })).toHaveAttribute(
+        'data-status',
+        'cancelled',
+      );
+      await client.goto(`${clinic.url}/admin/blocked-time`);
+      await expect(client).toHaveURL(`${clinic.url}/bookings`);
+      await other.goto(`${otherClinic.url}/admin/blocked-time`);
+      await expect(other.getByTestId('block-list-row').filter({ hasText: `${tenant} training` })).toHaveCount(0);
+    } finally {
+      await Promise.all([clientContext.close(), staffContext.close(), otherContext.close()]);
+    }
+  });
+}
+
 test('REQ-18.1-06 container build requires GIT_COMMIT and the production image refuses the virtual clock', async () => {
   test.setTimeout(900_000);
   const directory = tenantEvidenceDirectory('production-build');

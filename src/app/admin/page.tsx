@@ -30,11 +30,16 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   const rows = invalid ? [] : await listAdminBookings(db, filters, settings.timeZone);
   const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
   return (
-    <section>
+    <section className="clinic-page">
       <h1>Clinic bookings</h1>
       <p>
         <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
           Clinic settings
+        </Link>
+      </p>
+      <p>
+        <Link href="/admin/blocked-time" prefetch={false} className="underline" data-testid="admin-blocked-time-link">
+          Blocked time
         </Link>
       </p>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
