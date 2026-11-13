@@ -251,7 +251,7 @@ test('Booking and move emails include current calendar details without attachmen
       );
       const email = await receivedEmail(PATIENT_2, before, `Booking confirmed: ${appointment.when}`);
       checkEmail(email, appointment, phone);
-      expect(email.Text).toContain(details);
+      expect(email.Text.replace(/\r\n/g, '\n')).toContain(details);
     });
     await step(
       page,
@@ -263,7 +263,7 @@ test('Booking and move emails include current calendar details without attachmen
         checkEmail(email, moved, phone);
         expect(email.Text).not.toContain(`Start: ${appointment.when}`);
         expect(email.Text).toContain('update or remove the existing calendar event yourself');
-        expect(email.Text).toContain(await openDetails(page, moved));
+        expect(email.Text.replace(/\r\n/g, '\n')).toContain(await openDetails(page, moved));
       },
     );
   }

@@ -31,7 +31,9 @@ duration. It leaves out your contact details and private booking links.
 
 In each calendar, enter the title, start and end shown. Use the stated time zone
 (`Europe/London` for UK bookings), so winter and summer times stay correct. Save
-the event. Copying details does not create an event automatically.
+the event after checking that its length matches the duration shown. Enter each
+detail in the matching calendar field. Copying details does not create an event
+automatically.
 
 If you move a session, update your existing calendar event to the new time yourself.
 If you cancel, remove the event yourself. BookIt does not update your calendar.
