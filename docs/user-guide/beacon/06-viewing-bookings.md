@@ -14,3 +14,8 @@ Europe/London time. If no bookings appear, clear a filter or select another day.
 The table shows patient names and booking status. Keep access to authorised
 Beacon staff. Patient accounts use **My bookings** to view only their own dental
 appointments and cannot open the clinic admin list.
+
+Choose **Add to calendar** beside an upcoming confirmed booking to copy its current
+details. See [Confirmation emails](05-confirmation-emails.md) for the steps for
+Google Calendar, Outlook and Apple Calendar. Update your calendar yourself after
+moving or cancelling a booking.

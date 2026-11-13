@@ -14,3 +14,8 @@ the view; an empty list means no appointments match the current selection.
 
 The table includes patient names and booking status. Only authorised Acme clinic
 staff should use this page. Patients see their own appointments through **My bookings**.
+
+Choose **Add to calendar** beside an upcoming confirmed booking to copy its current
+details. See [Confirmation emails](05-confirmation-emails.md) for the steps for
+Google Calendar, Outlook and Apple Calendar. Update your calendar yourself after
+moving or cancelling a booking.

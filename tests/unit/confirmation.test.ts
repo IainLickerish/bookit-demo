@@ -54,6 +54,9 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
     expect(email.text).toContain('Your appointment at Test Physio Clinic is confirmed.');
     expect(email.text).toContain('When: Thu, 22 Oct 2026, 10:30 (Europe/London)');
     expect(email.text).toContain('With: Pat Physio');
+    expect(email.text).toContain('Duration: 45 minutes');
+    expect(email.text).toContain('Time zone: Europe/London (BST)');
+    expect(email).not.toHaveProperty('attachments');
     expect(email.text).toContain('Booking reference: 019a0000-0000-7000-8000-00000000b001');
   });
 
@@ -95,6 +98,34 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
     });
     expect(email.text).not.toContain('7700');
   });
+
+  it.each([true, false])(
+    'includes current calendar details in move emails, with phone inclusion %s',
+    (includePhone) => {
+      const moved = {
+        ...booking('+44 7700 900001'),
+        startsAt: new Date('2026-12-08T11:15:00Z'),
+        endsAt: new Date('2026-12-08T11:45:00Z'),
+        rescheduleCount: 1,
+      };
+      const email = composeConfirmation({
+        booking: moved,
+        patient,
+        settings: { ...settings, includeContactInConfirmation: includePhone },
+        from: TEST_MAIL_FROM,
+        moved: true,
+      });
+      expect(email.subject).toBe('Booking moved: Tue, 8 Dec 2026, 11:15');
+      expect(email.text.startsWith('Test Physio Clinic\n')).toBe(true);
+      expect(email.text).toContain('Start: Tue, 8 Dec 2026, 11:15');
+      expect(email.text).toContain('End: Tue, 8 Dec 2026, 11:45');
+      expect(email.text).toContain('Duration: 30 minutes');
+      expect(email.text).toContain('Time zone: Europe/London (GMT)');
+      expect(email.text).toContain('update or remove the existing calendar event yourself');
+      expect(email.text.includes('Contact phone:')).toBe(includePhone);
+      expect(email).not.toHaveProperty('attachments');
+    },
+  );
 
   it('formats a stored phone by collapsing whitespace', () => {
     expect(formatPhone(' +44 7700\t900001 ')).toBe('+44 7700 900001');

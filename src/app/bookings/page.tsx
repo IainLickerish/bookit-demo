@@ -41,6 +41,16 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         <p className="text-sm text-slate-600">
           With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
         </p>
+        {changeable ? (
+          <Link
+            href={`/bookings/${booking.id}/calendar`}
+            prefetch={false}
+            className="button-secondary mt-3"
+            data-testid="add-to-calendar"
+          >
+            Add to calendar
+          </Link>
+        ) : null}
       </div>
       {changeable ? (
         <div className="flex gap-2">

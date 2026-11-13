@@ -24,3 +24,11 @@ export function errorText(code: string | undefined): string | null {
 }
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export const CALENDAR_MESSAGES = {
+  copied: 'Calendar details copied. Paste them into a new event in your calendar.',
+  failed:
+    'Sorry, the details could not be copied. Copy the selected text yourself, or type the details into your calendar.',
+  manualUpdate:
+    'If you move or cancel your booking, update or remove the existing event in your calendar yourself. BookIt does not update your calendar.',
+} as const;

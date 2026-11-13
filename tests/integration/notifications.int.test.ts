@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
@@ -123,6 +124,39 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
     expect(row?.status).toBe('confirmed');
     expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.failed']);
     expect(smtp.messages).toHaveLength(0);
+  });
+
+  it('emails the saved new time after a move, without an attachment or a required phone', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: await freeSlotId() });
+    const moved = await rescheduleBooking(deps(), {
+      patientId: clinic.patient2.id,
+      bookingId: booking.id,
+      newSlotId: await freeSlotId(),
+    });
+    expect(smtp.messages).toHaveLength(2);
+    const raw = smtp.messages[1]!.raw;
+    const body = bodyOf(raw);
+    expect(body).toContain(`Start: Thu, 22 Oct 2026, ${formatLocalTime(moved.startsAt, 'Europe/London')}`);
+    expect(body).toContain(`End: Thu, 22 Oct 2026, ${formatLocalTime(moved.endsAt, 'Europe/London')}`);
+    expect(body).toContain('Duration: 45 minutes');
+    expect(body).toContain('update or remove the existing calendar event yourself');
+    expect(body).not.toContain('Contact phone:');
+    expect(raw).not.toMatch(/Content-Disposition: attachment|text\/calendar/i);
+    expect(moved.phone).toBeNull();
+  });
+
+  it('keeps the new booking time when the move email cannot be delivered', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
+    const target = await freeSlotId();
+    await rescheduleBooking(deps('smtp://127.0.0.1:9'), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: target,
+    });
+    const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+    expect(stored).toMatchObject({ status: 'confirmed', slotId: target, rescheduleCount: 1 });
+    expect(smtp.messages).toHaveLength(1);
+    expect(logs.events().at(-1)).toBe('email.confirmation.failed');
   });
 
   it('refuses to email a patient whose address is not on a .test domain, and keeps the booking', async () => {

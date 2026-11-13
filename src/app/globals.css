@@ -30,3 +30,34 @@
     @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
   }
 }
+
+@layer components {
+  .calendar-panel {
+    color: #16241f;
+  }
+  .calendar-panel textarea {
+    @apply block rounded-xl border bg-white p-3;
+    border-color: #8c9792;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  .calendar-panel .button {
+    background-color: #1d5c4b;
+  }
+  .calendar-panel .button:hover {
+    background-color: #164a3c;
+  }
+  .calendar-panel .button,
+  .calendar-panel .button-secondary {
+    @apply inline-flex min-h-12 items-center rounded-full;
+  }
+  .calendar-panel .notice {
+    color: #16241f;
+    background-color: #e9f1ec;
+    border-color: #e6e1d8;
+  }
+  .calendar-panel :is(button, a, textarea):focus-visible {
+    outline: 2px solid #1d5c4b;
+    outline-offset: 3px;
+  }
+}
