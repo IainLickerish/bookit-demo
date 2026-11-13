@@ -21,3 +21,7 @@ The final check runs files 01 to 09 unchanged against a fresh Acme copy. Their
 reports and screenshots accompany its results. It then checks a late
 cancellation in that same copy. Only those existing filenames are passed to the
 child runs, so the final check cannot run itself.
+
+`bun run test:unit` also loads every owner check with Playwright's list command.
+This catches syntax and import errors, focused tests and skipped checks before
+the factory runs the journeys. Discovery needs no Docker or running demo.
