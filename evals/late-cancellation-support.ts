@@ -132,6 +132,10 @@ export class CancellationClinic {
           EVAL_BASE_URL: this.copy.url,
           EVAL_MAIL_URL: `http://127.0.0.1:${this.copy.env.BOOKIT_MAIL_PORT}`,
           EVAL_NOW: evalNow().toISOString(),
+          // Keep the child report in stdout, separate from the factory's report.
+          PLAYWRIGHT_JSON_OUTPUT_FILE: '',
+          PLAYWRIGHT_JSON_OUTPUT_DIR: '',
+          PLAYWRIGHT_JSON_OUTPUT_NAME: '',
         },
         timeout: 240_000,
         maxBuffer: 8 * 1024 * 1024,

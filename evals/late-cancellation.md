@@ -24,4 +24,8 @@ child runs, so the final check cannot run itself.
 
 `bun run test:unit` also loads every owner check with Playwright's list command.
 This catches syntax and import errors, focused tests and skipped checks before
-the factory runs the journeys. Discovery needs no Docker or running demo.
+the factory runs the journeys. It also requires all eight agreed cancellation
+check titles, word for word. Discovery needs no Docker or running demo.
+
+The child runs keep their reports separate from the factory's report, including
+when the parent process sets a JSON report destination.
