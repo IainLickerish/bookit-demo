@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { createDatabase } from '@/db/client';
 import { MIGRATIONS_FOLDER } from '@/db/migrate';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   blockedCancellations,
@@ -20,6 +20,7 @@ import {
 } from '@/db/schema';
 import {
   BLOCKED_TIME_PAGE_SIZE,
+  BLOCK_CANCELLATIONS_PAGE_SIZE,
   confirmBlockedTime,
   getBlockedTime,
   listBlockCancellations,
@@ -160,7 +161,9 @@ describe('staff blocked time and cancellations', () => {
     const id = randomUUID();
     await confirmBlockedTime(database.db, clock, clinic.admin.id, values(), id, checked.snapshot);
     expect((await listBlockedTime(database.db, clinic.admin.id)).blocks).toHaveLength(1);
-    expect(await listBlockCancellations(database.db, clinic.admin.id, id)).toMatchObject([{ id: booking.id }]);
+    expect((await listBlockCancellations(database.db, clinic.admin.id, id)).cancellations).toMatchObject([
+      { id: booking.id },
+    ]);
     expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toMatchObject({
       status: 'cancelled',
       lateCancellation: false,
@@ -287,7 +290,9 @@ describe('staff blocked time and cancellations', () => {
       id: older.id,
       reason: 'Training',
     });
-    expect(await listBlockCancellations(database.db, clinic.admin.id, older.id)).toMatchObject([{ id: booking.id }]);
+    expect((await listBlockCancellations(database.db, clinic.admin.id, older.id)).cancellations).toMatchObject([
+      { id: booking.id },
+    ]);
     const second = await listBlockedTime(database.db, clinic.admin.id, first.nextCursor!);
     const last = await listBlockedTime(database.db, clinic.admin.id, second.nextCursor!);
     expect(second.blocks).toHaveLength(BLOCKED_TIME_PAGE_SIZE);
@@ -301,6 +306,91 @@ describe('staff blocked time and cancellations', () => {
       expect(await listBlockedTime(database.db, clinic.admin.id, invalid)).toEqual(first);
     }
     expect(await getBlockedTime(foreign.db, foreignClinic.admin.id, older.id)).toBeNull();
+  });
+
+  it('cancels the complete affected set and pages through every saved cancellation in time order', async () => {
+    const count = BLOCK_CANCELLATIONS_PAGE_SIZE * 2 + 1;
+    const targets = await database.db
+      .select()
+      .from(slots)
+      .where(eq(slots.practitionerId, clinic.practitioners.weekdays))
+      .orderBy(asc(slots.startsAt))
+      .limit(count);
+    expect(targets).toHaveLength(count);
+    const affected = [];
+    for (const slot of targets)
+      affected.push(await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: slot.id }));
+    const { id, checked } = await confirm({ ...values(), start: '2026-10-20T09:00', end: '2026-10-27T17:00' });
+    expect(checked.affected).toHaveLength(count);
+    expect(await database.db.select().from(blockedCancellations)).toHaveLength(count);
+    expect(await database.db.select().from(bookings).where(eq(bookings.status, 'confirmed'))).toHaveLength(0);
+    const first = await listBlockCancellations(database.db, clinic.admin.id, id);
+    expect(first.cancellations).toHaveLength(BLOCK_CANCELLATIONS_PAGE_SIZE);
+    const second = await listBlockCancellations(database.db, clinic.admin.id, id, first.nextCursor!);
+    expect(second.cancellations).toHaveLength(BLOCK_CANCELLATIONS_PAGE_SIZE);
+    const last = await listBlockCancellations(database.db, clinic.admin.id, id, second.nextCursor!);
+    expect(last.cancellations).toHaveLength(1);
+    expect(last.nextCursor).toBeNull();
+    const all = [...first.cancellations, ...second.cancellations, ...last.cancellations];
+    expect(all.map((booking) => booking.id)).toEqual(affected.map((booking) => booking.id));
+    expect(new Set(all.map((booking) => booking.id)).size).toBe(count);
+    expect(await listBlockCancellations(database.db, clinic.admin.id, id)).toEqual(first);
+    for (const invalid of ['not-an-id', randomUUID()]) {
+      expect(await listBlockCancellations(database.db, clinic.admin.id, id, invalid)).toEqual(first);
+      expect(await listBlockCancellations(database.db, clinic.admin.id, invalid, first.nextCursor!)).toEqual({
+        cancellations: [],
+        nextCursor: null,
+      });
+    }
+    const other = await confirm({ ...values(), start: '2026-10-28T09:00', end: '2026-10-28T17:00' });
+    expect(await listBlockCancellations(database.db, clinic.admin.id, other.id, first.nextCursor!)).toEqual({
+      cancellations: [],
+      nextCursor: null,
+    });
+    expect(await listBlockCancellations(foreign.db, foreignClinic.admin.id, id, first.nextCursor!)).toEqual({
+      cancellations: [],
+      nextCursor: null,
+    });
+    const indexes = await database.db.execute(sql`
+      select indexdef from pg_indexes where tablename = 'blocked_cancellation' and indexname = 'blocked_cancellation_block_idx'
+    `);
+    expect(indexes.rows).toHaveLength(1);
+    expect(indexes.rows[0]!.indexdef).toContain('(block_id)');
+  });
+
+  it('uses booking references to page tied cancellation times without gaps and ignores another block’s cursor', async () => {
+    const count = BLOCK_CANCELLATIONS_PAGE_SIZE + 1;
+    const target = await targetSlot();
+    const block = await confirm();
+    // Cancelled bookings can share a slot after clients cancel and rebook it.
+    const ids = Array.from({ length: count }, () => randomUUID()).sort();
+    await database.db.insert(bookings).values(
+      ids.map((id) => ({
+        id,
+        patientId: clinic.patient1.id,
+        slotId: target.id,
+        status: 'cancelled' as const,
+        cancelledAt: clock.now(),
+        lateCancellation: false,
+        rescheduleCount: 0,
+        createdAt: clock.now(),
+        updatedAt: clock.now(),
+      })),
+    );
+    await database.db.insert(blockedCancellations).values(ids.map((bookingId) => ({ bookingId, blockId: block.id })));
+    const first = await listBlockCancellations(database.db, clinic.admin.id, block.id);
+    const last = await listBlockCancellations(database.db, clinic.admin.id, block.id, first.nextCursor!);
+    expect(first.cancellations).toHaveLength(BLOCK_CANCELLATIONS_PAGE_SIZE);
+    expect(last.cancellations).toHaveLength(1);
+    expect(last.nextCursor).toBeNull();
+    expect([...first.cancellations, ...last.cancellations].map((booking) => booking.id)).toEqual(ids);
+    const other = await confirm({ ...values(), start: '2026-10-28T09:00', end: '2026-10-28T17:00' });
+    await database.db
+      .update(blockedCancellations)
+      .set({ blockId: other.id })
+      .where(eq(blockedCancellations.bookingId, ids[0]!));
+    const reset = await listBlockCancellations(database.db, clinic.admin.id, block.id);
+    expect(await listBlockCancellations(database.db, clinic.admin.id, block.id, ids[0]!)).toEqual(reset);
   });
 
   const operations = ['block A', 'block B', 'book', 'move'] as const;
@@ -436,7 +526,7 @@ describe('staff blocked time and cancellations', () => {
       expect(await database.db.select().from(blockedCancellations)).toHaveLength(2);
       expect(await database.db.select().from(bookings).where(eq(bookings.status, 'confirmed'))).toHaveLength(0);
       for (const [index, id] of ids.entries()) {
-        expect(await listBlockCancellations(database.db, clinic.admin.id, id)).toMatchObject([
+        expect((await listBlockCancellations(database.db, clinic.admin.id, id)).cancellations).toMatchObject([
           { id: affected[index]!.id },
         ]);
       }

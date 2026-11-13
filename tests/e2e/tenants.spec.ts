@@ -380,6 +380,99 @@ for (const tenant of ['acme', 'beacon'] as const) {
       await Promise.all([clientContext.close(), staffContext.close(), otherContext.close()]);
     }
   });
+  test(`${tenant} staff can reopen every cancellation from a long block across saved detail pages`, async ({
+    browser,
+  }) => {
+    const clinic = tenant === 'acme' ? acme : beacon;
+    const fixture = await clinic.command([
+      'exec',
+      '-T',
+      'bookit',
+      'bun',
+      '-e',
+      `
+        import { readFileSync } from 'node:fs';
+        import { randomUUID } from 'node:crypto';
+        import { and, asc, eq, gt, lt } from 'drizzle-orm';
+        import { createDatabase } from './src/db/client';
+        import { bookings, slots, practitioners, users } from './src/db/schema';
+        import { createFileClock } from './src/lib/clock';
+        const url = new URL('postgresql://bookit@db:5432/bookit');
+        url.password = readFileSync(process.env.BOOKIT_DB_PASSWORD_FILE, 'utf8').trim();
+        const handle = createDatabase(url.toString());
+        const readClock = createFileClock('/clock/now.json').now;
+        const createdAt = readClock();
+        try {
+          const [patient] = await handle.db.select().from(users).where(eq(users.email,
+            process.env.BOOKIT_TENANT === 'acme' ? 'patient1@patients.acmephysio.test' : 'patient1@patients.beacondental.test'));
+          const targets = await handle.db.select({ id: slots.id }).from(slots)
+            .innerJoin(practitioners, eq(practitioners.id, slots.practitionerId))
+            .where(and(eq(practitioners.name, process.env.BOOKIT_TENANT === 'acme' ? 'Sam Physiotherapist' : 'Robin Dentist'),
+              gt(slots.startsAt, new Date('2026-11-12T00:00:00Z')), lt(slots.startsAt, new Date('2026-11-15T00:00:00Z'))))
+            .orderBy(asc(slots.startsAt)).limit(21);
+          if (targets.length !== 21) throw new Error('Expected 21 fictional booking slots');
+          const rows = targets.map((slot) => ({ id: randomUUID(), slotId: slot.id, patientId: patient.id,
+            status: 'confirmed', lateCancellation: false, rescheduleCount: 0,
+            createdAt, updatedAt: createdAt }));
+          await handle.db.insert(bookings).values(rows);
+          console.log(JSON.stringify(rows.map((row) => row.id)));
+        } finally { await handle.pool.end(); }
+      `,
+    ]);
+    expect(fixture.code).toBe(0);
+    const expectedIds = JSON.parse(fixture.output.trim()) as string[];
+    const context = await signIn(browser, clinic, 'admin');
+    try {
+      const page = context.pages()[0]!;
+      await page.goto(`${clinic.url}/admin/blocked-time`);
+      await page
+        .getByTestId('block-practitioner')
+        .selectOption({ label: tenant === 'acme' ? 'Sam Physiotherapist' : 'Robin Dentist' });
+      await page.getByTestId('block-start').fill('2026-11-12T09:00');
+      await page.getByTestId('block-end').fill('2026-11-14T17:00');
+      await page.getByTestId('block-reason').fill(`${tenant} long absence`);
+      await page.getByTestId('block-review').click();
+      await expect(page.getByTestId('block-affected-booking')).toHaveCount(21);
+      await page.getByTestId('block-confirm').click();
+      await expect(page.getByTestId('block-saved')).toBeVisible();
+      await expect(page.getByTestId('block-cancelled-booking')).toHaveCount(20);
+      const firstUrl = page.url();
+      const firstIds = await page
+        .getByTestId('block-cancelled-booking')
+        .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-booking-id')));
+      expect(firstIds).toEqual(expectedIds.slice(0, 20));
+      // Keep the history position while paging the selected block's cancellations.
+      const withHistory = new URL(firstUrl);
+      withHistory.searchParams.set('before', new URL(firstUrl).searchParams.get('block')!);
+      await page.goto(withHistory.toString());
+      await page.getByTestId('block-cancellations-next').click();
+      await expect(page).toHaveURL(
+        (url) =>
+          url.searchParams.has('afterCancellation') &&
+          url.searchParams.get('before') === withHistory.searchParams.get('before'),
+      );
+      await expect(page.getByTestId('block-cancelled-booking')).toHaveCount(1);
+      await expect(page.getByTestId('block-cancelled-booking')).toHaveAttribute('data-booking-id', expectedIds[20]!);
+      await expect(page.getByTestId('block-detail')).toContainText(`${tenant} long absence`);
+      await expect(page.getByTestId('block-cancellations-next')).toHaveCount(0);
+      await page.reload();
+      await expect(page.getByTestId('block-cancelled-booking')).toHaveCount(1);
+      await page.getByTestId('block-cancellations-first').click();
+      await expect(page).toHaveURL(
+        (url) =>
+          !url.searchParams.has('afterCancellation') &&
+          url.searchParams.get('before') === withHistory.searchParams.get('before'),
+      );
+      await expect(page.getByTestId('block-cancelled-booking')).toHaveCount(20);
+      expect(
+        await page
+          .getByTestId('block-cancelled-booking')
+          .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-booking-id'))),
+      ).toEqual(firstIds);
+    } finally {
+      await context.close();
+    }
+  });
 }
 
 test('REQ-18.1-06 container build requires GIT_COMMIT and the production image refuses the virtual clock', async () => {

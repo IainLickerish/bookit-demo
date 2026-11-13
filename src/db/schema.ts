@@ -171,14 +171,18 @@ export const blockedPeriods = pgTable(
 );
 
 // Retain the link to cancellations made by a block, independently of later blocks.
-export const blockedCancellations = pgTable('blocked_cancellation', {
-  bookingId: uuid('booking_id')
-    .primaryKey()
-    .references(() => bookings.id),
-  blockId: uuid('block_id')
-    .notNull()
-    .references(() => blockedPeriods.id),
-});
+export const blockedCancellations = pgTable(
+  'blocked_cancellation',
+  {
+    bookingId: uuid('booking_id')
+      .primaryKey()
+      .references(() => bookings.id),
+    blockId: uuid('block_id')
+      .notNull()
+      .references(() => blockedPeriods.id),
+  },
+  (t) => [index('blocked_cancellation_block_idx').on(t.blockId)],
+);
 
 export const clinicSettings = pgTable(
   'clinic_settings',

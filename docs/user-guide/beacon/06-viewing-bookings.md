@@ -28,7 +28,7 @@ clinician, start, end and reason. Nothing is saved or cancelled.
 Choose **Review blocked time**. Check the clinician, the start and end,
 and every affected appointment, including its client, time and duration. Any
 confirmed appointment overlapping the block, even partly, will be cancelled.
-A appointment ending exactly at the block's start or starting exactly at its end
+An appointment ending exactly at the block's start or starting exactly at its end
 is unaffected. **Change details** returns to your entries without saving.
 
 Confirm once to save the blocked time and all affected cancellations together.
@@ -44,6 +44,9 @@ Open a block under **Saved blocks** to revisit its time, reason and cancelled
 bookings. Saved blocks appear 20 at a time, newest first. Choose **View older
 blocks** to reach earlier entries, or **View newest blocks** to return to the start.
 An older block can also be reopened from its saved link. A block with no affected
-bookings says so. Only your clinic's staff can
+bookings says so. Cancelled bookings appear 20 at a time, earliest first. Choose
+**View more cancellations** to see the next page, or **View first cancellations**
+to return to the start. Every cancellation remains available when you reopen the
+block. Only your clinic's staff can
 create or view these blocks. This page does not offer editing or removal of saved
 blocks.

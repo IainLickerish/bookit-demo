@@ -151,6 +151,7 @@ export async function confirmBlockedTime(
 }
 
 export const BLOCKED_TIME_PAGE_SIZE = 20;
+export const BLOCK_CANCELLATIONS_PAGE_SIZE = 20;
 const blockDetails = {
   id: blockedPeriods.id,
   practitionerName: practitioners.name,
@@ -195,15 +196,35 @@ export async function getBlockedTime(db: Executor, staffId: string, blockId: str
   return block ?? null;
 }
 
-export async function listBlockCancellations(db: Executor, staffId: string, blockId: string) {
+export async function listBlockCancellations(db: Executor, staffId: string, blockId: string, after?: string) {
   await assertStaff(db, staffId);
-  if (!z.uuid().safeParse(blockId).success) return [];
-  return db
+  if (!z.uuid().safeParse(blockId).success) return { cancellations: [], nextCursor: null };
+  // A cursor is valid only within this block in the current clinic.
+  const [cursor] = z.uuid().safeParse(after).success
+    ? await db
+        .select({ id: blockedCancellations.bookingId, startsAt: slots.startsAt })
+        .from(blockedCancellations)
+        .innerJoin(bookings, eq(bookings.id, blockedCancellations.bookingId))
+        .innerJoin(slots, eq(slots.id, bookings.slotId))
+        .where(and(eq(blockedCancellations.blockId, blockId), eq(blockedCancellations.bookingId, after!)))
+    : [];
+  const rows = await db
     .select({ id: bookings.id, patientName: users.name, startsAt: slots.startsAt, endsAt: slots.endsAt })
     .from(blockedCancellations)
     .innerJoin(bookings, eq(bookings.id, blockedCancellations.bookingId))
     .innerJoin(users, eq(users.id, bookings.patientId))
     .innerJoin(slots, eq(slots.id, bookings.slotId))
-    .where(eq(blockedCancellations.blockId, blockId))
-    .orderBy(asc(slots.startsAt), asc(bookings.id));
+    .where(
+      and(
+        eq(blockedCancellations.blockId, blockId),
+        cursor ? sql`(${slots.startsAt}, ${bookings.id}) > (${cursor.startsAt}, ${cursor.id})` : undefined,
+      ),
+    )
+    .orderBy(asc(slots.startsAt), asc(bookings.id))
+    .limit(BLOCK_CANCELLATIONS_PAGE_SIZE + 1);
+  const cancellations = rows.slice(0, BLOCK_CANCELLATIONS_PAGE_SIZE);
+  return {
+    cancellations,
+    nextCursor: rows.length > BLOCK_CANCELLATIONS_PAGE_SIZE ? cancellations.at(-1)!.id : null,
+  };
 }

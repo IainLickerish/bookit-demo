@@ -1,0 +1,1 @@
+CREATE INDEX "blocked_cancellation_block_idx" ON "blocked_cancellation" USING btree ("block_id");

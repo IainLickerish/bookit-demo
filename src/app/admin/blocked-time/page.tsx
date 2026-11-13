@@ -20,7 +20,13 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
     getBlockedTime(db, staff.id, single(params.block)),
   ]);
   const { blocks, nextCursor } = history;
-  const cancellations = selected ? await listBlockCancellations(db, staff.id, selected.id) : [];
+  const afterCancellation = single(params.afterCancellation);
+  const { cancellations, nextCursor: nextCancellation } = selected
+    ? await listBlockCancellations(db, staff.id, selected.id, afterCancellation)
+    : { cancellations: [], nextCursor: null };
+  const detailLink = selected
+    ? `/admin/blocked-time?block=${selected.id}${before ? `&before=${encodeURIComponent(before)}` : ''}`
+    : '';
   const beacon = process.env.BOOKIT_TENANT === 'beacon';
   return (
     <section className="clinic-page">
@@ -48,7 +54,7 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
           {cancellations.length ? (
             <ul className="space-y-4" data-testid="block-cancellations">
               {cancellations.map((booking) => (
-                <li key={booking.id} data-testid="block-cancelled-booking">
+                <li key={booking.id} data-testid="block-cancelled-booking" data-booking-id={booking.id}>
                   {booking.patientName}: {formatSlot(booking.startsAt, settings.timeZone)},{' '}
                   {(booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000} minutes. Cancelled.
                 </li>
@@ -59,6 +65,29 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
               No bookings were cancelled by this block. You can review another block below.
             </p>
           )}
+          {afterCancellation || nextCancellation ? (
+            <nav
+              aria-label="Cancelled bookings pages"
+              className="mt-6 flex flex-wrap gap-6"
+              data-testid="block-cancellation-pages"
+            >
+              {afterCancellation ? (
+                <Link href={detailLink} prefetch={false} className="underline" data-testid="block-cancellations-first">
+                  View first cancellations
+                </Link>
+              ) : null}
+              {nextCancellation ? (
+                <Link
+                  href={`${detailLink}&afterCancellation=${nextCancellation}`}
+                  prefetch={false}
+                  className="underline"
+                  data-testid="block-cancellations-next"
+                >
+                  View more cancellations
+                </Link>
+              ) : null}
+            </nav>
+          ) : null}
         </section>
       ) : params.block ? (
         <p role="alert" className="alert">
