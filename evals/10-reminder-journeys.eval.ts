@@ -1,38 +1,83 @@
-import { expect, test } from '@playwright/test';
-import { ADMIN, PATIENT_2, signIn, step } from './support';
+import { expect, test, type Page } from '@playwright/test';
+import { signIn, step } from './support';
 
-test('Clinic staff can switch reminder emails off and on, and the choice stays saved', async ({ page, browser }) => {
-  await step(page, 'Sign in as clinic staff and open settings', async () => {
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await signIn(page, ADMIN);
-    await page.goto('/admin/settings');
-    await expect(page.getByTestId('admin-reminders-enabled')).toBeChecked();
-    await expect(page.getByTestId('reminders-hint')).toContainText('23 to 24 hours');
-  });
+test('Only each clinic’s staff can control its saved reminder setting, which starts enabled and leaves the other clinic unaffected.', async ({
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  const clinics: { baseURL: string; domain: string; page: Page }[] = [];
+  for (const clinic of [
+    { baseURL: process.env.EVAL_BASE_URL ?? 'http://localhost:4101', domain: 'acmephysio.test' },
+    { baseURL: process.env.EVAL_BEACON_BASE_URL ?? 'http://localhost:4201', domain: 'beacondental.test' },
+  ]) {
+    const context = await browser.newContext({ baseURL: clinic.baseURL, viewport: { width: 1280, height: 900 } });
+    clinics.push({ ...clinic, page: await context.newPage() });
+  }
+  const page = clinics[0]!.page;
   try {
-    await step(page, 'Switch reminders off and see the saved choice after reopening settings', async () => {
-      await page.getByTestId('admin-reminders-enabled').uncheck();
-      await page.getByTestId('admin-save-settings').click();
-      await expect(page.getByTestId('admin-settings-saved')).toBeVisible();
-      await page.goto('/admin/settings');
-      await expect(page.getByTestId('admin-reminders-enabled')).not.toBeChecked();
+    await step(page, 'Sign in as each clinic’s staff and see reminders start switched on', async () => {
+      for (const clinic of clinics) {
+        await signIn(clinic.page, `admin@${clinic.domain}`);
+        await clinic.page.goto('/admin/settings');
+        await expect(clinic.page.getByTestId('admin-reminders-enabled')).toBeChecked();
+        await expect(clinic.page.getByTestId('reminders-hint')).toContainText('23 to 24 hours');
+      }
     });
-    const client = await (await browser.newContext()).newPage();
-    await step(client, 'Sign in as a client and see that reminder settings are reserved for staff', async () => {
-      await signIn(client, PATIENT_2);
-      await client.goto('/admin/settings');
-      await expect(client.getByTestId('admin-reminders-enabled')).toHaveCount(0);
-      await expect(client.getByTestId('admin-save-settings')).toHaveCount(0);
+    for (const [index, clinic] of clinics.entries()) {
+      await step(
+        clinic.page,
+        'Switch reminders off, reopen settings and see the other clinic is still on',
+        async () => {
+          await clinic.page.getByTestId('admin-reminders-enabled').uncheck();
+          await clinic.page.getByTestId('admin-save-settings').click();
+          await expect(clinic.page.getByTestId('admin-settings-saved')).toBeVisible();
+          await clinic.page.goto('/admin/settings');
+          await expect(clinic.page.getByTestId('admin-reminders-enabled')).not.toBeChecked();
+          const other = clinics[1 - index]!;
+          await other.page.goto('/admin/settings');
+          await expect(other.page.getByTestId('admin-reminders-enabled')).toBeChecked();
+        },
+      );
+      await step(clinic.page, 'Switch reminders back on and see the choice stays saved', async () => {
+        await clinic.page.getByTestId('admin-reminders-enabled').check();
+        await clinic.page.getByTestId('admin-save-settings').click();
+        await expect(clinic.page.getByTestId('admin-settings-saved')).toBeVisible();
+        await clinic.page.goto('/admin/settings');
+        await expect(clinic.page.getByTestId('admin-reminders-enabled')).toBeChecked();
+      });
+    }
+    await step(page, 'See that clients in both clinics cannot change reminder settings', async () => {
+      for (const clinic of clinics) {
+        const context = await browser.newContext({ baseURL: clinic.baseURL });
+        try {
+          const client = await context.newPage();
+          await signIn(client, `patient2@patients.${clinic.domain}`);
+          await client.goto('/admin/settings');
+          await expect(client.getByTestId('admin-reminders-enabled')).toHaveCount(0);
+          await expect(client.getByTestId('admin-save-settings')).toHaveCount(0);
+        } finally {
+          await context.close();
+        }
+      }
     });
-    await client.context().close();
+    await step(page, 'See that each staff sign-in cannot open the other clinic’s settings', async () => {
+      for (const [index, clinic] of clinics.entries()) {
+        await clinic.page.goto(`${clinics[1 - index]!.baseURL}/admin/settings`);
+        await expect(clinic.page).toHaveURL(/\/auth\/sign-in/);
+        await expect(clinic.page.getByTestId('admin-reminders-enabled')).toHaveCount(0);
+        await expect(clinic.page.getByTestId('admin-save-settings')).toHaveCount(0);
+      }
+    });
   } finally {
-    await step(page, 'Switch reminders back on and see the saved choice after reopening settings', async () => {
-      await page.goto('/admin/settings');
-      await page.getByTestId('admin-reminders-enabled').check();
-      await page.getByTestId('admin-save-settings').click();
-      await expect(page.getByTestId('admin-settings-saved')).toBeVisible();
-      await page.goto('/admin/settings');
-      await expect(page.getByTestId('admin-reminders-enabled')).toBeChecked();
-    });
+    for (const clinic of clinics) {
+      try {
+        await clinic.page.goto(`${clinic.baseURL}/admin/settings`);
+        await clinic.page.getByTestId('admin-reminders-enabled').check();
+        await clinic.page.getByTestId('admin-save-settings').click();
+        await expect(clinic.page.getByTestId('admin-settings-saved')).toBeVisible();
+      } finally {
+        await clinic.page.context().close();
+      }
+    }
   }
 });

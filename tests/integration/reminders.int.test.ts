@@ -207,6 +207,29 @@ describe('durable reminder delivery', () => {
     expect(await sendDueReminders(deps())).toBe(1);
   });
 
+  it.each([false, true])(
+    'keeps an SMTP attempt after reminders are switched off and on (uncertain: %s)',
+    async (uncertain) => {
+      const booking = await makeBooking();
+      const send = vi.fn(async () => {
+        if (uncertain) throw new Error('SMTP reply lost');
+        return { messageId: 'fictional-reminder.test' };
+      });
+      const transport: Mailer = { kind: 'smtp', send };
+      expect(await sendDueReminders(deps(transport))).toBe(uncertain ? 0 : 1);
+      const attempted = await stored(booking.id);
+      expect(attempted.reminderAttemptedAt).toEqual(clock.now());
+      expect(attempted.reminderSentAt).toEqual(uncertain ? null : clock.now());
+      await setEnabled(false);
+      expect(await sendDueReminders(deps(transport))).toBe(0);
+      clock.advanceMinutes(10);
+      await setEnabled(true);
+      expect(await sendDueReminders(deps(transport))).toBe(0);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(await stored(booking.id)).toEqual(attempted);
+    },
+  );
+
   it('releases an unsent claim when staff disable reminders between claim and delivery', async () => {
     const booking = await makeBooking();
     const before = await stored(booking.id);
