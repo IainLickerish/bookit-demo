@@ -34,7 +34,7 @@ export default async function CalendarPage({ params }: { params: Promise<{ booki
         Create an event in Google Calendar, Outlook or Apple Calendar. Use the title, start, end and time zone below,
         then save your event.
       </p>
-      <p className="notice" data-testid="calendar-update-help">
+      <p className="notice notice-sage" data-testid="calendar-update-help">
         {CALENDAR_MESSAGES.manualUpdate}
       </p>
       <CopyCalendarDetails details={details} />

@@ -187,6 +187,14 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await expect(page.getByTestId('calendar-update-help')).toContainText('update or remove the existing event');
       await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
+      await expect(page.getByTestId('calendar-update-help')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
+      await expect(page.getByTestId('calendar-update-help')).toHaveCSS('color', 'rgb(22, 36, 31)');
+      await expect(page.getByTestId('calendar-update-help')).toHaveCSS('border-top-color', 'rgb(230, 225, 216)');
+      // A fallback that only reports success must not pass with text left by the earlier copy.
+      const sentinel = 'The calendar details have not been copied yet.';
+      expect(sentinel).not.toBe(details);
+      await page.evaluate((value) => navigator.clipboard.writeText(value), sentinel);
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(sentinel);
       await page.evaluate(() => {
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
       });
@@ -222,6 +230,9 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       async () => {
         const moved = await move(page, appointment);
         await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
+        await expect(page.getByTestId('calendar-update-help')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
+        await expect(page.getByTestId('calendar-update-help')).toHaveCSS('color', 'rgb(22, 36, 31)');
+        await expect(page.getByTestId('calendar-update-help')).toHaveCSS('border-top-color', 'rgb(230, 225, 216)');
         await expect(bookingRow(page, 'upcoming-bookings', moved.when)).toHaveAttribute(
           'data-booking-id',
           appointment.id,

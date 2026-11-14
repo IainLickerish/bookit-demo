@@ -82,7 +82,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       ) : null}
       {single(params.notice) === 'rescheduled' ? (
-        <p className="notice" data-testid="calendar-update-help">
+        <p className="notice notice-sage" data-testid="calendar-update-help">
           {CALENDAR_MESSAGES.manualUpdate}
         </p>
       ) : null}

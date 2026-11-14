@@ -117,7 +117,7 @@
   .calendar-panel .button-secondary {
     @apply inline-flex min-h-12 items-center rounded-full;
   }
-  .calendar-panel .notice {
+  .notice-sage {
     color: #16241f;
     background-color: #e9f1ec;
     border-color: #e6e1d8;
