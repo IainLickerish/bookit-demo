@@ -1,4 +1,5 @@
-# The sealed space for Software Factory build runs (see the factory's docs/spec.md).
+# BookIt's settings for the Software Factory (see the factory's docs/spec.md and decision 0051). The factory reads this
+# file from the main version only, so a change cannot alter how it is built, checked or run.
 # Integration and browser tests need Docker, so they run in CI, not in the sealed space.
 image: node:24-bookworm
 install:
@@ -11,3 +12,66 @@ checks:
   - bun run lint
   - bun run format:check
   - bun run test:unit
+
+# Which changes get a closer look: those that change stored data, and those always reviewed in full.
+review:
+  dataChanges:
+    - drizzle/
+  alwaysFull:
+    - src/server/auth/
+    - src/app/auth/
+    - src/db/
+    - drizzle/
+    - package.json
+    - bun.lock
+    - Dockerfile
+    - compose
+    - infra/
+
+# How the factory runs copies of BookIt: previews for the owner, and copies for the key flows and the AI tester.
+copies:
+  # Taken from the main version, never from the change being tried.
+  trusted:
+    - compose.yml
+    - compose.key-flows.yml
+    - scripts/init-database.sh
+    - scripts/start-database.sh
+    - scripts/local-proxy.mjs
+  compose:
+    - compose.yml
+  # Added for key-flow copies: BookIt's test clock, frozen at keyFlowNow to match the seeded test data.
+  keyFlowCompose:
+    - compose.key-flows.yml
+  frontDoor: web
+  appPort: 3000
+  mailPort: 8025
+  mailNote: Mailpit; its API lists them at /api/v1/messages
+  keyFlowNow: 2026-10-20T07:00:00.000Z
+  # Made-up test accounts (tenants/acme.json), behind the previews' own sign-in.
+  password: try-bookit-demo
+  accounts:
+    - email: patient1@patients.acmephysio.test
+      who: a client
+    - email: patient2@patients.acmephysio.test
+      who: a client with no phone number
+    - email: patient3@patients.acmephysio.test
+      who: another client with no phone number
+    - email: admin@acmephysio.test
+      who: clinic staff
+  secrets:
+    - database-password
+    - postgres-password
+  # The factory fills in the values in braces for each copy.
+  env:
+    BOOKIT_TENANT: acme
+    BOOKIT_PRODUCT: ACME
+    BOOKIT_ENV: local
+    BOOKIT_MAIL_FROM: noreply@acmephysio.test
+    BOOKIT_CREDENTIALS_DIR: '{credentials}'
+    BOOKIT_PORT: '{port}'
+    BOOKIT_MAIL_PORT: '{mailPort}'
+    BOOKIT_PUBLIC_URL: '{publicUrl}'
+    BOOKIT_LOCAL_IMAGE: '{image}'
+  keyFlowEnv:
+    BOOKIT_ALLOW_TEST_CLOCK: 'true'
+    BOOKIT_CLOCK_DIR: '{clockDir}'
