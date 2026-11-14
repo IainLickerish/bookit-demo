@@ -134,6 +134,16 @@
   color: #a8261b;
 }
 
+.reminder-journey .field-error {
+  margin-top: 8px;
+  color: #a8261b;
+  font-size: 15px;
+}
+
+.reminder-journey input[aria-invalid='true'] {
+  border-color: #a8261b;
+}
+
 .reminder-journey :focus-visible,
 .clinic-wordmark:focus-visible {
   outline: 2px solid #1d5c4b;

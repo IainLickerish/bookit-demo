@@ -9,6 +9,17 @@ const NOTICES = {
 
 export type NoticeCode = keyof typeof NOTICES;
 
+export const SETTINGS_MESSAGES = {
+  saved: 'Clinic settings saved.',
+  invalid: 'Settings have not been saved. Correct the highlighted fields and save again.',
+  unavailable: 'Sorry, settings could not be saved. Your entries are still here. Please try again.',
+  fields: {
+    clinicName: 'Enter a clinic name from 1 to 120 characters.',
+    timeZone: 'Enter a valid time zone, for example Europe/London.',
+    lateCancellationHours: 'Enter a whole number of hours from 0 to 336.',
+  },
+} as const;
+
 export function single(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }

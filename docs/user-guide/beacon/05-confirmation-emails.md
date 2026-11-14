@@ -48,3 +48,8 @@ Change **Send reminder emails** and select **Save settings**. The saved choice
 stays in place after you reopen the page. It affects only Beacon Dental; clients
 cannot change it. Switching reminders off stops future reminder attempts. An
 email already sent cannot be recalled.
+
+If a setting needs correcting, the page keeps your entries, including the reminder
+choice, and marks the field to change. Correct it and select **Save settings**
+again. Nothing is saved until you see **Clinic settings saved.** If saving fails,
+your entries stay on the page so you can try again.

@@ -2,12 +2,11 @@ import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { requireAdmin } from '@/server/admin/context';
 import { loadClinicSettings } from '@/server/settings';
-import type { SearchParams } from '../../messages';
-import { saveSettingsAction } from './actions';
+import { SettingsForm } from './settings-form';
 
-export default async function AdminSettingsPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function AdminSettingsPage() {
   await requireAdmin();
-  const [settings, params] = await Promise.all([loadClinicSettings(getDatabase()), searchParams]);
+  const settings = await loadClinicSettings(getDatabase());
   return (
     <section className="reminder-journey">
       <h1>Clinic settings</h1>
@@ -16,79 +15,15 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           Back to bookings
         </Link>
       </p>
-      {params.saved === '1' ? (
-        <p role="status" className="notice" data-testid="admin-settings-saved">
-          Clinic settings saved.
-        </p>
-      ) : null}
-      {params.error ? (
-        <p role="alert" className="alert" data-testid="admin-settings-error">
-          {params.error === 'invalid'
-            ? 'Enter a clinic name, a valid IANA time zone and a whole number of hours from 0 to 336.'
-            : 'Settings could not be saved. Please try again.'}
-        </p>
-      ) : null}
-      <form action={saveSettingsAction} className="mt-6 space-y-4">
-        <label>
-          Clinic name
-          <input
-            name="clinicName"
-            defaultValue={settings.clinicName}
-            maxLength={120}
-            required
-            data-testid="admin-clinic-name"
-          />
-        </label>
-        <label>
-          Time zone
-          <input name="timeZone" defaultValue={settings.timeZone} required data-testid="admin-time-zone" />
-        </label>
-        <p className="text-sm">
-          Use an IANA time zone, for example Europe/London. Existing appointment times stay fixed; display and date
-          filters use this zone.
-        </p>
-        <label>
-          Late-cancellation window (hours)
-          <input
-            name="lateCancellationHours"
-            type="number"
-            min={0}
-            max={336}
-            step={1}
-            defaultValue={settings.lateCancellationHours}
-            required
-            data-testid="admin-late-hours"
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="includeContactInConfirmation"
-            defaultChecked={settings.includeContactInConfirmation}
-            className="w-auto"
-            data-testid="admin-include-contact"
-          />
-          Include contact details in confirmation emails
-        </label>
-        <label className="flex min-h-12 items-center gap-2">
-          <input
-            type="checkbox"
-            name="remindersEnabled"
-            defaultChecked={settings.remindersEnabled}
-            className="w-auto"
-            aria-describedby="reminders-hint"
-            data-testid="admin-reminders-enabled"
-          />
-          Send reminder emails
-        </label>
-        <p id="reminders-hint" data-testid="reminders-hint">
-          Send one reminder 23 to 24 hours before each booked time. Reminders use UK time and never include a phone
-          number. Turning this off stops future reminders for this clinic.
-        </p>
-        <button type="submit" className="button" data-testid="admin-save-settings">
-          Save settings
-        </button>
-      </form>
+      <SettingsForm
+        values={{
+          clinicName: settings.clinicName,
+          timeZone: settings.timeZone,
+          lateCancellationHours: String(settings.lateCancellationHours),
+          includeContactInConfirmation: settings.includeContactInConfirmation,
+          remindersEnabled: settings.remindersEnabled,
+        }}
+      />
     </section>
   );
 }
