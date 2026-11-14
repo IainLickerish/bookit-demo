@@ -4,8 +4,8 @@ BookIt feels calm, assured, warm and quietly premium, like a well-kept private c
 its configured name is the wordmark, with no separate logo. BookIt has its own look, without the Software Factory's
 dark banners, cartoon people or teal. This guide follows the Design policy reviewed on 12 November 2026.
 
-The shared foundation and client and account presentation are in place. Staff booking and settings pages and
-fallback screens are the next presentation step. Existing wording and journeys are preserved. Emails stay plain text.
+The shared foundation, client and account screens, staff pages and fallback screens use this presentation.
+Existing wording and journeys are preserved. Emails stay plain text.
 
 ## Colours
 
@@ -107,6 +107,27 @@ administration message. Client pages open with the serif title, and existing not
 The shared header remains the one small clay accent. No new pictures or motion are needed for these screens
 (DS-2 to DS-6). The unchanged wording takes precedence over adding subtitles, location details, new rules or
 extra confirmations suggested by a broader policy. Those are separate product decisions, beyond this visual step.
+
+## Staff and fallback screens
+
+Clinic bookings uses a short serif page header, a white filter card and a separate white table card, within the
+1120px staff width. Keep Filter bookings, Clear filters and Export filtered bookings (CSV) in their existing roles.
+The table has stone headings, roomy cells, full names and complete clinic-local dates, with written status pills.
+Do not shorten names, hide columns, change exported values or turn rows into a different booking workflow.
+
+The table's labelled scroll area can receive keyboard focus and scroll horizontally. On narrow screens and at
+zoom, the table stays inside that area and the rest of the page stays within the viewport. Its pine focus ring
+must remain visible. Empty selections keep the existing message inside the table card; invalid selections keep
+the existing problem banner and available filter controls (DS-4, DS-5).
+
+Clinic settings uses the 720px reading width with one white form card, labelled fields and the existing checkbox.
+The time-zone hint is linked to its field. Save confirmation and general validation errors stay above the card,
+with their existing words and announcement roles. The booking count is also announced after filtering.
+
+Errors and missing pages use the same white card and serif title, with the existing recovery action presented
+as a pine pill. Reuse any existing explanatory sentence in the short header. Never display an error's private
+message or reference. Try again keeps the existing retry, and Go to the start page keeps its existing destination.
+No crash route or new product behaviour is added to demonstrate the error screen (DS-2 to DS-5, PS-6).
 
 ## Accessibility and decoration
 

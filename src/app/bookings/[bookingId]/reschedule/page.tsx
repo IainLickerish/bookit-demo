@@ -56,11 +56,11 @@ export default async function ReschedulePage({
         with {booking.practitionerName}.
       </p>
       {!changeable ? (
-        <p className="alert" data-testid="not-reschedulable">
+        <p role="alert" className="alert" data-testid="not-reschedulable">
           This booking can no longer be rescheduled online.
         </p>
       ) : remaining === 0 ? (
-        <p className="alert" data-testid="reschedule-limit">
+        <p role="alert" className="alert" data-testid="reschedule-limit">
           This booking has been rescheduled as many times as the clinic allows. Please contact the clinic.
         </p>
       ) : (

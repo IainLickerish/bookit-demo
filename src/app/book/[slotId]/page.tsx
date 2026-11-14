@@ -83,7 +83,7 @@ export default async function BookSlotPage({
           </div>
         </form>
       ) : (
-        <p className="alert" data-testid="slot-taken">
+        <p role="alert" className="alert" data-testid="slot-taken">
           This time is no longer available.
         </p>
       )}

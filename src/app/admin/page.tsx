@@ -30,14 +30,16 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   const rows = invalid ? [] : await listAdminBookings(db, filters, settings.timeZone);
   const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
   return (
-    <section>
-      <h1>Clinic bookings</h1>
-      <p>
-        <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
-          Clinic settings
-        </Link>
-      </p>
-      <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
+    <section className="staff-page">
+      <header className="page-header">
+        <h1 id="clinic-bookings-title">Clinic bookings</h1>
+        <p className="page-links">
+          <Link href="/admin/settings" prefetch={false} data-testid="admin-settings-link">
+            Clinic settings
+          </Link>
+        </p>
+      </header>
+      <form method="get" action="/admin" className="card staff-filters" data-testid="admin-filters">
         <label>
           Practitioner
           <select name="practitionerId" defaultValue={filters.practitionerId ?? ''} data-testid="admin-practitioner">
@@ -61,12 +63,14 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
             <option value="cancelled">Cancelled</option>
           </select>
         </label>
-        <button className="button" type="submit" data-testid="admin-filter">
-          Filter bookings
-        </button>
-        <Link href="/admin" prefetch={false} className="button-secondary">
-          Clear filters
-        </Link>
+        <div className="form-actions">
+          <button className="button" type="submit" data-testid="admin-filter">
+            Filter bookings
+          </button>
+          <Link href="/admin" prefetch={false} className="button-secondary" data-testid="admin-clear-filters">
+            Clear filters
+          </Link>
+        </div>
       </form>
       {invalid ? (
         <p role="alert" className="alert" data-testid="admin-filter-error">
@@ -74,40 +78,58 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
         </p>
       ) : (
         <>
-          <p data-testid="admin-row-count">{rows.length} bookings</p>
-          <a href={`/api/admin/export?${exportQuery}`} className="button-secondary my-3" data-testid="admin-export">
-            Export filtered bookings (CSV)
-          </a>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Clinic bookings in {settings.timeZone}</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Patient</th>
-                  <th scope="col">Practitioner</th>
-                  <th scope="col">Appointment</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-t" data-testid="admin-booking-row">
-                    <td className="py-3">{row.patientName}</td>
-                    <td>{row.practitionerName}</td>
-                    <td>{formatSlot(row.startsAt, settings.timeZone)}</td>
-                    <td>
-                      {row.status === 'confirmed'
-                        ? 'Confirmed'
-                        : row.lateCancellation
-                          ? 'Cancelled (late)'
-                          : 'Cancelled'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="results-toolbar">
+            <p role="status" data-testid="admin-row-count">
+              {rows.length} bookings
+            </p>
+            <a href={`/api/admin/export?${exportQuery}`} className="button-secondary" data-testid="admin-export">
+              Export filtered bookings (CSV)
+            </a>
           </div>
-          {rows.length === 0 ? <p>No bookings match these filters.</p> : null}
+          <div className="card" data-testid="admin-table-card">
+            <div
+              className="table-scroll"
+              role="region"
+              aria-labelledby="clinic-bookings-title"
+              tabIndex={0}
+              data-testid="admin-table-scroll"
+            >
+              <table className="bookings-table">
+                <caption className="sr-only">Clinic bookings in {settings.timeZone}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Patient</th>
+                    <th scope="col">Practitioner</th>
+                    <th scope="col">Appointment</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.id} data-testid="admin-booking-row">
+                      <td>{row.patientName}</td>
+                      <td>{row.practitionerName}</td>
+                      <td className="table-time">{formatSlot(row.startsAt, settings.timeZone)}</td>
+                      <td>
+                        <span className={`status-pill status-${row.status}`}>
+                          {row.status === 'confirmed'
+                            ? 'Confirmed'
+                            : row.lateCancellation
+                              ? 'Cancelled (late)'
+                              : 'Cancelled'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {rows.length === 0 ? (
+              <p className="table-empty" data-testid="admin-empty">
+                No bookings match these filters.
+              </p>
+            ) : null}
+          </div>
         </>
       )}
     </section>

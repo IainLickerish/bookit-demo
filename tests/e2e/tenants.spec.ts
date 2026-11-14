@@ -194,6 +194,41 @@ test('both clinics use the client cards and phone actions without changing their
   }
 });
 
+test('both clinics keep staff tables contained and use shared settings and fallback cards', async ({ browser }) => {
+  test.setTimeout(90_000);
+  for (const clinic of [acme, beacon]) {
+    const context = await signIn(browser, clinic, 'admin');
+    try {
+      const page = context.pages()[0]!;
+      await page.goto(`${clinic.url}/admin`);
+      await expect(page.getByTestId('admin-filters')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('admin-table-card')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      for (const width of [1280, 640, 320]) {
+        await page.setViewportSize({ width, height: 900 });
+        const area = page.getByRole('region', { name: 'Clinic bookings', exact: true });
+        await expect(area).toHaveAttribute('tabindex', '0');
+        await expect(area).toHaveCSS('overflow-x', 'auto');
+        if (width < 900) {
+          expect(await area.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      }
+      await page.getByTestId('admin-settings-link').click();
+      await expect(page.getByTestId('admin-settings-form')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('admin-time-zone')).toHaveAttribute('aria-describedby', 'time-zone-hint');
+      await expect(page.getByTestId('admin-save-settings')).toHaveText('Save settings');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.goto(`${clinic.url}/premium-design-missing-page`);
+      await expect(page.getByTestId('not-found')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('clinic-name')).toHaveText(clinic.tenant.settings.clinicName);
+      await page.getByTestId('not-found-start').click();
+      await expect(page.getByTestId('admin-home')).toHaveText('You are signed in as the clinic admin.');
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test('REQ-18.1-06 both local Compose tenants expose distinct identity, virtual time and local SDK receipt', async () => {
   for (const clinic of [acme, beacon]) {
     const publicOrigin = await clinic.command(['exec', '-T', 'bookit', 'node', '-p', 'process.env.BOOKIT_PUBLIC_URL']);
