@@ -238,4 +238,6 @@ a delivery timestamp and `email.reminder.sent`; failure records
 acceptance by the configured mail service, not proof that a client read it.
 Failed or interrupted attempts are never retried, including after a restart,
 because SMTP acceptance can be uncertain. My bookings stays the source of truth.
-Turning reminders off and back on preserves existing attempts.
+Turning reminders off and back on preserves actual or uncertain SMTP attempts. If
+the delivery recheck finds reminders disabled before contacting SMTP, it releases
+that revision's unused claim, so re-enabling within the window restores eligibility.

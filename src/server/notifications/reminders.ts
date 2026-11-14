@@ -47,13 +47,15 @@ export async function sendDueReminders(
       // worker can send another reminder until reminders are enabled again.
       const [settings] = await tx.select().from(clinicSettings).where(eq(clinicSettings.id, 1)).for('share');
       const [locked] = await tx.select().from(bookings).where(eq(bookings.id, claim.id)).for('update');
-      if (
-        !settings?.remindersEnabled ||
-        !locked ||
-        locked.status !== 'confirmed' ||
-        locked.rescheduleCount !== claim.revision
-      )
+      if (!settings?.remindersEnabled) {
+        // No SMTP call has happened. Release only this revision's claim so
+        // re-enabling within the window can still deliver its reminder.
+        if (locked?.rescheduleCount === claim.revision) {
+          await tx.update(bookings).set({ reminderAttemptedAt: null }).where(eq(bookings.id, claim.id));
+        }
         return false;
+      }
+      if (!locked || locked.status !== 'confirmed' || locked.rescheduleCount !== claim.revision) return false;
       const booking = await findBookingForPatient(tx, locked.patientId, locked.id);
       if (!booking || !reminderDue(booking.startsAt, deps.clock.now())) return false;
       const patient = await findUserById(tx, locked.patientId);

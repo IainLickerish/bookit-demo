@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bookings, slots } from '@/db/schema';
 import { newId } from '@/lib/ids';
 import { addHours, addMinutes } from '@/lib/time';
@@ -205,6 +205,69 @@ describe('durable reminder delivery', () => {
     expect((await stored(booking.id)).reminderAttemptedAt).toBeNull();
     await setEnabled(true);
     expect(await sendDueReminders(deps())).toBe(1);
+  });
+
+  it('releases an unsent claim when staff disable reminders between claim and delivery', async () => {
+    const booking = await makeBooking();
+    const before = await stored(booking.id);
+    mailer.sent.length = 0;
+    const transaction = database.db.transaction.bind(database.db);
+    const intercept = vi.spyOn(database.db, 'transaction').mockImplementationOnce(async (callback, config) => {
+      const result = await transaction(callback, config);
+      // The claim is committed, but the delivery transaction has not started.
+      expect((await stored(booking.id)).reminderAttemptedAt).toEqual(clock.now());
+      await setEnabled(false);
+      return result;
+    });
+    try {
+      expect(await sendDueReminders(deps())).toBe(0);
+      expect(mailer.sent).toHaveLength(0);
+      expect(await stored(booking.id)).toEqual(before);
+    } finally {
+      intercept.mockRestore();
+    }
+    clock.advanceMinutes(10);
+    await setEnabled(true);
+    expect(await sendDueReminders(deps())).toBe(1);
+    expect(await sendDueReminders(deps())).toBe(0);
+    expect(mailer.sent).toHaveLength(1);
+    expect((await stored(booking.id)).reminderSentAt).toEqual(clock.now());
+  });
+
+  it('does not release a moved revision claim when an older claim finds reminders disabled', async () => {
+    const booking = await makeBooking();
+    const target = await makeBooking(23.5, clinic.patient2.id);
+    await cancelBooking(deps(), { patientId: clinic.patient2.id, bookingId: target.id });
+    const transaction = database.db.transaction.bind(database.db);
+    const intercept = vi.spyOn(database.db, 'transaction').mockImplementationOnce(async (callback, config) => {
+      const result = await transaction(callback, config);
+      await rescheduleBooking(deps(), {
+        patientId: clinic.patient1.id,
+        bookingId: booking.id,
+        newSlotId: target.slotId,
+      });
+      const failing: Mailer = {
+        kind: 'smtp',
+        send: async () => {
+          throw new Error('SMTP reply lost');
+        },
+      };
+      expect(await sendDueReminders(deps(failing))).toBe(0);
+      await setEnabled(false);
+      return result;
+    });
+    try {
+      expect(await sendDueReminders(deps())).toBe(0);
+    } finally {
+      intercept.mockRestore();
+    }
+    const moved = await stored(booking.id);
+    expect(moved.rescheduleCount).toBe(1);
+    expect(moved.reminderAttemptedAt).toEqual(clock.now());
+    expect(moved.reminderSentAt).toBeNull();
+    await setEnabled(true);
+    expect(await sendDueReminders(deps())).toBe(0);
+    expect(await stored(booking.id)).toEqual(moved);
   });
 
   it('asks for a fresh review if a cancellation becomes late before confirmation', async () => {
