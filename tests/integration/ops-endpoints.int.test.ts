@@ -90,6 +90,14 @@ afterAll(async () => {
   await receiver?.stop();
 });
 
+describe('test server readiness', () => {
+  it('starts without reading clinic data or reporting a missing database', () => {
+    expect(server.served).toBe(true);
+    expect(server.output()).not.toContain('DATABASE_URL is not set.');
+    expect(receiver.events()).toEqual([]);
+  });
+});
+
 describe('GET /api/version (REQ-18.1-05, REQ-15.4-05, plan 12.6, F-39)', () => {
   it('returns the build and container identity with Cache-Control: no-store', async () => {
     const response = await get('/api/version');

@@ -70,7 +70,7 @@ export interface RunningServer {
   stop(): Promise<void>;
 }
 
-/** Starts a built server and waits until it serves a request or exits. */
+/** Starts a built server and waits until its liveness check succeeds or it exits. */
 export async function launchServer(distDir: string, env: Record<string, string>): Promise<RunningServer> {
   const port = await freePort();
   const child = spawn(NEXT, ['start', '-p', String(port), '-H', '127.0.0.1'], {
@@ -94,12 +94,17 @@ export async function launchServer(distDir: string, env: Record<string, string>)
   const deadline = performance.now() + 30_000;
   while (running && performance.now() < deadline) {
     try {
-      await fetch(`${url}/favicon.ico`, { signal: AbortSignal.timeout(2_000) });
-      served = true;
-      break;
+      // Missing pages render the clinic layout and can report database errors.
+      // The liveness endpoint is intentionally independent of clinic data.
+      const response = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(2_000) });
+      if (response.ok) {
+        served = true;
+        break;
+      }
     } catch {
-      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 250))]);
+      // The process may still be starting.
     }
+    await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 250))]);
   }
   return {
     url,
