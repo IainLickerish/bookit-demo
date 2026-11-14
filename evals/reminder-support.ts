@@ -1,34 +1,61 @@
-import { readFileSync, renameSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
-import { expect } from '@playwright/test';
-import { evalNow } from './support';
+import { expect, type Page } from '@playwright/test';
+import { bookSlot, bookingRow, evalNow, londonDate } from './support';
 
-/** Both already-running demo clinics share this writable, mounted virtual clock. */
-export function advanceReminderClock(now: Date): void {
-  const file =
-    process.env.EVAL_CLOCK_FILE ??
-    (process.env.BOOKIT_CLOCK_DIR ? path.join(process.env.BOOKIT_CLOCK_DIR, 'clock.json') : undefined);
-  if (!file) throw new Error('Set EVAL_CLOCK_FILE to the shared demo clock file');
-  const clock = JSON.parse(readFileSync(file, 'utf8')) as { now: string };
-  expect(now.getTime(), 'the shared demo clock only advances').toBeGreaterThanOrEqual(Date.parse(clock.now));
-  const temporary = `${file}.reminder-eval.tmp`;
-  writeFileSync(temporary, `${JSON.stringify({ ...clock, now: now.toISOString() })}\n`);
-  renameSync(temporary, file);
+/** Only use copies explicitly supplied by the runner. A second clinic is optional. */
+export function reminderClinics(baseURL: string) {
+  const clinics = [
+    {
+      name: 'Acme Physio',
+      baseURL,
+      mailURL: process.env.EVAL_MAIL_URL ?? 'http://localhost:8025',
+      domain: 'acmephysio.test',
+      practitioner: 'Alex Physiotherapist',
+      practitionerWord: 'physiotherapist',
+      appointment: 'session',
+      minutes: 45,
+    },
+  ];
+  if (process.env.EVAL_BEACON_BASE_URL) {
+    if (!process.env.EVAL_BEACON_MAIL_URL) throw new Error('Supply EVAL_BEACON_MAIL_URL with EVAL_BEACON_BASE_URL');
+    clinics.push({
+      name: 'Beacon Dental',
+      baseURL: process.env.EVAL_BEACON_BASE_URL,
+      mailURL: process.env.EVAL_BEACON_MAIL_URL,
+      domain: 'beacondental.test',
+      practitioner: 'Blair Dentist',
+      practitionerWord: 'clinician',
+      appointment: 'appointment',
+      minutes: 30,
+    });
+  }
+  return clinics;
 }
+export type ReminderClinic = ReturnType<typeof reminderClinics>[number];
 
-/** The next two UK clock-change Sundays, ordered so the demo clock never moves backwards. */
-export function reminderClockChanges(): string[] {
-  const start = evalNow();
-  const dates: string[] = [];
-  for (let year = start.getUTCFullYear(); dates.length < 2; year++) {
-    for (const month of [2, 9]) {
-      const last = new Date(Date.UTC(year, month + 1, 0));
-      last.setUTCDate(last.getUTCDate() - last.getUTCDay());
-      if (last.getTime() > start.getTime() + 2 * 86_400_000) dates.push(last.toISOString().slice(0, 10));
-      if (dates.length === 2) break;
+/** Book a free reference time in the reminder window using the normal client journey. */
+export async function bookReminderTime(page: Page, clinic: ReminderClinic) {
+  const now = evalNow().getTime();
+  // The fresh seed supplies a reference if ordinary opening hours have no free
+  // time in this window. Nothing advances the app's clock or invokes delivery.
+  const dates = [23, 24].map((hours) => londonDate(0, new Date(now + hours * 3_600_000)));
+  for (const date of new Set(dates)) {
+    await page.getByTestId('nav-book').click();
+    await page.getByTestId('practitioner-select').selectOption({ label: clinic.practitioner });
+    await page.getByTestId('date-input').fill(date);
+    await page.getByTestId('show-slots').click();
+    for (const slot of await page.getByTestId('slot-link').all()) {
+      const startsAt = new Date((await slot.getAttribute('data-starts-at'))!);
+      const hours = (startsAt.getTime() - now) / 3_600_000;
+      if (hours < 23 || hours > 24) continue;
+      const when = await bookSlot(page, (await slot.getAttribute('data-slot-id'))!);
+      const row = bookingRow(page, 'upcoming-bookings', when);
+      await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
+      const bookingId = (await row.getAttribute('data-booking-id'))!;
+      expect(bookingId).not.toBe('');
+      return { when, startsAt, bookingId };
     }
   }
-  return dates;
+  throw new Error('The fresh demo copy needs a free reference time 23 to 24 hours after EVAL_NOW');
 }
 
 export interface ReminderMessage {
@@ -36,7 +63,6 @@ export interface ReminderMessage {
   Subject: string;
   Text: string;
 }
-
 export async function reminderMessages(
   mailUrl: string,
   address: string,
@@ -54,10 +80,23 @@ export async function reminderMessages(
   }
   return reminders;
 }
+export async function receiveReminder(clinic: ReminderClinic, bookingId: string) {
+  let messages: ReminderMessage[] = [];
+  await expect
+    .poll(
+      async () => {
+        messages = await reminderMessages(clinic.mailURL, `patient3@patients.${clinic.domain}`, bookingId);
+        return messages.length;
+      },
+      { timeout: 45_000, message: `${clinic.name} sends one reminder automatically` },
+    )
+    .toBe(1);
+  return messages[0]!;
+}
 
-/** Observe real worker polls, rather than triggering delivery or merely checking twice immediately. */
-export async function observeReminderPolls(check: () => Promise<void>, milliseconds = 65_000): Promise<void> {
-  const end = performance.now() + milliseconds;
+/** Keep checking through more than one real worker poll without changing virtual time. */
+export async function observeReminderPolls(check: () => Promise<void>): Promise<void> {
+  const end = performance.now() + 65_000;
   do {
     await check();
     await new Promise((resolve) => setTimeout(resolve, 5_000));

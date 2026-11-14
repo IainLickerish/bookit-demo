@@ -67,5 +67,5 @@ done
 
 EVAL_BASE_URL="http://127.0.0.1:$acme_port" EVAL_MAIL_URL="http://127.0.0.1:$((acme_port + 1))" \
   EVAL_BEACON_BASE_URL="http://127.0.0.1:$beacon_port" EVAL_BEACON_MAIL_URL="http://127.0.0.1:$((beacon_port + 1))" \
-  EVAL_CLOCK_FILE="$work/clock/clock.json" EVAL_PASSWORD="$password" EVAL_NOW="$now" \
+  EVAL_PASSWORD="$password" EVAL_NOW="$now" \
   bun x playwright test -c evals "$@"

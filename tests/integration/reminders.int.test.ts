@@ -78,6 +78,29 @@ beforeEach(async () => {
 
 describe('durable reminder delivery', () => {
   it.each([
+    ['acme', '2026-10-24T09:00:00Z'],
+    ['beacon', '2026-10-24T09:00:00Z'],
+    ['acme', '2027-03-27T08:00:00Z'],
+    ['beacon', '2027-03-27T08:00:00Z'],
+  ])('selects only the elapsed-hour window for %s across the clock change at %s', async (tenant, instant) => {
+    clock.set(instant);
+    const candidates = [];
+    for (const hours of [22.999, 23, 23.5, 24, 24.001]) {
+      candidates.push({ hours, booking: await makeBooking(hours) });
+    }
+    mailer.sent.length = 0;
+    expect(await sendDueReminders({ ...deps(), tenant })).toBe(3);
+    expect(mailer.sent).toHaveLength(3);
+    for (const { hours, booking } of candidates) {
+      const due = hours >= 23 && hours <= 24;
+      expect((await stored(booking.id)).reminderAttemptedAt).toEqual(due ? clock.now() : null);
+      expect((await stored(booking.id)).reminderSentAt).toEqual(due ? clock.now() : null);
+      expect(mailer.sent.filter((email) => email.text.includes(`/bookings/${booking.id}/`))).toHaveLength(due ? 1 : 0);
+    }
+    expect(await sendDueReminders({ ...deps(), tenant })).toBe(0);
+  });
+
+  it.each([
     ['acme', 'Acme Physio', '2026-10-24T09:00:00Z', 'Sun, 25 Oct 2026, 09:00', 45, 'physiotherapist'],
     ['beacon', 'Beacon Dental', '2027-03-27T08:00:00Z', 'Sun, 28 Mar 2027, 09:00', 30, 'clinician'],
   ] as const)(
