@@ -152,7 +152,7 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       await expect(row).toHaveCount(1);
       await expect(row).toContainText('Confirmed');
       await expect(staff.getByTestId('add-to-calendar')).toHaveCount(0);
-      return row.innerText();
+      return row.getByRole('cell').allTextContents();
     });
     const path = await step(page, 'Open Add to calendar and copy with both browser copy controls', async () => {
       const details = await openDetails(page, appointment);
@@ -184,7 +184,9 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       await copyAndCheck(page, details);
       await copyAndCheck(page, details);
       await staff.reload();
-      await expect(staff.getByTestId('admin-booking-row').filter({ hasText: appointment.when })).toHaveText(before);
+      const diaryRow = staff.getByTestId('admin-booking-row').filter({ hasText: appointment.when });
+      await expect(diaryRow).toHaveCount(1);
+      await expect(diaryRow.getByRole('cell')).toHaveText(before);
       await expect(staff.getByTestId('admin-settings-link')).toBeVisible();
       await expect(staff.getByTestId('add-to-calendar')).toHaveCount(0);
     });
