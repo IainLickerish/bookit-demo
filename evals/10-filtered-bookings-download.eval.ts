@@ -16,8 +16,14 @@ test('The downloaded file contains exactly the filtered bookings, or just the ex
 }) => {
   const date = londonDate(34);
   const client = await sessionFor(browser, PATIENT_2);
-  const when = await step(client, 'Book a session to find in the download', async () => {
-    return bookSlot(client, (await pickFreeSlot(client, date)).id);
+  const { when, startsAt } = await step(client, 'Book a session to find in the download', async () => {
+    const slot = await pickFreeSlot(client, date);
+    const startsAt = await client
+      .getByTestId('slot-link')
+      .filter({ hasText: slot.time })
+      .getAttribute('data-starts-at');
+    expect(startsAt, 'the selected session has a start time').toBeTruthy();
+    return { when: await bookSlot(client, slot.id), startsAt: new Date(startsAt!).toISOString() };
   });
 
   const staff = await sessionFor(browser, ADMIN);
@@ -46,6 +52,7 @@ test('The downloaded file contains exactly the filtered bookings, or just the ex
     expect(records[0]).toBe(headings);
     expect(records[1]).toContain('"Łukasz Wiśniewski"');
     expect(records[1]).toContain(`"${PRACTITIONER}"`);
+    expect(records[1]).toContain(`"${startsAt}"`);
     expect(records[1]).toContain('"confirmed","no"');
     await expect(staff.getByTestId('admin-booking-row')).toContainText(when);
   });
