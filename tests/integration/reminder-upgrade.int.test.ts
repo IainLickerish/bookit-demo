@@ -1,11 +1,13 @@
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { runMigrations } from '@/db/migrate';
-import { bookings, clinicSettings } from '@/db/schema';
+import { bookings, clinicSettings, slots } from '@/db/schema';
+import { addHours } from '@/lib/time';
 import { listBookingsForPatient } from '@/server/bookings/queries';
 import { seedTenant } from '@/server/seed/seed';
 import { loadTenant } from '@/server/seed/tenant';
 import { loadClinicSettings } from '@/server/settings';
+import { listAvailableSlots } from '@/server/slots/queries';
 import { manualClock } from '../helpers/clock';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 
@@ -26,6 +28,24 @@ afterAll(async () => {
 
 it('upgrades existing booking history, keeps legacy seed identity valid and enables reminders without replacing settings', async () => {
   await seedTenant(database.db, clock, input);
+  const reference = await listAvailableSlots(database.db, {
+    practitionerId: (await database.db.select().from(slots))[0]!.practitionerId,
+    after: addHours(clock.now(), 23),
+    until: addHours(clock.now(), 24),
+  });
+  expect(reference.length).toBeGreaterThan(0);
+  const diaryBefore = await database.db.select().from(slots);
+  for (const slot of reference) {
+    expect(
+      diaryBefore.filter(
+        (other) =>
+          other.id !== slot.id &&
+          other.practitionerId === slot.practitionerId &&
+          other.startsAt < slot.endsAt &&
+          other.endsAt > slot.startsAt,
+      ),
+    ).toHaveLength(0);
+  }
   const before = await database.db.select().from(bookings);
   expect(before.length).toBeGreaterThan(0);
   // Rehearse upgrading the previous schema with its existing history and seed
@@ -39,6 +59,7 @@ it('upgrades existing booking history, keeps legacy seed identity valid and enab
   expect(await database.db.select().from(bookings)).toEqual(before);
   expect((await loadClinicSettings(database.db)).remindersEnabled).toBe(true);
   expect((await seedTenant(database.db, clock, input)).outcome).toBe('unchanged');
+  expect(await database.db.select().from(slots)).toEqual(diaryBefore);
   expect(await database.db.select().from(bookings)).toEqual(before);
   const patientId = before[0]!.patientId;
   expect((await listBookingsForPatient(database.db, patientId)).length).toBeGreaterThan(0);

@@ -9,11 +9,28 @@ import { addDaysToLocalDate, addHours, addMinutes, localDateOf, timeZoneOffsetMs
 import { ENVIRONMENTS } from '@/lib/runtime-identity';
 import { hashPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '../auth/password';
 import { ensureSlotsThroughHorizon } from '../slots/ensure';
+import { listAvailableSlots } from '../slots/queries';
 import { tenantSchema, type Tenant } from './tenant';
 
 export const seedEnvironment = z.enum(ENVIRONMENTS);
 const passwordsSchema = z.record(z.string(), z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH));
 const SEED_VERSION = 1;
+
+/** A free demo reference in the reminder window, without overlapping the clinic diary. */
+export function reminderReferenceStart(
+  now: Date,
+  minutes: number,
+  diary: { startsAt: Date; endsAt: Date }[],
+): Date | null {
+  let candidate = addHours(now, 23.25);
+  const latest = addHours(now, 23.75);
+  for (const slot of [...diary].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())) {
+    if (slot.endsAt <= candidate) continue;
+    if (slot.startsAt >= addMinutes(candidate, minutes)) break;
+    candidate = slot.endsAt;
+  }
+  return candidate <= latest ? candidate : null;
+}
 
 /** Keep a 09:00 reference on each side even when seeding late on the preceding day. */
 export function clockChangeReferenceStarts(now: Date, timeZone: string): Date[] {
@@ -167,6 +184,31 @@ export async function seedTenant(
         updatedAt: now,
         cancelledAt: null,
       });
+    }
+    // Fresh demo copies can exercise the real reminder worker with a frozen
+    // clock. Reuse an ordinary free time where possible; otherwise add one
+    // reference time, like the existing three-hour cancellation reference.
+    // This runs after the original seed bookings, and never on an upgrade.
+    const available = await listAvailableSlots(tx, {
+      practitionerId: id('practitioner:0'),
+      after: addHours(now, 23),
+      until: addHours(now, 24),
+    });
+    if (available.length === 0) {
+      const diary = await tx
+        .select()
+        .from(slots)
+        .where(eq(slots.practitionerId, id('practitioner:0')));
+      const startsAt = reminderReferenceStart(now, tenant.settings.sessionMinutes, diary);
+      if (startsAt) {
+        await tx.insert(slots).values({
+          id: id('reminder-reference'),
+          practitionerId: id('practitioner:0'),
+          startsAt,
+          endsAt: addMinutes(startsAt, tenant.settings.sessionMinutes),
+          createdAt: now,
+        });
+      }
     }
     await tx.execute(
       sql`insert into bookit_seed_state (singleton, tenant, environment, fingerprint, seeded_at) values (true, ${tenant.tenant}, ${environment}, ${fingerprint}, ${now.toISOString()})`,

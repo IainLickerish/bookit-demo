@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadTenant, tenantSchema } from '@/server/seed/tenant';
-import { clockChangeReferenceStarts, validatePasswords } from '@/server/seed/seed';
+import { clockChangeReferenceStarts, reminderReferenceStart, validatePasswords } from '@/server/seed/seed';
 
 describe('REQ-18.2-01 tenant configuration boundaries', () => {
   it('creates private caller credentials without printing values or overwriting a previous set', () => {
@@ -72,6 +72,31 @@ describe('REQ-18.2-01 tenant configuration boundaries', () => {
       'Supply one valid password',
     );
   });
+});
+
+describe('reminder demo reference times', () => {
+  const now = new Date('2026-10-20T07:00:00Z');
+  it('offers a time in the reminder window without changing existing diary entries', () => {
+    const diary = [{ startsAt: new Date('2026-10-21T06:00:00Z'), endsAt: new Date('2026-10-21T06:45:00Z') }];
+    const before = structuredClone(diary);
+    expect(reminderReferenceStart(now, 45, diary)?.toISOString()).toBe('2026-10-21T06:45:00.000Z');
+    expect(diary).toEqual(before);
+  });
+  it('does not add an overlapping time when the window is full', () => {
+    expect(
+      reminderReferenceStart(now, 45, [
+        { startsAt: new Date('2026-10-21T06:00:00Z'), endsAt: new Date('2026-10-21T07:00:00Z') },
+      ]),
+    ).toBeNull();
+  });
+  it.each(['2026-10-24T07:00:00Z', '2027-03-27T07:00:00Z'])(
+    'keeps the reference inside elapsed-hour bounds across a UK clock change at %s',
+    (instant) => {
+      const start = new Date(instant);
+      const reference = reminderReferenceStart(start, 30, [])!;
+      expect((reference.getTime() - start.getTime()) / 3_600_000).toBe(23.25);
+    },
+  );
 });
 
 describe('REQ-18.1-03 sixteen tenant-specific guide articles', () => {

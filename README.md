@@ -25,7 +25,7 @@ Vitest uses disposable PostgreSQL containers and local SMTP/Sentry fixtures.
 Playwright also builds the Docker image and starts two isolated Compose projects
 for the tenant checks. The owner's key flows (`evals/`) are the product's browser
 checks of what it must always do: `bun run test:key-flows` starts a Compose copy
-with the Acme test data and a fixed date and runs them, as CI and the Software
+with both clinics’ test data and a fixed date and runs them, as CI and the Software
 Factory do. First runs download pinned base images; tests never use
 a live model, hosted Sentry or a real email service. Container test projects are
 stopped afterwards, preserving their volumes and sanitised evidence for review.
@@ -166,6 +166,10 @@ selected tenant file. The seed logs only tenant, environment, outcome and counts
 It creates Unicode patient bookings, a booking three hours after the seed instant,
 and 09:00–17:00 local slots through the 220-day horizon, spanning the next London
 clock change. Beacon has its distinctive practitioner marker for isolation tests.
+A fresh seed also keeps a free time in the 23-to-24-hour reminder window, adding
+a non-overlapping reference time if the normal diary has none. This supports
+browser checks at a frozen date without changing that date or existing bookings.
+Repeated seeds leave the diary untouched.
 `bun run slots:ensure` extends available slots later without resetting bookings.
 
 ## Guides and demonstration baseline
