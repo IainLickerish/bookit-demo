@@ -76,7 +76,7 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
 }
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
-  it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
+  it('exports fictional accented names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
@@ -104,6 +104,20 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     expect(await summary.json()).toEqual({ total: 1, confirmed: 0, cancelled: 1, lateCancellations: 1 });
     const empty = await report(`type=bookings&practitionerId=${clinic.practitioners.weekdays}`, adminToken, 'report');
     expect(await empty.json()).toEqual({ bookings: [] });
+  });
+  it('downloads exactly the selected confirmed bookings with accented names', async () => {
+    const response = await report(`practitionerId=${fixture.practitionerId}&date=2026-10-25&status=confirmed`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-disposition')).toContain('attachment');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    expect([...bytes.subarray(0, 3)]).toEqual([239, 187, 191]);
+    const csv = bytes.toString('utf8');
+    expect(csv).toContain(ADMIN_PATIENT_NAMES[1]);
+    expect(csv).toContain(fixture.bookingIds[1]);
+    for (const index of [0, 2, 3]) {
+      expect(csv).not.toContain(fixture.bookingIds[index]);
+      expect(csv).not.toContain(ADMIN_PATIENT_NAMES[index]);
+    }
   });
   it('refuses missing, forged, expired and patient sessions before reading data', async () => {
     for (const token of ['', 'forged', patientToken]) {

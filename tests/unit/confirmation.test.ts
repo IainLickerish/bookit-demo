@@ -57,6 +57,21 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
     expect(email.text).toContain('Booking reference: 019a0000-0000-7000-8000-00000000b001');
   });
 
+  it('confirms a move with the new clinic-local time and booking reference', () => {
+    const moved = {
+      ...booking(null),
+      startsAt: new Date('2026-10-26T11:15:00Z'),
+      endsAt: new Date('2026-10-26T12:00:00Z'),
+    };
+    const email = composeConfirmation({ booking: moved, patient, settings, from: TEST_MAIL_FROM, rescheduled: true });
+    expect(email.subject).toBe('Booking rescheduled: Mon, 26 Oct 2026, 11:15');
+    expect(email.text.startsWith('Test Physio Clinic\n')).toBe(true);
+    expect(email.text).toContain('has been rescheduled.');
+    expect(email.text).toContain('When: Mon, 26 Oct 2026, 11:15 (Europe/London)');
+    expect(email.text).toContain(`Booking reference: ${moved.id}`);
+    expect(email.text).not.toContain('Contact phone');
+  });
+
   it('includes the contact phone when the clinic asks for it and the patient gave one', () => {
     const email = composeConfirmation({
       booking: booking('+44  7700 900001'),

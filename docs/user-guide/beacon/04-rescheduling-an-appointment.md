@@ -15,3 +15,7 @@ Beacon Dental allows up to **2 reschedules per booking**. The new appointment mu
 be in the future and within the booking horizon. If someone else takes your new
 slot first, your existing appointment stays booked. Please contact reception
 when you need help after reaching the limit.
+
+After a successful move, a confirmation email gives your new time and practitioner.
+If it does not arrive, check **My bookings** for the saved time. An email delivery
+problem does not undo your move.

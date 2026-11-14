@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import {
   ADMIN,
@@ -7,6 +8,7 @@ import {
   bookSlot,
   bookingRow,
   londonDate,
+  mailTo,
   showDay,
   signIn,
   step,
@@ -159,6 +161,33 @@ test('Clients are neither offered nor allowed to book or move into overlapping t
       await expect(client.locator('main')).not.toContainText(reason);
     },
   );
+  await step(client, 'Move to an unaffected time and receive a confirmation of the new time', async () => {
+    const seen = new Set((await mailTo(PATIENT_1)).map((mail) => mail.ID));
+    await client.getByTestId('nav-my-bookings').click();
+    await bookingRow(client, 'upcoming-bookings', when).getByTestId('reschedule-link').click();
+    const target = client.getByTestId('reschedule-to').filter({ hasText: '11:15' });
+    const newWhen = (await target.textContent())!.trim();
+    await target.click();
+    await expect(bookingRow(client, 'upcoming-bookings', newWhen).getByTestId('booking-status')).toHaveText(
+      'Confirmed',
+    );
+    let messageId = '';
+    await expect
+      .poll(async () => {
+        const message = (await mailTo(PATIENT_1)).find(
+          (mail) => !seen.has(mail.ID) && mail.Subject.startsWith('Booking rescheduled:'),
+        );
+        messageId = message?.ID ?? '';
+        return message?.Subject ?? '';
+      })
+      .toContain(newWhen);
+    const base = process.env.EVAL_MAIL_URL ?? 'http://localhost:8025';
+    const message = (await (await fetch(`${base}/api/v1/message/${messageId}`)).json()) as { Text: string };
+    expect(message.Text).toContain(newWhen);
+    expect(message.Text).toContain(PRACTITIONER);
+    expect(message.Text).toContain('has been rescheduled');
+    expect(message.Text).not.toContain(reason);
+  });
   await client.context().close();
   await staff.context().close();
 });
@@ -200,6 +229,29 @@ test('Staff see every affected confirmed booking in a warning, or a clear no-con
       await expect(row).toContainText(PRACTITIONER);
       await expect(row).toContainText('Confirmed');
     }
+  });
+  await step(staff, 'Download the filtered diary with both affected clients’ names and times', async () => {
+    await staff.getByTestId('blocks-back').click();
+    await staff.getByTestId('admin-date').fill(date);
+    await staff.getByTestId('admin-status').selectOption('confirmed');
+    await staff.getByTestId('admin-filter').click();
+    for (const name of ['Zoë Brontë', 'Łukasz Wiśniewski']) {
+      await expect(staff.getByTestId('admin-booking-row').filter({ hasText: name })).toContainText('Confirmed');
+    }
+    const downloaded = staff.waitForEvent('download');
+    await staff.getByTestId('admin-export').click();
+    const file = await downloaded;
+    expect(file.suggestedFilename()).toBe('bookings.csv');
+    const csv = await readFile((await file.path())!, 'utf8');
+    expect(csv.startsWith('\uFEFF')).toBe(true);
+    for (const name of ['Zoë Brontë', 'Łukasz Wiśniewski']) expect(csv).toContain(`"${name}"`);
+    expect(csv).toContain('"confirmed"');
+    expect(csv).not.toContain('"cancelled"');
+    expect(csv).not.toContain(reason);
+    // This check’s two bookings occupy the only selected times on its own date.
+    const records = csv.trim().split('\r\n').slice(1);
+    expect(records).toHaveLength(2);
+    for (const record of records) expect(record).toContain(date);
   });
   await step(staff, 'Save another block with no reason and see the no-conflicts message', async () => {
     await fillBlock(staff, date, '15:01', '15:02', '');

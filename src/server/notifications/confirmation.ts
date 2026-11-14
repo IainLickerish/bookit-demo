@@ -9,6 +9,7 @@ export interface ConfirmationInput {
   patient: { email: string; name: string };
   settings: ClinicSettings;
   from: string;
+  rescheduled?: boolean;
 }
 
 /** A stored phone number as it appears in an email. */
@@ -30,9 +31,13 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   const { booking, patient, settings } = input;
   const when = formatSlot(booking.startsAt, settings.timeZone);
   const lines = [
+    settings.clinicName,
+    '',
     `Dear ${patient.name},`,
     '',
-    `Your appointment at ${settings.clinicName} is confirmed.`,
+    input.rescheduled
+      ? `Your ${process.env.BOOKIT_TENANT === 'beacon' ? 'appointment' : 'session'} at ${settings.clinicName} has been rescheduled.`
+      : `Your appointment at ${settings.clinicName} is confirmed.`,
     '',
     `When: ${when} (${settings.timeZone})`,
     `With: ${booking.practitionerName}`,
@@ -45,7 +50,7 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   return {
     from: input.from,
     to: patient.email,
-    subject: `Booking confirmed: ${when}`,
+    subject: `${input.rescheduled ? 'Booking rescheduled' : 'Booking confirmed'}: ${when}`,
     text: `${lines.join('\n')}\n`,
   };
 }

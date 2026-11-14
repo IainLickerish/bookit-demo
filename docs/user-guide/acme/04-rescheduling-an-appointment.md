@@ -15,3 +15,7 @@ Acme Physio allows up to **3 reschedules per booking**. The new time must be in
 the future and within the booking horizon. If a time is taken while you are
 choosing, your existing booking stays in place. Contact the clinic for help once
 you reach the reschedule limit.
+
+After a successful move, a confirmation email gives your new time and practitioner.
+If it does not arrive, check **My bookings** for the saved time. An email delivery
+problem does not undo your move.

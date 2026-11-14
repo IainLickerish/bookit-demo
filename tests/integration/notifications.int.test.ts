@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { bookSlot } from '@/server/bookings/book';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
@@ -122,6 +123,45 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
     const [row] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
     expect(row?.status).toBe('confirmed');
     expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.failed']);
+    expect(smtp.messages).toHaveLength(0);
+  });
+
+  it('sends the new time after a committed move and sends nothing for a refused move', async () => {
+    const originalId = await freeSlotId();
+    const targetId = await freeSlotId(1);
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: originalId });
+    smtp.messages.length = 0;
+    const moved = await rescheduleBooking(deps(), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: targetId,
+    });
+    expect(smtp.messages).toHaveLength(1);
+    expect(smtp.messages[0]!.to).toEqual([clinic.patient1.email]);
+    const body = bodyOf(smtp.messages[0]!.raw);
+    expect(body).toContain('has been rescheduled.');
+    expect(body).toContain(`When: Thu, 22 Oct 2026, ${formatLocalTime(moved.startsAt, 'Europe/London')}`);
+    expect(body).toContain(`Booking reference: ${booking.id}`);
+    await expect(
+      rescheduleBooking(deps(), { patientId: clinic.patient2.id, bookingId: booking.id, newSlotId: originalId }),
+    ).rejects.toMatchObject({ code: 'booking_not_found' });
+    expect(smtp.messages).toHaveLength(1);
+  });
+
+  it('keeps the moved booking confirmed when its email cannot be delivered', async () => {
+    const originalId = await freeSlotId();
+    const targetId = await freeSlotId(1);
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: originalId });
+    smtp.messages.length = 0;
+    const moved = await rescheduleBooking(deps('smtp://127.0.0.1:9'), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: targetId,
+    });
+    const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+    expect(stored).toMatchObject({ slotId: targetId, status: 'confirmed', rescheduleCount: 1 });
+    expect(moved.slotId).toBe(targetId);
+    expect(logs.events()).toContain('email.confirmation.failed');
     expect(smtp.messages).toHaveLength(0);
   });
 
