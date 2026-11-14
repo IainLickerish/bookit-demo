@@ -1,5 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readMigrationFiles } from 'drizzle-orm/migrator';
+import { MIGRATIONS_FOLDER, runMigrations } from '@/db/migrate';
 import { bookings, practitioners, timeBlocks } from '@/db/schema';
 import { saveTimeBlock, listTimeBlocks } from '@/server/admin/time-blocks';
 import { bookSlot } from '@/server/bookings/book';
@@ -76,7 +78,13 @@ describe('blocked practitioner time', () => {
       after: clock.now(),
       until: new Date('2026-10-23T00:00:00Z'),
     });
-    expect(other.length).toBeGreaterThan(0);
+    expect(
+      other.some(
+        (slot) =>
+          localDateOf(slot.startsAt, 'Europe/London') === '2026-10-22' &&
+          formatLocalTime(slot.startsAt, 'Europe/London') === '10:00',
+      ),
+    ).toBe(true);
     // A block inside a slot must hide the whole slot.
     await block('2026-10-22T10:40', '2026-10-22T10:41');
     expect(await isSlotFree(database.db, after.id)).toBe(false);
@@ -148,10 +156,25 @@ describe('blocked practitioner time', () => {
       operation === 'move'
         ? rescheduleBooking(deps(), { patientId: clinic.patient1.id, bookingId: original!.id, newSlotId: target.id })
         : bookSlot(deps(), { patientId: clinic.patient1.id, slotId: target.id });
-    const outcome = expect(attempt).rejects.toMatchObject({ code: 'slot_blocked' });
-    release();
-    await save;
-    await outcome;
+    const outcome = attempt.then(
+      () => 'confirmed',
+      (error: unknown) => error,
+    );
+    try {
+      await vi.waitFor(
+        async () => {
+          const waiting = await database.handle.pool.query<{ count: string }>(
+            "select count(*) from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'",
+          );
+          expect(Number(waiting.rows[0]!.count)).toBeGreaterThan(0);
+        },
+        { timeout: 5_000 },
+      );
+    } finally {
+      release();
+      await save;
+    }
+    expect(await outcome).toMatchObject({ code: 'slot_blocked' });
     if (original) expect(await findBookingForPatient(database.db, clinic.patient1.id, original.id)).toEqual(original);
   });
 
@@ -199,5 +222,26 @@ describe('blocked practitioner time', () => {
           .map((slot) => formatLocalTime(slot.startsAt, 'Europe/London')),
       ).not.toContain('09:00');
     }
+  });
+
+  it('upgrades the previous schema with bookings intact and rehearses reversible removal of a mistaken block', async () => {
+    const existing = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: (await at('09:00')).id });
+    const target = await at('09:45');
+    const before = await database.db.select().from(bookings);
+    // Reconstruct the previous schema only inside this disposable test database.
+    const addedMigration = readMigrationFiles({ migrationsFolder: MIGRATIONS_FOLDER }).at(-1)!;
+    await database.handle.pool.query('drop table time_block');
+    await database.handle.pool.query('delete from drizzle.__drizzle_migrations where hash = $1', [addedMigration.hash]);
+    await runMigrations(database.url);
+    expect(await database.db.select().from(bookings)).toEqual(before);
+    expect(await findBookingForPatient(database.db, clinic.patient1.id, existing.id)).toEqual(existing);
+    const id = await block('2026-10-22T09:45', '2026-10-22T10:30', 'Mistaken block');
+    const [copy] = await database.db.select().from(timeBlocks).where(eq(timeBlocks.id, id));
+    expect(await isSlotFree(database.db, target.id)).toBe(false);
+    await database.db.delete(timeBlocks).where(eq(timeBlocks.id, id));
+    expect(await isSlotFree(database.db, target.id)).toBe(true);
+    await database.db.insert(timeBlocks).values(copy!);
+    expect(await isSlotFree(database.db, target.id)).toBe(false);
+    expect(await database.db.select().from(bookings)).toEqual(before);
   });
 });

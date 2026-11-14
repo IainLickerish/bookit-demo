@@ -18,7 +18,8 @@ then delete only the matching row and verify that availability is restored. The
 private copy can be reinserted to undo the deletion. Never delete bookings or
 slots to remove a block. There is no deletion control in this change.
 
-Integration coverage applies migrations to an empty database, saves blocks after
-bookings exist and verifies that every stored booking field remains unchanged.
+Integration coverage applies migrations to an empty database and upgrades the previous
+schema containing bookings. It verifies every stored booking field remains unchanged,
+and rehearses removing and restoring a mistaken block without affecting bookings.
 The added migration contains only table creation, its foreign key and index;
 no existing records are updated or dropped.
