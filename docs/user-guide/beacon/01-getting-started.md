@@ -15,3 +15,13 @@ Times are shown in Europe/London and adjust for the seasonal clock change.
 Need a hand? Contact Bella Byrne, Reception Lead, at `bella@beacondental.test`.
 We can help Monday to Saturday, 08:00 to 18:00, Europe/London. Please sign out
 when you have finished on a shared device.
+
+## Reminder email setting for staff
+
+Sign in with your clinic staff account, open **Clinic bookings**, then **Clinic
+settings**. Choose **On** or **Off** under **Reminder emails** and select **Save
+settings**. Reopen settings to check the saved choice. Reminders start off and
+only your clinic’s staff can change this choice.
+
+This saves your preference for reminder emails. Reminder emails are not being
+sent yet. Booking confirmation emails continue as before.

@@ -27,7 +27,9 @@ export const tenantSchema = z
     allowedSenderDomains: z.array(text).length(1),
     mailFrom: fictionalEmail,
     branding: z.strictObject({ practitionerLabel: text, welcome: text }),
-    settings: clinicSettingsInput.strict(),
+    // Preserve the version-one tenant fingerprint on existing databases. The new
+    // reminder preference is staff-owned and starts with the database default.
+    settings: clinicSettingsInput.omit({ remindersEnabled: true }).strict(),
     supportHours: text,
     tone: text,
     contacts: z

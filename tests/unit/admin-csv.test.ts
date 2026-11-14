@@ -69,6 +69,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
       timeZone: 'Europe/London',
       lateCancellationHours: 48,
       includeContactInConfirmation: false,
+      remindersEnabled: false,
     };
     expect(adminSettingsInput.parse(valid)).toEqual(valid);
     for (const change of [

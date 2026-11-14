@@ -147,6 +147,26 @@ export const bookings = pgTable(
   ],
 );
 
+/** One durable reservation per booking, retained even after a move or cancellation.
+ * A missing sentAt means delivery is unconfirmed, not permission to send again.
+ * Slot identity and time describe the appointment at reservation, not its current time.
+ */
+export const bookingReminders = pgTable(
+  'booking_reminder',
+  {
+    bookingId: uuid('booking_id')
+      .primaryKey()
+      .references(() => bookings.id),
+    slotId: uuid('slot_id')
+      .notNull()
+      .references(() => slots.id),
+    startsAt: instant('starts_at').notNull(),
+    reservedAt: instant('reserved_at').notNull(),
+    sentAt: instant('sent_at'),
+  },
+  () => [check('booking_reminder_sent_after_reserved', sql`"sent_at" is null or "sent_at" >= "reserved_at"`)],
+);
+
 export const clinicSettings = pgTable(
   'clinic_settings',
   {
@@ -155,6 +175,7 @@ export const clinicSettings = pgTable(
     timeZone: text('time_zone').notNull(),
     lateCancellationHours: integer('late_cancellation_hours').notNull(),
     includeContactInConfirmation: boolean('include_contact_in_confirmation').notNull(),
+    remindersEnabled: boolean('reminders_enabled').default(false).notNull(),
     slotHorizonDays: integer('slot_horizon_days').notNull(),
     sessionMinutes: integer('session_minutes').notNull(),
     maxReschedulesPerBooking: integer('max_reschedules_per_booking').notNull(),

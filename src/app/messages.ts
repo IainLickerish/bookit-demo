@@ -24,3 +24,11 @@ export function errorText(code: string | undefined): string | null {
 }
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export const SETTINGS_SAVED = 'Clinic settings saved.';
+
+export function settingsErrorText(error: string | string[]): string {
+  return error === 'invalid'
+    ? 'Enter a clinic name, a valid IANA time zone, whole hours from 0 to 336 and a reminder choice of On or Off.'
+    : 'Sorry, settings could not be saved. Please try again.';
+}

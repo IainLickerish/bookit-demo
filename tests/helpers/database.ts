@@ -14,10 +14,10 @@ export interface TestDatabase {
 }
 
 /** A migrated PostgreSQL in a throwaway container. */
-export async function startTestDatabase(poolSize = 25): Promise<TestDatabase> {
+export async function startTestDatabase(poolSize = 25, migrate = true): Promise<TestDatabase> {
   const container = await new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('bookit').start();
   const url = container.getConnectionUri();
-  await runMigrations(url);
+  if (migrate) await runMigrations(url);
   const handle = createDatabase(url, { max: poolSize });
   return {
     url,
@@ -33,6 +33,6 @@ export async function startTestDatabase(poolSize = 25): Promise<TestDatabase> {
 
 export async function emptyDatabase(db: Database): Promise<void> {
   await db.execute(
-    sql`truncate table "booking", "session", "password_reset_token", "slot", "practitioner", "user", "clinic_settings"`,
+    sql`truncate table "booking_reminder", "booking", "session", "password_reset_token", "slot", "practitioner", "user", "clinic_settings"`,
   );
 }
