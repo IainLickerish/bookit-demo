@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import type { Logger } from '@/lib/logger';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
@@ -55,6 +56,7 @@ export async function cancelAction(formData: FormData): Promise<void> {
       patientId: patient.id,
       bookingId: formText(formData, 'bookingId'),
     });
+    revalidatePath(`/bookings/${result.booking.id}/calendar`);
     destination = result.late ? '/bookings?notice=cancelled_late' : '/bookings?notice=cancelled';
   } catch (error) {
     destination = `/bookings?error=${refusalCode(error, deps.log, 'cancel')}`;
@@ -68,11 +70,12 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
   const bookingId = formText(formData, 'bookingId');
   let destination: string;
   try {
-    await rescheduleBooking(deps, {
+    const booking = await rescheduleBooking(deps, {
       patientId: patient.id,
       bookingId,
       newSlotId: formText(formData, 'newSlotId'),
     });
+    revalidatePath(`/bookings/${booking.id}/calendar`);
     destination = '/bookings?notice=rescheduled';
   } catch (error) {
     const code = refusalCode(error, deps.log, 'reschedule');

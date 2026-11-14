@@ -32,6 +32,7 @@ COPY --from=production-dependencies /app/node_modules ./node_modules
 # runtime install attempt on the isolated clinic network.
 COPY --from=dependencies /app/node_modules/typescript ./node_modules/typescript
 COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
 COPY --from=build /app/seed-clock-build-flag ./seed-clock-build-flag
 COPY package.json tsconfig.json next.config.ts ./
 COPY src ./src

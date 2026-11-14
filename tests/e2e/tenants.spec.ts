@@ -10,6 +10,7 @@ import {
 } from '../helpers/compose';
 import { TEST_COMMIT } from '../helpers/built-server';
 import { tenantEvidenceDirectory, writeTenantEvidence } from '../helpers/tenant-evidence';
+import { calendarEmail, copyCalendar, expectedCalendar } from './calendar-support';
 
 test.describe.configure({ mode: 'serial' });
 // The fixture fills generated passwords; browser traces must not retain them.
@@ -254,6 +255,64 @@ test('REQ-18.2-01 patient sees the three-hour appointment, rerun seed preserves 
     expect((await acme.command(['logs', '--no-color', 'bookit'])).output).toContain('2026-10-20T08:00:00.000Z');
   } finally {
     await context.close();
+  }
+});
+
+test('clients in both clinics can copy their saved booking and move details and receive the matching calendar emails', async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  for (const clinic of [acme, beacon]) {
+    const context = await signIn(browser, clinic, 'patient2');
+    try {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: clinic.url });
+      const page = context.pages()[0]!;
+      const address = clinic.tenant.accounts.find((account) => account.email.startsWith('patient2@'))!.email;
+      const practitioner = clinic.tenant.practitioners[0]!.name;
+      const phone = '+44 7700 900123';
+      await page.getByTestId('nav-book').click();
+      await page.getByTestId('practitioner-select').selectOption({ label: practitioner });
+      await page.getByTestId('date-input').fill('2026-11-18');
+      await page.getByTestId('show-slots').click();
+      const slot = page.getByTestId('slot-link').last();
+      const startsAt = (await slot.getAttribute('data-starts-at'))!;
+      await slot.click();
+      await expect(page.getByTestId('book-practitioner')).toHaveText(practitioner);
+      await expect(page.getByTestId('book-when')).toContainText(`(${clinic.tenant.settings.sessionMinutes} minutes)`);
+      const when = ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
+      await page.getByTestId('book-phone').fill(phone);
+      await page.getByTestId('confirm-booking').click();
+      await expect(page).toHaveURL(`${clinic.url}/bookings?notice=booked`);
+      const booking = page.getByTestId('booking-row').filter({ hasText: when });
+      await expect(booking.getByTestId('booking-status')).toHaveText('Confirmed');
+      await expect(booking).toContainText(practitioner);
+      const id = (await booking.getAttribute('data-booking-id'))!;
+      const expected = expectedCalendar(clinic, startsAt);
+      await booking.getByTestId('add-to-calendar').click();
+      await copyCalendar(page, expected);
+      await calendarEmail(context, clinic, address, `Booking confirmed: ${when}`, expected, phone);
+
+      await page.getByTestId('calendar-back').click();
+      await expect(page).toHaveURL(`${clinic.url}/bookings`);
+      await booking.getByTestId('reschedule-link').click();
+      const target = page.getByTestId('reschedule-to').last();
+      const newStart = (await target.getAttribute('data-starts-at'))!;
+      const newWhen = ((await target.textContent()) ?? '').trim();
+      await target.click();
+      await expect(page).toHaveURL(`${clinic.url}/bookings?notice=rescheduled`);
+      const moved = page.getByTestId('booking-row').filter({ hasText: newWhen });
+      await expect(moved).toHaveAttribute('data-booking-id', id);
+      await expect(moved.getByTestId('booking-status')).toHaveText('Confirmed');
+      await expect(moved).toContainText(practitioner);
+      await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
+      const updated = expectedCalendar(clinic, newStart);
+      expect(updated).not.toBe(expected);
+      await moved.getByTestId('add-to-calendar').click();
+      await copyCalendar(page, updated);
+      await calendarEmail(context, clinic, address, `Booking moved: ${newWhen}`, updated, phone);
+    } finally {
+      await context.close();
+    }
   }
 });
 

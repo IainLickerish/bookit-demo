@@ -53,7 +53,8 @@ async function book(page: Page, date: string, phone = ''): Promise<Appointment> 
 }
 
 async function move(page: Page, appointment: Appointment): Promise<Appointment> {
-  await page.goto('/bookings');
+  await page.getByTestId('nav-my-bookings').click();
+  await expect(page).toHaveURL(/\/bookings$/);
   await bookingRow(page, 'upcoming-bookings', appointment.when).getByTestId('reschedule-link').click();
   const target = page.getByTestId('reschedule-to').last();
   await expect(target).toBeVisible();
@@ -79,6 +80,15 @@ async function returnToBookings(page: Page): Promise<void> {
   // itself can be reloaded while the link's navigation is still pending.
   await expect(page).toHaveURL(/\/bookings$/);
   await expect(page.getByRole('heading', { name: 'My bookings', exact: true })).toBeVisible();
+}
+
+// Traverse the actual client navigation history without a reload or fresh visit.
+async function backToCalendar(page: Page, path: string): Promise<void> {
+  for (let visits = 0; visits < 6; visits++) {
+    await page.goBack();
+    if (new URL(page.url()).pathname === path) break;
+  }
+  await expect(page).toHaveURL(new RegExp(`${path}$`));
 }
 
 function ukWhen(instant: Date): string {
@@ -158,6 +168,23 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       const details = await openDetails(page, appointment);
       await copyAndCheck(page, details);
       expect(details).toContain(`Start: ${appointment.when}`);
+      const fonts = await page.evaluate(async () => ({
+        title: (await document.fonts.load('500 28px Fraunces')).length,
+        body: (await document.fonts.load('400 16px Figtree')).length,
+      }));
+      expect(fonts.title).toBeGreaterThan(0);
+      expect(fonts.body).toBeGreaterThan(0);
+      const title = page.getByTestId('calendar-title');
+      await expect(title).toHaveCSS('font-family', 'Fraunces, serif');
+      await expect(title).toHaveCSS('font-weight', '500');
+      await expect(title).toHaveCSS('font-size', '28px');
+      await expect(page.getByTestId('calendar-details')).toHaveCSS('font-family', 'Figtree, sans-serif');
+      await expect(page.getByTestId('copy-calendar-details')).toHaveCSS('font-size', '15px');
+      await expect(page.getByTestId('clinic-name')).toHaveCSS('font-family', 'Fraunces, serif');
+      await expect(page.getByTestId('clinic-name')).toHaveCSS('font-weight', '500');
+      await page.setViewportSize({ width: 1024, height: 768 });
+      await expect(title).toHaveCSS('font-size', '32px');
+      await page.setViewportSize({ width: 375, height: 812 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await expect(page.getByTestId('calendar-update-help')).toContainText('update or remove the existing event');
       await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
@@ -196,33 +223,32 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       async () => {
         const moved = await move(page, appointment);
         await expect(page.getByTestId('calendar-update-help')).toContainText('BookIt does not update your calendar.');
-        const details = await openDetails(page, moved);
-        await copyAndCheck(page, details);
-        expect(details).toContain(`Start: ${moved.when}`);
-        expect(details).not.toContain(`Start: ${appointment.when}`);
-        expect(await slotOffered(page, date, appointment.slotId)).toBe(true);
+        await expect(bookingRow(page, 'upcoming-bookings', moved.when)).toHaveAttribute(
+          'data-booking-id',
+          appointment.id,
+        );
         return moved;
       },
     );
-    await step(page, 'Reopen the original calendar page and copy the saved new time', async () => {
-      await page.goto(path);
-      await page.reload();
+    await step(page, 'Use browser Back to revisit the earlier summary and copy the saved new time', async () => {
+      await backToCalendar(page, path);
       const details = await page.getByTestId('calendar-details').inputValue();
       await copyAndCheck(page, details);
       expect(details).toContain(`Start: ${moved.when}`);
       expect(details).not.toContain(`Start: ${appointment.when}`);
       await expect(page.getByTestId('calendar-update-help')).toContainText('update or remove the existing event');
-      await returnToBookings(page);
-      await page.reload();
+      expect(await slotOffered(page, date, appointment.slotId)).toBe(true);
+      await page.getByTestId('nav-my-bookings').click();
+      await expect(page).toHaveURL(/\/bookings$/);
       expect(await openDetails(page, moved)).toBe(details);
     });
-    await step(page, 'Cancel the session and see that its calendar summary is no longer offered', async () => {
-      await page.goto('/bookings');
+    await step(page, 'Cancel the session and use browser Back to see that its earlier summary is refused', async () => {
+      await returnToBookings(page);
       await bookingRow(page, 'upcoming-bookings', moved.when).getByTestId('cancel-booking').click();
       const row = bookingRow(page, 'other-bookings', moved.when);
       await expect(row.getByTestId('booking-status')).toHaveText('Cancelled');
       await expect(row.getByTestId('add-to-calendar')).toHaveCount(0);
-      await page.goto(path);
+      await backToCalendar(page, path);
       await expect(page.getByTestId('not-found')).toBeVisible();
       await expect(page.getByTestId('calendar-details')).toHaveCount(0);
     });

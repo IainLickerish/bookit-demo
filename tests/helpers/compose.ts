@@ -139,6 +139,7 @@ export async function prepareComposeTenant(name: TenantName) {
     env,
     command,
     url: `http://127.0.0.1:${port}`,
+    mailUrl: `http://127.0.0.1:${mailPort}`,
     receiverUrl: `http://127.0.0.1:${receiverPort}`,
     canaries: [
       password,

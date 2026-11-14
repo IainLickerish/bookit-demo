@@ -29,7 +29,7 @@ export default async function CalendarPage({ params }: { params: Promise<{ booki
   });
   return (
     <section className="calendar-panel max-w-xl space-y-6">
-      <h1>Add to calendar</h1>
+      <h1 data-testid="calendar-title">Add to calendar</h1>
       <p>
         Create an event in Google Calendar, Outlook or Apple Calendar. Use the title, start, end and time zone below,
         then save your event.
