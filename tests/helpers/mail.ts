@@ -43,13 +43,18 @@ export interface SmtpReceiver {
 }
 
 /** A local SMTP server standing in for Mailpit; nothing leaves the machine. */
-export async function startSmtpReceiver(): Promise<SmtpReceiver> {
+export async function startSmtpReceiver({
+  rejectDelivery = false,
+}: { rejectDelivery?: boolean } = {}): Promise<SmtpReceiver> {
   const messages: ReceivedMessage[] = [];
   const listeners: ((message: ReceivedMessage) => void)[] = [];
   const server = new SMTPServer({
     authOptional: true,
     disabledCommands: ['STARTTLS'],
     logger: false,
+    onMailFrom(_address, _session, callback) {
+      callback(rejectDelivery ? Object.assign(new Error('Demo delivery refused'), { responseCode: 550 }) : undefined);
+    },
     onData(stream, session, callback) {
       let raw = '';
       stream.setEncoding('utf8');

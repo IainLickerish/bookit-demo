@@ -4,6 +4,7 @@ import { composeConfirmation, formatPhone } from '@/server/notifications/confirm
 import { deliverEmail } from '@/server/notifications/deliver';
 import {
   assertTestAddress,
+  createSmtpMailer,
   disabledMailer,
   EmailAddressRefusedError,
   type Mailer,
@@ -11,7 +12,7 @@ import {
 import type { ClinicSettings } from '@/server/settings';
 import { manualClock } from '../helpers/clock';
 import { captureLogs } from '../helpers/logs';
-import { recordingMailer, TEST_MAIL_FROM, testMail } from '../helpers/mail';
+import { recordingMailer, startSmtpReceiver, TEST_MAIL_FROM, testMail } from '../helpers/mail';
 
 const settings: ClinicSettings = {
   clinicName: 'Test Physio Clinic',
@@ -187,5 +188,19 @@ describe('sending confirmations (REQ-18.1-01; brief 18: no real email)', () => {
     await expect(disabledMailer.send({ ...email, to: 'someone@example.com' })).rejects.toThrow(
       EmailAddressRefusedError,
     );
+  });
+
+  it('reports a real SMTP rejection of calendar mail without throwing or delivering the message', async () => {
+    const receiver = await startSmtpReceiver({ rejectDelivery: true });
+    try {
+      const logs = captureLogs(manualClock('2026-10-20T07:00:00Z'));
+      const email = composeConfirmation({ booking: booking(null), patient, settings, from: TEST_MAIL_FROM });
+      expect(email.text).toContain('Add to calendar');
+      expect(await deliverEmail(testMail(createSmtpMailer(receiver.url)), logs.log, email, 'confirmation')).toBe(false);
+      expect(receiver.messages).toHaveLength(0);
+      expect(logs.events()).toEqual(['email.confirmation.failed']);
+    } finally {
+      await receiver.stop();
+    }
   });
 });

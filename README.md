@@ -66,8 +66,6 @@ Open <http://localhost:4101>. The Acme accounts are
 `patient3@patients.acmephysio.test` and `admin@acmephysio.test`. Retrieve the matching
 password privately from `accounts.json`; never paste it into an issue, log or prompt.
 Mailpit is at <http://localhost:8025>. Patient 2 has no phone number.
-The local inbox allows controlled delivery failures for behaviour checks. Its
-Chaos settings start with no failures and checks restore them after use.
 
 To run Beacon alongside Acme, use a separate project, credential directory and ports:
 

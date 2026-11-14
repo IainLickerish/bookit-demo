@@ -17,6 +17,7 @@ import {
 // Factory demos may use a private HTTP hostname instead of localhost. Give
 // that test origin the same Clipboard API support as a local browser demo.
 test.use({
+  permissions: ['clipboard-read', 'clipboard-write'],
   launchOptions: {
     args: [
       `--unsafely-treat-insecure-origin-as-secure=${new URL(process.env.EVAL_BASE_URL ?? 'http://localhost:4101').origin}`,
@@ -72,6 +73,14 @@ async function openDetails(page: Page, appointment: Appointment): Promise<string
   return page.getByTestId('calendar-details').inputValue();
 }
 
+async function returnToBookings(page: Page): Promise<void> {
+  await page.getByTestId('calendar-back').click();
+  // Wait for client-side navigation before reloading, or the calendar page
+  // itself can be reloaded while the link's navigation is still pending.
+  await expect(page).toHaveURL(/\/bookings$/);
+  await expect(page.getByRole('heading', { name: 'My bookings', exact: true })).toBeVisible();
+}
+
 function ukWhen(instant: Date): string {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London',
@@ -117,18 +126,18 @@ function checkEmail(email: { Text: string; Attachments?: unknown[] | null }, app
   else expect(email.Text).not.toContain('Contact phone:');
 }
 
-// These three journeys retain copying, clock changes, mail, privacy and failure checks together.
+// These journeys cover copying, clock changes, mail, privacy and refused copying.
+// SMTP failure coverage lives in notifications.int.test.ts, using a local receiver
+// rather than requiring failure controls on the factory's shared demo inbox.
 test.setTimeout(120_000);
 
 test('Clients can copy calendar details after booking or moving and from upcoming bookings in My bookings.', async ({
   page,
   browser,
-  context,
 }) => {
   const date = londonDate(24);
   const appointment = await step(page, 'Sign in on a phone and book a free session', async () => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await signIn(page, PATIENT_2);
     return book(page, date);
   });
@@ -166,7 +175,7 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       return new URL(page.url()).pathname;
     });
     await step(page, 'Return later and copy again without changing the booking or clinic diary', async () => {
-      await page.getByTestId('calendar-back').click();
+      await returnToBookings(page);
       await page.reload();
       const row = bookingRow(page, 'upcoming-bookings', appointment.when);
       await expect(row).toHaveAttribute('data-booking-id', appointment.id);
@@ -201,7 +210,7 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       expect(details).toContain(`Start: ${moved.when}`);
       expect(details).not.toContain(`Start: ${appointment.when}`);
       await expect(page.getByTestId('calendar-update-help')).toContainText('update or remove the existing event');
-      await page.getByTestId('calendar-back').click();
+      await returnToBookings(page);
       await page.reload();
       expect(await openDetails(page, moved)).toBe(details);
     });
@@ -309,16 +318,6 @@ test('Only the booking client can retrieve their calendar summary, which exclude
     return new URL(page.url()).pathname;
   });
   const other = await browser.newPage();
-  let originalChaos: unknown;
-  let restoreMail = false;
-  const setChaos = async (value: unknown) => {
-    const response = await fetch(`${mailBase()}/api/v1/chaos`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(value),
-    });
-    expect(response.ok, 'the local demo inbox accepts the test delivery setting').toBe(true);
-  };
   try {
     await step(other, 'Try opening that calendar summary while signed out', async () => {
       await other.goto(path);
@@ -340,23 +339,8 @@ test('Only the booking client can retrieve their calendar summary, which exclude
       await expect(other.getByTestId('admin-home')).toBeVisible();
       await expect(other.getByTestId('calendar-details')).toHaveCount(0);
     });
-    const withoutMail = await step(page, 'Confirm a session while email delivery is unavailable', async () => {
-      // The fictional local inbox rejects SMTP, exercising the real saved-booking path.
-      const response = await fetch(`${mailBase()}/api/v1/chaos`);
-      expect(response.ok, 'the local demo inbox allows controlled delivery failures').toBe(true);
-      originalChaos = await response.json();
-      restoreMail = true;
-      await setChaos({ Sender: { ErrorCode: 550, Probability: 100 } });
-      const before = new Set((await mailTo(PATIENT_2)).map((m) => m.ID));
-      const appointment = await book(page, londonDate(30));
-      await expect(page.getByTestId('notice')).toHaveText('Booking confirmed.');
-      expect((await mailTo(PATIENT_2)).filter((m) => !before.has(m.ID))).toHaveLength(0);
-      return appointment;
-    });
-    await step(page, 'Move without email and retrieve the saved new time even when copying fails', async () => {
-      const before = new Set((await mailTo(PATIENT_2)).map((m) => m.ID));
-      const moved = await move(page, withoutMail);
-      expect((await mailTo(PATIENT_2)).filter((m) => !before.has(m.ID))).toHaveLength(0);
+    await step(page, 'Move the session and retrieve the saved new time even when copying fails', async () => {
+      const moved = await move(page, appointment);
       await page.reload();
       await expect(bookingRow(page, 'upcoming-bookings', moved.when).getByTestId('booking-status')).toHaveText(
         'Confirmed',
@@ -365,16 +349,11 @@ test('Only the booking client can retrieve their calendar summary, which exclude
       await page.reload();
       await checkManualCopy(page, details);
       expect(details).toContain(`Start: ${moved.when}`);
+      expect(details).not.toContain(`Start: ${appointment.when}`);
+      expect(details).not.toMatch(/900123|Łukasz|Wiśniewski|@|https?:|\/bookings|reset-password|token/i);
+      expect(details).not.toContain(appointment.id);
     });
   } finally {
-    try {
-      if (restoreMail) {
-        await step(page, 'Restore normal email delivery for the other client journeys', async () =>
-          setChaos(originalChaos),
-        );
-      }
-    } finally {
-      await other.close();
-    }
+    await other.close();
   }
 });

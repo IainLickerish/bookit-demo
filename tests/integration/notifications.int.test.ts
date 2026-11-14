@@ -3,8 +3,10 @@ import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
-import { formatLocalTime, localDateOf } from '@/lib/time';
+import { calendarDetails } from '@/lib/calendar';
+import { formatLocalTime, formatSlot, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { findBookingForPatient, type BookingView } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
@@ -157,6 +159,45 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
     expect(stored).toMatchObject({ status: 'confirmed', slotId: target, rescheduleCount: 1 });
     expect(smtp.messages).toHaveLength(1);
     expect(logs.events().at(-1)).toBe('email.confirmation.failed');
+  });
+
+  it('retains retrievable calendar details after booking and moving when SMTP rejects both confirmations', async () => {
+    const refusing = await startSmtpReceiver({ rejectDelivery: true });
+    try {
+      const checkSavedCalendar = async (saved: BookingView) => {
+        // Read through the same owner-scoped query used by the calendar page.
+        const current = await findBookingForPatient(database.db, clinic.patient2.id, saved.id);
+        expect(current).toMatchObject({ status: 'confirmed', slotId: saved.slotId, phone: null });
+        const details = calendarDetails({
+          clinicName: clinic.settings.clinicName,
+          timeZone: clinic.settings.timeZone,
+          practitionerName: current!.practitionerName,
+          startsAt: current!.startsAt,
+          endsAt: current!.endsAt,
+        });
+        expect(details).toContain(`Start: ${formatSlot(saved.startsAt, clinic.settings.timeZone)}`);
+        expect(details).toContain(`End: ${formatSlot(saved.endsAt, clinic.settings.timeZone)}`);
+        expect(details).toContain('Duration: 45 minutes');
+      };
+      const booking = await bookSlot(deps(refusing.url), {
+        patientId: clinic.patient2.id,
+        slotId: await freeSlotId(),
+      });
+      await checkSavedCalendar(booking);
+      const target = await freeSlotId();
+      const moved = await rescheduleBooking(deps(refusing.url), {
+        patientId: clinic.patient2.id,
+        bookingId: booking.id,
+        newSlotId: target,
+      });
+      expect(moved.startsAt).not.toEqual(booking.startsAt);
+      await checkSavedCalendar(moved);
+      expect(refusing.messages).toHaveLength(0);
+      expect(logs.events().filter((event) => event === 'email.confirmation.failed')).toHaveLength(2);
+      expect(logs.events().filter((event) => event === 'email.confirmation.sent')).toHaveLength(0);
+    } finally {
+      await refusing.stop();
+    }
   });
 
   it('refuses to email a patient whose address is not on a .test domain, and keeps the booking', async () => {
