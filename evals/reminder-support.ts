@@ -1,5 +1,5 @@
-import { expect, type Page } from '@playwright/test';
-import { bookSlot, bookingRow, evalNow, londonDate } from './support';
+import { expect, type Page, type Route } from '@playwright/test';
+import { bookingRow, evalNow, givePhone, londonDate } from './support';
 
 /** Only use copies explicitly supplied by the runner. A second clinic is optional. */
 export function reminderClinics(baseURL: string) {
@@ -49,7 +49,11 @@ export async function bookReminderTime(page: Page, clinic: ReminderClinic) {
       const startsAt = new Date((await slot.getAttribute('data-starts-at'))!);
       const hours = (startsAt.getTime() - now) / 3_600_000;
       if (hours < 23 || hours > 24) continue;
-      const when = await bookSlot(page, (await slot.getAttribute('data-slot-id'))!);
+      await slot.click();
+      const when = (await page.getByTestId('book-when').innerText()).replace(/\s*\(.*\)\s*$/, '').trim();
+      await givePhone(page);
+      await confirmWithDoublePress(page, 'confirm-booking', /\/bookings\?notice=booked$/);
+      await revisitSavedResult(page);
       const row = bookingRow(page, 'upcoming-bookings', when);
       await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
       const bookingId = (await row.getAttribute('data-booking-id'))!;
@@ -104,4 +108,51 @@ export async function observeReminderPolls(check: () => Promise<void>): Promise<
     await new Promise((resolve) => setTimeout(resolve, 5_000));
   } while (performance.now() < end);
   await check();
+}
+
+/** A slow connection makes the saving state observable during a quick double press. */
+export async function confirmWithDoublePress(page: Page, testId: string, destination: RegExp): Promise<void> {
+  let release!: () => void;
+  const connection = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let submissions = 0;
+  const holdSave = async (route: Route) => {
+    const request = route.request();
+    if (request.method() === 'POST' && request.headers()['next-action']) {
+      submissions++;
+      await connection;
+    }
+    await route.continue();
+  };
+  await page.route('**/*', holdSave);
+  try {
+    const button = page.getByTestId(testId);
+    try {
+      await button.dblclick();
+      await expect(button).toBeDisabled();
+      await expect(button).toHaveText('Saving your booking…');
+    } finally {
+      release();
+    }
+    await expect(page).toHaveURL(destination);
+    expect(submissions, 'a double press submits the confirmation once').toBe(1);
+    await expect(page.getByTestId('booking-error')).toHaveCount(0);
+  } finally {
+    release();
+    await page.unroute('**/*', holdSave);
+  }
+}
+
+/** Refresh and browser history must return to the saved result without submitting again. */
+export async function revisitSavedResult(page: Page): Promise<void> {
+  const destination = page.url();
+  const message = await page.getByTestId('notice').innerText();
+  await page.reload();
+  await expect(page.getByTestId('notice')).toHaveText(message);
+  await page.goBack();
+  await page.goForward();
+  await expect(page).toHaveURL(destination);
+  await expect(page.getByTestId('notice')).toHaveText(message);
+  await expect(page.getByTestId('booking-error')).toHaveCount(0);
 }

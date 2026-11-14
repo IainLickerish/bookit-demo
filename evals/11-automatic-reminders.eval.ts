@@ -2,10 +2,12 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { bookingRow, demoPassword, evalNow, londonDate, signIn, step } from './support';
 import {
   bookReminderTime,
+  confirmWithDoublePress,
   observeReminderPolls,
   receiveReminder,
   reminderClinics,
   reminderMessages,
+  revisitSavedResult,
   type ReminderClinic,
 } from './reminder-support';
 
@@ -69,12 +71,16 @@ test('Reminders show the clinic, practitioner, duration and UK appointment date 
   const journeys = await openJourneys(browser, baseURL!);
   const page = journeys[0]!.page;
   try {
-    await step(page, 'Book a confirmed time about 24 hours ahead', async () => {
-      for (const j of journeys) {
-        await signIn(j.page, `patient3@patients.${j.clinic.domain}`);
-        j.booked = await bookReminderTime(j.page, j.clinic);
-      }
-    });
+    await step(
+      page,
+      'Double press to book a time about 24 hours ahead, then refresh and go back and forward',
+      async () => {
+        for (const j of journeys) {
+          await signIn(j.page, `patient3@patients.${j.clinic.domain}`);
+          j.booked = await bookReminderTime(j.page, j.clinic);
+        }
+      },
+    );
     await step(page, 'Read the automatically delivered reminder with UK time and private change links', async () => {
       for (const j of journeys) {
         const message = await receiveReminder(j.clinic, j.booked!.bookingId);
@@ -224,15 +230,19 @@ test('Reminder links require sign-in, protect booking privacy and show current d
         );
       }
     });
-    await step(page, 'Confirm the move and see the new time in My bookings', async () => {
-      for (const j of journeys) {
-        await j.page.getByTestId('confirm-change').click();
-        await expect(j.page).toHaveURL(/\/bookings\?notice=rescheduled$/);
-        await expect(bookingRow(j.page, 'upcoming-bookings', j.movedWhen!).getByTestId('booking-status')).toHaveText(
-          'Confirmed',
-        );
-      }
-    });
+    await step(
+      page,
+      'Double press to confirm the move and see the saved time after refresh and back and forward',
+      async () => {
+        for (const j of journeys) {
+          await confirmWithDoublePress(j.page, 'confirm-change', /\/bookings\?notice=rescheduled$/);
+          await revisitSavedResult(j.page);
+          await expect(bookingRow(j.page, 'upcoming-bookings', j.movedWhen!).getByTestId('booking-status')).toHaveText(
+            'Confirmed',
+          );
+        }
+      },
+    );
     await step(page, 'Reopen the original Cancel link and confirm cancellation of the current time', async () => {
       for (const j of journeys) {
         await j.page.goto(j.links!.cancel);
@@ -242,8 +252,8 @@ test('Reminder links require sign-in, protect booking privacy and show current d
         await expect(j.page.getByTestId('review-consequences')).toContainText(
           'This is outside the late-cancellation window.',
         );
-        await j.page.getByTestId('confirm-change').click();
-        await expect(j.page).toHaveURL(/\/bookings\?notice=cancelled$/);
+        await confirmWithDoublePress(j.page, 'confirm-change', /\/bookings\?notice=cancelled$/);
+        await revisitSavedResult(j.page);
         await expect(bookingRow(j.page, 'other-bookings', j.movedWhen!).getByTestId('booking-status')).toHaveText(
           'Cancelled',
         );

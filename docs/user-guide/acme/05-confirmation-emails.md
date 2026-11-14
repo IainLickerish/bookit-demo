@@ -37,6 +37,9 @@ and the late-cancellation warning before **Confirm cancellation**. Use **Back to
 my bookings** to leave without changing anything. Your old time stays booked if
 a move fails. A successful move makes the new booked time eligible for one reminder.
 
+While a change is saving, the confirmation button shows **Saving your booking…**
+and cannot be pressed again. Wait for **My bookings** to show the result.
+
 BookIt does not retry a failed or interrupted reminder attempt, because the mail
 service may already have accepted it. A missing email does not change your booking.
 Check **My bookings** for the current details.

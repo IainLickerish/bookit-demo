@@ -9,6 +9,10 @@ const NOTICES = {
 
 export type NoticeCode = keyof typeof NOTICES;
 
+export const BOOKING_MESSAGES = {
+  saving: 'Saving your booking…',
+} as const;
+
 export const SETTINGS_MESSAGES = {
   saved: 'Clinic settings saved.',
   invalid: 'Settings have not been saved. Correct the highlighted fields and save again.',

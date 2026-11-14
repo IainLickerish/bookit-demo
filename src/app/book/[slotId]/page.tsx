@@ -6,6 +6,7 @@ import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { findBookableSlot, isSlotFree } from '@/server/slots/queries';
 import { bookAction } from '../../bookings/actions';
+import { ConfirmationButton } from '../../bookings/confirmation-button';
 import { errorText, single, type SearchParams } from '../../messages';
 
 export default async function BookSlotPage({
@@ -59,9 +60,7 @@ export default async function BookSlotPage({
               data-testid="book-phone"
             />
           </label>
-          <button type="submit" className="button" data-testid="confirm-booking">
-            Confirm booking
-          </button>
+          <ConfirmationButton testId="confirm-booking">Confirm booking</ConfirmationButton>
         </form>
       ) : (
         <p className="alert" data-testid="slot-taken">

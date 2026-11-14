@@ -11,6 +11,7 @@ import { loadClinicSettings } from '@/server/settings';
 import { findBookableSlot, isSlotFree } from '@/server/slots/queries';
 import { single, type SearchParams } from '../../../messages';
 import { cancelAction, rescheduleAction } from '../../actions';
+import { ConfirmationButton } from '../../confirmation-button';
 
 export default async function ReviewBookingPage({
   params,
@@ -86,9 +87,9 @@ export default async function ReviewBookingPage({
             ) : (
               <input type="hidden" name="late" value={String(late)} />
             )}
-            <button type="submit" className="button" data-testid="confirm-change">
+            <ConfirmationButton testId="confirm-change">
               {slotId ? 'Confirm reschedule' : 'Confirm cancellation'}
-            </button>
+            </ConfirmationButton>
           </form>
         </>
       ) : (
