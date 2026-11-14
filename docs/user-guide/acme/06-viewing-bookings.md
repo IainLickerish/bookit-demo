@@ -27,7 +27,7 @@ A block with no affected bookings says **No confirmed bookings overlap this bloc
 Clients cannot see blocks or reasons. Any session that overlaps a block is unavailable to book or move into.
 A session ending exactly at the start, or starting exactly at the end, can still be booked.
 
-If a field needs correcting, the page keeps the other entries. Times skipped when UK clocks go forward,
+If a field needs correcting, the page keeps the other entries. Starting another save clears the previous success message; a failed save shows its error instead. Times skipped when UK clocks go forward,
 or repeated when they go back, cannot be entered as an endpoint. Choose a time before or after that hour.
 A block spanning a clock change keeps the start and end you entered. Saved times remain fixed if the clinic later changes its time zone.
 

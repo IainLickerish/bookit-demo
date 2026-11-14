@@ -12,15 +12,18 @@ const initialState: BlockFormState = {
 };
 
 export function BlockForm({
+  saved,
   practitioners,
   practitionerLabel,
   timeZone,
 }: {
+  saved: boolean;
   practitioners: { id: string; name: string }[];
   practitionerLabel: string;
   timeZone: string;
 }) {
   const [state, action, pending] = useActionState(saveBlockAction, initialState);
+  const hasErrors = Object.keys(state.errors).length > 0;
   const error = (field: BlockField) =>
     state.errors[field] ? (
       <p id={`${field}-error`} className="field-error" data-testid={`block-${field}-error`}>
@@ -30,70 +33,81 @@ export function BlockForm({
     ) : null;
   const description = (field: BlockField) => (state.errors[field] ? `${field}-error` : undefined);
   return (
-    <form action={action} noValidate className="space-y-4" data-testid="block-form">
-      {Object.keys(state.errors).length ? (
-        <p role="alert" className="alert" data-testid="block-error">
-          <FeedbackIcon kind="attention" />
-          {BLOCK_MESSAGES.invalid}
+    <>
+      {saved && !pending && !hasErrors ? (
+        <p role="status" className="notice" data-testid="block-saved">
+          <FeedbackIcon kind="done" />
+          {BLOCK_MESSAGES.saved}
         </p>
       ) : null}
-      <div>
-        <label htmlFor="block-practitioner">{practitionerLabel}</label>
-        <select
-          key={state.values.practitionerId}
-          id="block-practitioner"
-          name="practitionerId"
-          defaultValue={state.values.practitionerId}
-          required
-          aria-invalid={!!state.errors.practitionerId}
-          aria-describedby={description('practitionerId')}
-          data-testid="block-practitioner"
-        >
-          <option value="">Choose a {practitionerLabel.toLowerCase()}</option>
-          {practitioners.map((person) => (
-            <option key={person.id} value={person.id}>
-              {person.name}
-            </option>
+      <div className="staff-card">
+        <h2 className="mt-0">Block out time</h2>
+        <form action={action} noValidate className="space-y-4" data-testid="block-form">
+          {hasErrors ? (
+            <p role="alert" className="alert" data-testid="block-error">
+              <FeedbackIcon kind="attention" />
+              {BLOCK_MESSAGES.invalid}
+            </p>
+          ) : null}
+          <div>
+            <label htmlFor="block-practitioner">{practitionerLabel}</label>
+            <select
+              key={state.values.practitionerId}
+              id="block-practitioner"
+              name="practitionerId"
+              defaultValue={state.values.practitionerId}
+              required
+              aria-invalid={!!state.errors.practitionerId}
+              aria-describedby={description('practitionerId')}
+              data-testid="block-practitioner"
+            >
+              <option value="">Choose a {practitionerLabel.toLowerCase()}</option>
+              {practitioners.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}
+                </option>
+              ))}
+            </select>
+            {error('practitionerId')}
+          </div>
+          <p id="block-zone" className="text-sm">
+            Enter dates and 24-hour times in {timeZone}. A booking may start when the block ends. Times in a repeated or
+            skipped hour cannot be used.
+          </p>
+          {(['start', 'end'] as const).map((field) => (
+            <div key={field}>
+              <label htmlFor={`block-${field}`}>{field === 'start' ? 'Start' : 'End'}</label>
+              <input
+                id={`block-${field}`}
+                type="datetime-local"
+                name={field}
+                defaultValue={state.values[field]}
+                required
+                aria-invalid={!!state.errors[field]}
+                aria-describedby={[description(field), 'block-zone'].filter(Boolean).join(' ')}
+                data-testid={`block-${field}`}
+              />
+              {error(field)}
+            </div>
           ))}
-        </select>
-        {error('practitionerId')}
+          <div>
+            <label htmlFor="block-reason">Reason (optional)</label>
+            <input
+              id="block-reason"
+              name="reason"
+              defaultValue={state.values.reason}
+              maxLength={500}
+              aria-invalid={!!state.errors.reason}
+              aria-describedby={description('reason')}
+              data-testid="block-reason"
+            />
+            {error('reason')}
+          </div>
+          <button type="submit" className="button" disabled={pending} data-testid="block-save">
+            {pending ? 'Saving blocked time…' : 'Save blocked time'}
+          </button>
+        </form>
       </div>
-      <p id="block-zone" className="text-sm">
-        Enter dates and 24-hour times in {timeZone}. A booking may start when the block ends. Times in a repeated or
-        skipped hour cannot be used.
-      </p>
-      {(['start', 'end'] as const).map((field) => (
-        <div key={field}>
-          <label htmlFor={`block-${field}`}>{field === 'start' ? 'Start' : 'End'}</label>
-          <input
-            id={`block-${field}`}
-            type="datetime-local"
-            name={field}
-            defaultValue={state.values[field]}
-            required
-            aria-invalid={!!state.errors[field]}
-            aria-describedby={[description(field), 'block-zone'].filter(Boolean).join(' ')}
-            data-testid={`block-${field}`}
-          />
-          {error(field)}
-        </div>
-      ))}
-      <div>
-        <label htmlFor="block-reason">Reason (optional)</label>
-        <input
-          id="block-reason"
-          name="reason"
-          defaultValue={state.values.reason}
-          maxLength={500}
-          aria-invalid={!!state.errors.reason}
-          aria-describedby={description('reason')}
-          data-testid="block-reason"
-        />
-        {error('reason')}
-      </div>
-      <button type="submit" className="button" disabled={pending} data-testid="block-save">
-        {pending ? 'Saving blocked time…' : 'Save blocked time'}
-      </button>
-    </form>
+    </>
   );
 }

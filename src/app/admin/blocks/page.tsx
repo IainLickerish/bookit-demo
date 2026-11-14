@@ -19,21 +19,18 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
     searchParams,
   ]);
   const practitionerLabel = process.env.BOOKIT_TENANT === 'beacon' ? 'Clinician' : 'Physiotherapist';
-  const saved = blocks.some((block) => block.id === single(params.saved));
+  const savedId = blocks.find((block) => block.id === single(params.saved))?.id ?? null;
   return (
     <section className="staff-page">
       <h1>Blocked time</h1>
       <p className="mb-6">Keep time free when a {practitionerLabel.toLowerCase()} is away.</p>
-      {saved ? (
-        <p role="status" className="notice" data-testid="block-saved">
-          <FeedbackIcon kind="done" />
-          {BLOCK_MESSAGES.saved}
-        </p>
-      ) : null}
-      <div className="staff-card">
-        <h2 className="mt-0">Block out time</h2>
-        <BlockForm practitioners={practitioners} practitionerLabel={practitionerLabel} timeZone={settings.timeZone} />
-      </div>
+      <BlockForm
+        key={savedId ?? 'new'}
+        saved={savedId !== null}
+        practitioners={practitioners}
+        practitionerLabel={practitionerLabel}
+        timeZone={settings.timeZone}
+      />
       <h2>Saved blocks</h2>
       <p className="mb-4 text-sm">Clients cannot book or move into these times. Existing bookings stay confirmed.</p>
       {blocks.length === 0 ? (

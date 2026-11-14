@@ -56,6 +56,50 @@ test('Clinic staff can save a practitioner’s start, end and optional reason, s
     await expect(saved.getByTestId('block-saved-end')).toContainText('11:00');
     await expect(saved.getByTestId('block-no-conflicts')).toContainText('No confirmed bookings overlap');
   });
+  const rejectedReason = 'Clock-change block awaiting correction in the form check';
+  await step(page, 'Start another save in a skipped hour and see only its failure result', async () => {
+    await page.getByTestId('block-practitioner').selectOption({ label: PRACTITIONER });
+    await page.getByTestId('block-start').fill('2027-03-28T01:30');
+    await page.getByTestId('block-end').fill('2027-03-28T03:00');
+    await page.getByTestId('block-reason').fill(rejectedReason);
+    // Hold the request until the browser has removed the preceding success notice.
+    await page.route('**/admin/blocks*', async (route) => {
+      if (route.request().method() === 'POST') {
+        await expect(page.getByTestId('block-saved')).toHaveCount(0);
+      }
+      await route.continue();
+    });
+    await page.getByTestId('block-save').click();
+    await expect(page.getByTestId('block-start-error')).toContainText('skipped');
+    await expect(page.getByTestId('block-error')).toContainText('could not be saved');
+    await expect(page.getByTestId('block-saved')).toHaveCount(0);
+    await expect(page.getByTestId('block-reason')).toHaveValue(rejectedReason);
+    await expect(page.getByTestId('block-row').filter({ hasText: rejectedReason })).toHaveCount(0);
+    await expect(page.getByTestId('block-row').filter({ hasText: reason })).toBeVisible();
+  });
+  await step(page, 'Try a repeated hour and keep the error without reviving the earlier success', async () => {
+    await page.getByTestId('block-start').fill('2027-10-31T01:30');
+    await page.getByTestId('block-end').fill('2027-10-31T03:00');
+    await page.getByTestId('block-save').click();
+    await expect(page.getByTestId('block-start-error')).toContainText('occurs twice');
+    await expect(page.getByTestId('block-error')).toContainText('could not be saved');
+    await expect(page.getByTestId('block-saved')).toHaveCount(0);
+    await expect(page.getByTestId('block-start')).toHaveValue('2027-10-31T01:30');
+    await expect(page.getByTestId('block-end')).toHaveValue('2027-10-31T03:00');
+    await expect(page.getByTestId('block-practitioner').locator('option:checked')).toHaveText(PRACTITIONER);
+    await expect(page.getByTestId('block-row').filter({ hasText: rejectedReason })).toHaveCount(0);
+  });
+  await step(page, 'Correct the second block and see a fresh saved result', async () => {
+    await page.getByTestId('block-start').fill(`${date}T12:00`);
+    await page.getByTestId('block-end').fill(`${date}T13:00`);
+    await page.getByTestId('block-save').click();
+    await expect(page.getByTestId('block-saved')).toContainText('Blocked time saved');
+    await expect(page.getByTestId('block-error')).toHaveCount(0);
+    const saved = page.getByTestId('block-row').filter({ hasText: rejectedReason });
+    await expect(saved.getByTestId('block-saved-start')).toContainText('12:00');
+    await expect(saved.getByTestId('block-saved-end')).toContainText('13:00');
+    await expect(page.getByTestId('block-row').filter({ hasText: reason })).toBeVisible();
+  });
   await step(page, 'Return to the clinic diary', async () => {
     await page.getByTestId('blocks-back').click();
     await expect(page.getByRole('heading', { name: 'Clinic bookings' })).toBeVisible();
