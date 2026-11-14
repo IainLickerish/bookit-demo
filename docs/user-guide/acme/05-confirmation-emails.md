@@ -7,9 +7,10 @@ audience: patient
 
 # Your Acme Physio confirmation
 
-Booking and rescheduling confirmations are sent from `noreply@acmephysio.test`.
+Booking confirmations are sent from `noreply@acmephysio.test`.
 They describe the physiotherapist, appointment date and local time. Acme includes
-contact details when available; providing a phone number is optional.
+contact details when available; providing a phone number is optional. After a
+move, check **My bookings** for the new time.
 
 In this fictional demonstration, email is delivered to the local Mailpit inbox,
 not to a real email service. **My bookings** at `/bookings` is the place to check

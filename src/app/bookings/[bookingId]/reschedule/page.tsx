@@ -68,6 +68,9 @@ export default async function ReschedulePage({
           <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
             You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
           </p>
+          <p className="mb-6" data-testid="reschedule-horizon">
+            Choose a new time within {view.settings.slotHorizonDays} days. You will review the change before confirming.
+          </p>
           <DayPicker view={view} path={path} />
           {choices.length === 0 ? (
             <p data-testid="no-slots">No free times on this day. Try another day.</p>

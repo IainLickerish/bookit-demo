@@ -75,13 +75,17 @@ export default async function ReviewBookingPage({
         <>
           <p className="notice" data-testid="review-consequences">
             {slotId
-              ? `Your old time is released only when the new time is secured. This uses 1 of your ${remaining} remaining moves. The new time must be within ${settings.slotHorizonDays} days. Reminder eligibility starts again for the new time.`
+              ? `Your old time is released only when the new time is secured. This uses 1 of your ${remaining} remaining moves. The new time must be within ${settings.slotHorizonDays} days. If reminders are on, the new time can receive a reminder.`
               : `Cancelling releases your time for someone else. No further reminder will be sent for this booking. Cancellations within ${settings.lateCancellationHours} hours are late cancellations.${late ? ' This will be recorded as a late cancellation.' : ' This is outside the late-cancellation window.'}`}
           </p>
           <form action={slotId ? rescheduleAction : cancelAction} className="booking-confirmation mt-6">
             <input type="hidden" name="bookingId" value={booking.id} />
             <input type="hidden" name="revision" value={booking.rescheduleCount} />
-            {slotId ? <input type="hidden" name="newSlotId" value={slotId} /> : null}
+            {slotId ? (
+              <input type="hidden" name="newSlotId" value={slotId} />
+            ) : (
+              <input type="hidden" name="late" value={String(late)} />
+            )}
             <button type="submit" className="button" data-testid="confirm-change">
               {slotId ? 'Confirm reschedule' : 'Confirm cancellation'}
             </button>

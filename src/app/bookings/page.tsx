@@ -65,7 +65,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   );
 
   return (
-    <section>
+    <section className="reminder-journey">
       <h1>My bookings</h1>
       {notice ? (
         <p role="status" className="notice" data-testid="notice">

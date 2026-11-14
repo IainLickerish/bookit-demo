@@ -22,7 +22,6 @@ export async function rescheduleBooking(
   if (!isUuid(request.bookingId)) {
     throw new BookingError('booking_not_found');
   }
-  const now = deps.clock.now();
   const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
@@ -39,6 +38,7 @@ export async function rescheduleBooking(
     if (!locked) {
       throw new BookingError('booking_not_found');
     }
+    const now = deps.clock.now();
     if (request.expectedRevision !== undefined && request.expectedRevision !== locked.rescheduleCount) {
       throw new BookingError('booking_changed');
     }

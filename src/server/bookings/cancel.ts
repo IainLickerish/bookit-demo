@@ -10,6 +10,7 @@ export interface CancelBookingRequest {
   patientId: string;
   bookingId: string;
   expectedRevision?: number;
+  expectedLate?: boolean;
 }
 
 export interface CancelBookingResult {
@@ -25,7 +26,6 @@ export async function cancelBooking(
   if (!isUuid(request.bookingId)) {
     throw new BookingError('booking_not_found');
   }
-  const now = deps.clock.now();
   const result = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
@@ -37,6 +37,7 @@ export async function cancelBooking(
     if (!locked) {
       throw new BookingError('booking_not_found');
     }
+    const now = deps.clock.now();
     if (request.expectedRevision !== undefined && request.expectedRevision !== locked.rescheduleCount) {
       throw new BookingError('booking_changed');
     }
@@ -44,6 +45,9 @@ export async function cancelBooking(
       throw new BookingError('booking_not_active');
     }
     const late = isLateCancellation(locked.startsAt, now, settings);
+    if (request.expectedLate !== undefined && request.expectedLate !== late) {
+      throw new BookingError('booking_changed');
+    }
     await tx
       .update(bookings)
       .set({ status: 'cancelled', lateCancellation: late, cancelledAt: now, updatedAt: now })

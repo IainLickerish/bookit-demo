@@ -44,7 +44,14 @@ export const disabledMailer: Mailer = {
 
 /** Sends through an SMTP server such as Mailpit (`smtp://mailpit:1025`). */
 export function createSmtpMailer(url: string): Mailer {
-  const transport = nodemailer.createTransport(url);
+  // Reminder sends hold a booking lock. Bound a stalled mail connection so
+  // clients and staff can still complete a change when SMTP is unavailable.
+  const transport = nodemailer.createTransport({
+    url,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
+  });
   return {
     kind: 'smtp',
     async send(email) {

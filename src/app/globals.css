@@ -166,3 +166,24 @@
     width: 100%;
   }
 }
+
+body:has(.reminder-journey) {
+  background: #faf8f4;
+  color: #16241f;
+}
+
+body:has(.reminder-journey) > header {
+  border-color: #e6e1d8;
+}
+
+body:has(.reminder-journey) > main {
+  padding-right: 20px;
+  padding-left: 20px;
+}
+
+@media (min-width: 640px) {
+  body:has(.reminder-journey) > main {
+    padding-right: 32px;
+    padding-left: 32px;
+  }
+}

@@ -54,6 +54,7 @@ export async function cancelAction(formData: FormData): Promise<void> {
     const result = await cancelBooking(deps, {
       patientId: patient.id,
       bookingId: formText(formData, 'bookingId'),
+      expectedLate: formData.has('late') ? formText(formData, 'late') === 'true' : undefined,
       expectedRevision: formData.has('revision') ? Number(formText(formData, 'revision')) : undefined,
     });
     destination = result.late ? '/bookings?notice=cancelled_late' : '/bookings?notice=cancelled';

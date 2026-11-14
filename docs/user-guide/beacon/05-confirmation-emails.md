@@ -7,9 +7,10 @@ audience: patient
 
 # Your Beacon Dental confirmation
 
-Look for booking and rescheduling confirmations from `noreply@beacondental.test`.
+Look for booking confirmations from `noreply@beacondental.test`.
 They include your clinician and appointment date and time. Beacon does not include
-patient contact details in confirmation messages.
+patient contact details in confirmation messages. After a move, check **My
+bookings** for the new time.
 
 This is a fictional demonstration: messages go to the local Mailpit inbox rather
 than a real mail service. If a message is missing, check **My bookings** at

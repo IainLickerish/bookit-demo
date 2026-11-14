@@ -20,12 +20,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en-GB">
       <body className={`${figtree.variable} ${fraunces.variable} min-h-screen bg-slate-50 text-slate-900`}>
         <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-4 px-4 py-3">
             <Link href="/" prefetch={false} className="clinic-wordmark" data-testid="clinic-name">
               {settings.clinicName}
             </Link>
             {user ? (
-              <nav aria-label="Main" className="flex items-center gap-4 text-sm">
+              <nav aria-label="Main" className="flex flex-wrap items-center gap-4 text-sm">
                 {user.role === 'patient' ? (
                   <>
                     <Link href="/slots" prefetch={false} data-testid="nav-book">
