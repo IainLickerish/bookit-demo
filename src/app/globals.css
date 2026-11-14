@@ -146,3 +146,22 @@ body:has(.staff-page) :focus-visible {
     font-size: 28px;
   }
 }
+body:has(.staff-page) header > div {
+  flex-wrap: wrap;
+  padding-right: 20px;
+  padding-left: 20px;
+}
+body:has(.staff-page) header a,
+body:has(.staff-page) header button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+.staff-page .feedback-icon {
+  display: inline-block;
+  vertical-align: text-bottom;
+  color: #16241f;
+}
+.staff-page .text-sm {
+  font-size: 13px;
+}

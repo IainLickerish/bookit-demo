@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import type { BlockField } from '@/server/admin/time-block-input';
+import { FeedbackIcon } from '../../feedback-icon';
 import { BLOCK_MESSAGES } from '../../messages';
 import { saveBlockAction, type BlockFormState } from './actions';
 
@@ -23,7 +24,7 @@ export function BlockForm({
   const error = (field: BlockField) =>
     state.errors[field] ? (
       <p id={`${field}-error`} className="field-error" data-testid={`block-${field}-error`}>
-        <span aria-hidden="true">⚠ </span>
+        <FeedbackIcon kind="attention" />
         {BLOCK_MESSAGES[state.errors[field]]}
       </p>
     ) : null;
@@ -32,13 +33,14 @@ export function BlockForm({
     <form action={action} noValidate className="space-y-4" data-testid="block-form">
       {Object.keys(state.errors).length ? (
         <p role="alert" className="alert" data-testid="block-error">
-          <span aria-hidden="true">⚠ </span>
+          <FeedbackIcon kind="attention" />
           {BLOCK_MESSAGES.invalid}
         </p>
       ) : null}
       <div>
         <label htmlFor="block-practitioner">{practitionerLabel}</label>
         <select
+          key={state.values.practitionerId}
           id="block-practitioner"
           name="practitionerId"
           defaultValue={state.values.practitionerId}

@@ -5,6 +5,7 @@ import { listAdminPractitioners } from '@/server/admin/bookings';
 import { requireAdmin } from '@/server/admin/context';
 import { listTimeBlocks } from '@/server/admin/time-blocks';
 import { loadClinicSettings } from '@/server/settings';
+import { FeedbackIcon } from '../../feedback-icon';
 import { BLOCK_MESSAGES, single, type SearchParams } from '../../messages';
 import { BlockForm } from './block-form';
 
@@ -25,7 +26,7 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
       <p className="mb-6">Keep time free when a {practitionerLabel.toLowerCase()} is away.</p>
       {saved ? (
         <p role="status" className="notice" data-testid="block-saved">
-          <span aria-hidden="true">✓ </span>
+          <FeedbackIcon kind="done" />
           {BLOCK_MESSAGES.saved}
         </p>
       ) : null}
@@ -65,7 +66,7 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
               {block.affected.length ? (
                 <div role="status">
                   <p className="attention" data-testid="block-conflicts">
-                    <span aria-hidden="true">⚠ </span>
+                    <FeedbackIcon kind="attention" />
                     {BLOCK_MESSAGES.conflicts}
                   </p>
                   <ul className="mt-4 space-y-4" data-testid="block-affected-list">
@@ -77,7 +78,7 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
                           {formatSlot(booking.startsAt, settings.timeZone)} to{' '}
                           {formatSlot(booking.endsAt, settings.timeZone)}
                         </p>
-                        <p>Booking reference: {booking.id}</p>
+                        <p className="break-words">Booking reference: {booking.id}</p>
                         <p>Confirmed</p>
                       </li>
                     ))}
