@@ -30,3 +30,139 @@
     @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
   }
 }
+
+/* Clinic identity and the reminder review/settings journeys (DS-1 to DS-5). */
+.clinic-wordmark {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: #16241f;
+}
+
+.reminder-journey {
+  max-width: 720px;
+  color: #16241f;
+  font-family: var(--font-figtree), Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.reminder-journey h1,
+.reminder-journey h2 {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.reminder-journey h1 {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.reminder-journey h2 {
+  margin-top: 32px;
+  font-size: 22px;
+}
+
+.reminder-journey label,
+.reminder-journey .button,
+.reminder-journey .button-secondary {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.reminder-journey input:not([type='hidden']),
+.reminder-journey select,
+.reminder-journey .button,
+.reminder-journey .button-secondary {
+  min-height: 48px;
+}
+
+.reminder-journey input:not([type='checkbox']),
+.reminder-journey select {
+  border: 1px solid #8c9792;
+  border-radius: 12px;
+}
+
+.reminder-journey input[type='checkbox'] {
+  min-width: 24px;
+  min-height: 24px;
+  accent-color: #1d5c4b;
+}
+
+.reminder-journey a {
+  color: #1d5c4b;
+}
+
+.reminder-journey .button,
+.reminder-journey .button-secondary {
+  border-radius: 999px;
+  padding: 12px 24px;
+  text-align: center;
+}
+
+.reminder-journey .button {
+  background: #1d5c4b;
+  color: #fff;
+}
+
+.reminder-journey .button:hover {
+  background: #164a3c;
+}
+
+.reminder-journey .button-secondary {
+  border-color: #8c9792;
+  background: #fff;
+}
+
+.reminder-journey .button-secondary:hover {
+  background: #f1eee8;
+}
+
+.reminder-journey .notice {
+  margin-top: 24px;
+  border: 1px solid #e6e1d8;
+  border-radius: 12px;
+  background: #e9f1ec;
+  font-size: 16px;
+}
+
+.reminder-journey .alert {
+  border-color: #a8261b;
+  border-radius: 12px;
+  background: #fcebe8;
+  color: #a8261b;
+}
+
+.reminder-journey :focus-visible,
+.clinic-wordmark:focus-visible {
+  outline: 2px solid #1d5c4b;
+  outline-offset: 3px;
+}
+
+@media (min-width: 640px) {
+  .reminder-journey h1 {
+    font-size: 32px;
+  }
+}
+
+@media (max-width: 639px) {
+  .booking-review {
+    padding-bottom: 112px;
+  }
+
+  .booking-confirmation {
+    position: fixed;
+    z-index: 10;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-top: 1px solid #e6e1d8;
+    background: #fff;
+    padding: 16px 20px max(16px, env(safe-area-inset-bottom));
+  }
+
+  .booking-confirmation .button {
+    width: 100%;
+  }
+}

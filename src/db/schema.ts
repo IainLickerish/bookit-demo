@@ -133,6 +133,8 @@ export const bookings = pgTable(
     createdAt: instant('created_at').notNull(),
     updatedAt: instant('updated_at').notNull(),
     cancelledAt: instant('cancelled_at'),
+    reminderAttemptedAt: instant('reminder_attempted_at'),
+    reminderSentAt: instant('reminder_sent_at'),
   },
   (t) => [
     // At most one confirmed booking per slot, so concurrent bookings of the
@@ -155,6 +157,7 @@ export const clinicSettings = pgTable(
     timeZone: text('time_zone').notNull(),
     lateCancellationHours: integer('late_cancellation_hours').notNull(),
     includeContactInConfirmation: boolean('include_contact_in_confirmation').notNull(),
+    remindersEnabled: boolean('reminders_enabled').notNull().default(true),
     slotHorizonDays: integer('slot_horizon_days').notNull(),
     sessionMinutes: integer('session_minutes').notNull(),
     maxReschedulesPerBooking: integer('max_reschedules_per_booking').notNull(),

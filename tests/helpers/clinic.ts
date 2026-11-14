@@ -12,6 +12,7 @@ import { createUser, type PublicUser } from '@/server/users';
 export const TEST_PASSWORD = 'test-only-password-for-bookit';
 
 export const TEST_CLINIC_SETTINGS: ClinicSettings = {
+  remindersEnabled: true,
   clinicName: 'Test Physio Clinic',
   timeZone: 'Europe/London',
   lateCancellationHours: 24,

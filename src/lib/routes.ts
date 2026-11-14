@@ -27,3 +27,9 @@ export function redactUrl(url: string): string {
     return redactPath(url);
   }
 }
+
+/** Only booking review destinations may survive sign-in. Never accept another origin. */
+export function bookingReturnPath(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  return /^\/bookings\/[0-9a-f-]{36}\/(reschedule|review)(\?slot=[0-9a-f-]{36})?$/.test(value) ? value : null;
+}

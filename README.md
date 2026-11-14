@@ -204,3 +204,38 @@ failing-then-passing tests live in SupportAgents under `demo/bookit-expected/`.
 BookIt's ordinary tests exercise unaffected cancellation/export/display cases and
 must pass both on this baseline and after each expected fix. The tenant seed keeps
 its Unicode names and DST reference slots so those defects remain reproducible.
+
+## Appointment reminders
+
+The running app checks each clinic's database every 30 seconds, using the same
+application clock as booking. There is no public trigger endpoint and no extra
+scheduler to deploy. Keep the app running with SMTP and its clinic-specific
+`BOOKIT_PUBLIC_URL` configured. Reminders start enabled; clinic staff can save
+**Send reminder emails** in **Clinic settings**. All recipients remain fictional
+`.test` addresses, through the existing mail service (PR-21, PS-7).
+
+A confirmed booked time is eligible from 24 hours until 23 hours before its start,
+measured as elapsed hours across UK clock changes (PR-7). Outside this window,
+including after downtime, no reminder is sent. Successful moves renew eligibility;
+failed moves preserve the original booking and markers (PR-17). Reminder links
+require the client's sign-in and open current details for review (PR-5, PR-15).
+
+Migration `0002_polite_killer_shrike.sql` adds an enabled-by-default clinic setting
+and nullable attempt and delivery timestamps on bookings. It changes no booking
+history. The seed fingerprint remains compatible with existing clinic databases.
+The upgrade test rehearses an existing-history upgrade as well as repeated migration
+and seeding. Recovery: switch reminders off in each clinic's settings and, if
+needed, return to the previous app version, retaining the additive columns and
+migration record. Do not rerun a seed against an empty replacement database or
+remove reminder markers, since doing so could allow duplicate reminders (EN-6).
+
+Attempts are committed before contacting SMTP. Multiple app processes share the
+same durable claims. Sending rechecks the clinic setting and current booking,
+holding a booking lock so a move or cancellation cannot finish before an old-time
+send. A saved disable waits for any in-progress send. Only SMTP acceptance records
+a delivery timestamp and `email.reminder.sent`; failure records
+`email.reminder.failed` without changing booking details. Delivery here means
+acceptance by the configured mail service, not proof that a client read it.
+Failed or interrupted attempts are never retried, including after a restart,
+because SMTP acceptance can be uncertain. My bookings stays the source of truth.
+Turning reminders off and back on preserves existing attempts.

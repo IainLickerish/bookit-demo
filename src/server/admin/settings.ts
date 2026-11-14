@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import type { Executor } from '@/db/client';
 import { clinicSettings } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
@@ -10,10 +11,12 @@ export const adminSettingsInput = clinicSettingsInput
     timeZone: true,
     lateCancellationHours: true,
     includeContactInConfirmation: true,
+    remindersEnabled: true,
   })
+  .extend({ remindersEnabled: z.boolean().optional() })
   .strict();
 
-/** Update only the four admin-editable fields; preserve the booking rules. */
+/** Update only the admin-editable fields; preserve the booking rules. */
 export async function updateAdminSettings(db: Executor, clock: Clock, input: unknown): Promise<void> {
   const values = adminSettingsInput.parse(input);
   const changed = await db

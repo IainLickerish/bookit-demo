@@ -8,7 +8,8 @@ audience: patient
 # Choosing a different time
 
 Open **My bookings** at `/bookings` and choose **Reschedule** next to your upcoming
-appointment. Pick a free date and time, then confirm. Check that the new time
+appointment. Pick a free date and time, review the old and new details, then choose
+**Confirm reschedule**. Use **Back to my bookings** to leave without moving it. Check that the new time
 appears in your bookings list.
 
 Beacon Dental allows up to **2 reschedules per booking**. The new appointment must

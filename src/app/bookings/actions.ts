@@ -54,6 +54,7 @@ export async function cancelAction(formData: FormData): Promise<void> {
     const result = await cancelBooking(deps, {
       patientId: patient.id,
       bookingId: formText(formData, 'bookingId'),
+      expectedRevision: formData.has('revision') ? Number(formText(formData, 'revision')) : undefined,
     });
     destination = result.late ? '/bookings?notice=cancelled_late' : '/bookings?notice=cancelled';
   } catch (error) {
@@ -72,6 +73,7 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
       patientId: patient.id,
       bookingId,
       newSlotId: formText(formData, 'newSlotId'),
+      expectedRevision: formData.has('revision') ? Number(formText(formData, 'revision')) : undefined,
     });
     destination = '/bookings?notice=rescheduled';
   } catch (error) {

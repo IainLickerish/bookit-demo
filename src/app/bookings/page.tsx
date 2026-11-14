@@ -6,7 +6,6 @@ import { listBookingsForPatient, type BookingView } from '@/server/bookings/quer
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
-import { cancelAction } from './actions';
 
 function statusText(booking: BookingView): string {
   if (booking.status === 'confirmed') {
@@ -52,12 +51,14 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           >
             Reschedule
           </Link>
-          <form action={cancelAction}>
-            <input type="hidden" name="bookingId" value={booking.id} />
-            <button type="submit" className="button-secondary" data-testid="cancel-booking">
-              Cancel
-            </button>
-          </form>
+          <Link
+            href={`/bookings/${booking.id}/review`}
+            prefetch={false}
+            className="button-secondary"
+            data-testid="cancel-booking"
+          >
+            Cancel
+          </Link>
         </div>
       ) : null}
     </li>

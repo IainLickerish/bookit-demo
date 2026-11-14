@@ -9,7 +9,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
   await requireAdmin();
   const [settings, params] = await Promise.all([loadClinicSettings(getDatabase()), searchParams]);
   return (
-    <section>
+    <section className="reminder-journey">
       <h1>Clinic settings</h1>
       <p>
         <Link href="/admin" prefetch={false} className="underline">
@@ -70,6 +70,21 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           />
           Include contact details in confirmation emails
         </label>
+        <label className="flex min-h-12 items-center gap-2">
+          <input
+            type="checkbox"
+            name="remindersEnabled"
+            defaultChecked={settings.remindersEnabled}
+            className="w-auto"
+            aria-describedby="reminders-hint"
+            data-testid="admin-reminders-enabled"
+          />
+          Send reminder emails
+        </label>
+        <p id="reminders-hint" data-testid="reminders-hint">
+          Send one reminder 23 to 24 hours before each booked time. Reminders use UK time and never include a phone
+          number. Turning this off stops future reminders for this clinic.
+        </p>
         <button type="submit" className="button" data-testid="admin-save-settings">
           Save settings
         </button>

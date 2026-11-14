@@ -94,6 +94,8 @@ test('Clients see the correct UK date and time when reviewing a booking, in My b
       const target = choices.last();
       const movedWhen = ukWhen((await target.getAttribute('data-starts-at')) ?? '');
       await target.click();
+      await expect(page.getByTestId('review-new')).toContainText(movedWhen);
+      await page.getByTestId('confirm-change').click();
       await expect(page).toHaveURL(/\/bookings\?notice=rescheduled$/);
       await expect(bookingRow(page, 'upcoming-bookings', movedWhen).getByTestId('booking-status')).toHaveText(
         'Confirmed',

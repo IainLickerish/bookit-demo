@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { FORGOT_PASSWORD_PATH } from '@/lib/routes';
+import { bookingReturnPath, FORGOT_PASSWORD_PATH } from '@/lib/routes';
 import { currentUser } from '@/server/request-context';
 import { single, type SearchParams } from '../../messages';
 import { signIn } from '../actions';
@@ -26,6 +26,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
         </p>
       ) : null}
       <form action={signIn} className="space-y-4">
+        <input type="hidden" name="next" value={bookingReturnPath(single(query.next)) ?? ''} />
         <label>
           Email address
           <input name="email" type="email" autoComplete="username" required data-testid="sign-in-email" />

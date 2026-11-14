@@ -11,6 +11,7 @@ import { assertReschedulable, assertSlotBookable } from './rules';
 export interface RescheduleBookingRequest {
   patientId: string;
   bookingId: string;
+  expectedRevision?: number;
   newSlotId: string;
 }
 
@@ -38,6 +39,9 @@ export async function rescheduleBooking(
     if (!locked) {
       throw new BookingError('booking_not_found');
     }
+    if (request.expectedRevision !== undefined && request.expectedRevision !== locked.rescheduleCount) {
+      throw new BookingError('booking_changed');
+    }
     assertReschedulable(locked, request.newSlotId, now, settings);
     const target = await findBookableSlot(tx, request.newSlotId);
     if (!target) {
@@ -51,6 +55,8 @@ export async function rescheduleBooking(
           slotId: target.id,
           rescheduleCount: locked.rescheduleCount + 1,
           updatedAt: now,
+          reminderAttemptedAt: null,
+          reminderSentAt: null,
         })
         .where(eq(bookings.id, request.bookingId));
     } catch (error) {

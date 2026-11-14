@@ -8,6 +8,8 @@ audience: patient
 # Cancelling your dental appointment
 
 Go to **My bookings** at `/bookings`, find your appointment and choose **Cancel**.
+Review the current time, duration and cancellation consequences, then choose
+**Confirm cancellation**. Use **Back to my bookings** to leave without cancelling.
 Look for it in the past and cancelled list afterwards. Cancelling releases the
 slot so another patient can use it.
 

@@ -1,0 +1,208 @@
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { bookings, slots } from '@/db/schema';
+import { newId } from '@/lib/ids';
+import { addHours, addMinutes } from '@/lib/time';
+import { updateAdminSettings } from '@/server/admin/settings';
+import { bookSlot } from '@/server/bookings/book';
+import { cancelBooking } from '@/server/bookings/cancel';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
+import { disabledMailer, type Mailer } from '@/server/notifications/mailer';
+import { sendDueReminders } from '@/server/notifications/reminders';
+import { loadClinicSettings } from '@/server/settings';
+import { seedClinic, type SeededClinic } from '../helpers/clinic';
+import { manualClock } from '../helpers/clock';
+import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/database';
+import { captureLogs } from '../helpers/logs';
+import { recordingMailer, testMail } from '../helpers/mail';
+
+let database: TestDatabase;
+let otherDatabase: TestDatabase;
+let clinic: SeededClinic;
+const clock = manualClock('2026-10-20T07:00:00Z');
+let mailer = recordingMailer();
+let logs = captureLogs(clock);
+const deps = (transport: Mailer = mailer) => ({
+  db: database.db,
+  clock,
+  log: logs.log,
+  mail: testMail(transport),
+  publicUrl: new URL('https://clinic.test'),
+  tenant: 'acme',
+});
+
+async function makeBooking(hoursAhead = 24, patientId = clinic.patient1.id) {
+  const id = newId(clock);
+  const start = addHours(clock.now(), hoursAhead);
+  await database.db.insert(slots).values({
+    id,
+    practitionerId: clinic.practitioners.weekdays,
+    startsAt: start,
+    endsAt: addMinutes(start, 45),
+    createdAt: clock.now(),
+  });
+  return bookSlot(deps(), { patientId, slotId: id, phone: '+44 7700 900001' });
+}
+async function stored(id: string) {
+  const [row] = await database.db.select().from(bookings).where(eq(bookings.id, id));
+  return row!;
+}
+async function setEnabled(remindersEnabled: boolean) {
+  await updateAdminSettings(database.db, clock, { ...editable(), remindersEnabled });
+}
+function editable() {
+  return {
+    clinicName: clinic.settings.clinicName,
+    timeZone: clinic.settings.timeZone,
+    lateCancellationHours: clinic.settings.lateCancellationHours,
+    includeContactInConfirmation: false,
+  };
+}
+
+beforeAll(async () => {
+  database = await startTestDatabase(10);
+  otherDatabase = await startTestDatabase();
+});
+afterAll(async () => {
+  await Promise.allSettled([database?.stop(), otherDatabase?.stop()]);
+});
+beforeEach(async () => {
+  clock.set('2026-10-20T07:00:00Z');
+  await emptyDatabase(database.db);
+  clinic = await seedClinic(database.db, clock);
+  mailer = recordingMailer();
+  logs = captureLogs(clock);
+});
+
+describe('durable reminder delivery', () => {
+  it('sends once across concurrent workers and repeated runs, without changing booking details', async () => {
+    const booking = await makeBooking();
+    const before = await stored(booking.id);
+    mailer.sent.length = 0;
+    expect(
+      (await Promise.all(Array.from({ length: 5 }, () => sendDueReminders(deps())))).reduce((a, b) => a + b, 0),
+    ).toBe(1);
+    expect(await sendDueReminders(deps())).toBe(0);
+    expect(mailer.sent).toHaveLength(1);
+    expect(mailer.sent[0]!.text).not.toContain('7700');
+    expect(await stored(booking.id)).toEqual({
+      ...before,
+      reminderAttemptedAt: clock.now(),
+      reminderSentAt: clock.now(),
+    });
+  });
+
+  it('does not remind cancelled bookings, including late cancellations', async () => {
+    const booking = await makeBooking(23.5);
+    const result = await cancelBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id });
+    expect(result).toMatchObject({ late: true, booking: { status: 'cancelled', lateCancellation: true } });
+    const early = await makeBooking(24);
+    await cancelBooking(deps(), { patientId: clinic.patient1.id, bookingId: early.id });
+    mailer.sent.length = 0;
+    expect(await sendDueReminders(deps())).toBe(0);
+    expect(mailer.sent).toHaveLength(0);
+  });
+
+  it('renews eligibility only after successful moves, including a move back to a previous time', async () => {
+    const booking = await makeBooking(24);
+    const target = await makeBooking(23.5, clinic.patient2.id);
+    await cancelBooking(deps(), { patientId: clinic.patient2.id, bookingId: target.id });
+    await sendDueReminders(deps());
+    expect((await stored(booking.id)).reminderSentAt).not.toBeNull();
+    const moved = await rescheduleBooking(deps(), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: target.slotId,
+    });
+    expect((await stored(booking.id)).reminderAttemptedAt).toBeNull();
+    expect(await sendDueReminders(deps())).toBe(1);
+    expect(await sendDueReminders(deps())).toBe(0);
+    await rescheduleBooking(deps(), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: booking.slotId,
+    });
+    expect(await sendDueReminders(deps())).toBe(1);
+    expect(moved.rescheduleCount).toBe(1);
+  });
+
+  it('does not send for an old time after a move outside the window, then sends for the new time', async () => {
+    const booking = await makeBooking(24);
+    const target = await makeBooking(48, clinic.patient2.id);
+    await cancelBooking(deps(), { patientId: clinic.patient2.id, bookingId: target.id });
+    await rescheduleBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id, newSlotId: target.slotId });
+    expect(await sendDueReminders(deps())).toBe(0);
+    clock.set(addHours(clock.now(), 24).toISOString());
+    expect(await sendDueReminders(deps())).toBe(1);
+    expect(mailer.sent.at(-1)!.text).toContain('Thu, 22 Oct 2026, 08:00');
+  });
+
+  it('preserves the original time and its unsent or sent reminder state after a failed move', async () => {
+    const booking = await makeBooking(24);
+    const taken = await makeBooking(23.5, clinic.patient2.id);
+    const attemptMove = () =>
+      rescheduleBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id, newSlotId: taken.slotId });
+    const before = await stored(booking.id);
+    await expect(attemptMove()).rejects.toMatchObject({ code: 'slot_unavailable' });
+    expect(await stored(booking.id)).toEqual(before);
+    expect(await sendDueReminders(deps())).toBe(2);
+    const sent = await stored(booking.id);
+    await expect(attemptMove()).rejects.toMatchObject({ code: 'slot_unavailable' });
+    expect(await stored(booking.id)).toEqual(sent);
+    expect(await sendDueReminders(deps())).toBe(0);
+  });
+
+  it('records failure without claiming delivery or retrying an uncertain send, and keeps the booking', async () => {
+    const booking = await makeBooking();
+    const before = await stored(booking.id);
+    const failing: Mailer = {
+      kind: 'smtp',
+      send: async () => {
+        throw new Error('SMTP unavailable');
+      },
+    };
+    expect(await sendDueReminders(deps(failing))).toBe(0);
+    expect(await stored(booking.id)).toEqual({ ...before, reminderAttemptedAt: clock.now() });
+    expect(logs.events()).toContain('email.reminder.failed');
+    expect(logs.events()).not.toContain('email.reminder.sent');
+    expect(await sendDueReminders(deps())).toBe(0);
+  });
+
+  it('leaves eligibility intact when mail or reminders are disabled and keeps clinics separate', async () => {
+    const other = await seedClinic(otherDatabase.db, clock, { settings: { clinicName: 'Other Dental Clinic' } });
+    const booking = await makeBooking();
+    expect(await sendDueReminders(deps(disabledMailer))).toBe(0);
+    expect((await stored(booking.id)).reminderAttemptedAt).toBeNull();
+    await setEnabled(false);
+    expect((await loadClinicSettings(otherDatabase.db)).remindersEnabled).toBe(other.settings.remindersEnabled);
+    expect(await sendDueReminders(deps())).toBe(0);
+    expect((await stored(booking.id)).reminderAttemptedAt).toBeNull();
+    await setEnabled(true);
+    expect(await sendDueReminders(deps())).toBe(1);
+  });
+
+  it('rejects stale review confirmations without moving or cancelling the current booking', async () => {
+    const booking = await makeBooking(24);
+    const target = await makeBooking(23.5, clinic.patient2.id);
+    await cancelBooking(deps(), { patientId: clinic.patient2.id, bookingId: target.id });
+    await rescheduleBooking(deps(), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: target.slotId,
+      expectedRevision: 0,
+    });
+    const before = await stored(booking.id);
+    await expect(
+      cancelBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id, expectedRevision: 0 }),
+    ).rejects.toMatchObject({ code: 'booking_changed' });
+    await expect(
+      rescheduleBooking(deps(), {
+        patientId: clinic.patient1.id,
+        bookingId: booking.id,
+        newSlotId: booking.slotId,
+        expectedRevision: 0,
+      }),
+    ).rejects.toMatchObject({ code: 'booking_changed' });
+    expect(await stored(booking.id)).toEqual(before);
+  });
+});

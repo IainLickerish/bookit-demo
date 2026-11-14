@@ -76,8 +76,12 @@ export async function seedTenant(
   const passwords = validatePasswords(tenant, input.passwords);
   const now = clock.now();
   const fixedClock: Clock = { now: () => new Date(now) };
+  // Reminders are an additive saved setting, not a change to the seed identity.
+  // Keep pre-reminder fingerprints valid so upgrades preserve booking history.
+  const identitySettings = { ...tenant.settings } as Partial<typeof tenant.settings>;
+  delete identitySettings.remindersEnabled;
   const fingerprint = createHash('sha256')
-    .update(JSON.stringify({ version: SEED_VERSION, tenant }))
+    .update(JSON.stringify({ version: SEED_VERSION, tenant: { ...tenant, settings: identitySettings } }))
     .digest('hex');
   const id = (label: string) => uuidv5(`bookit-demo:${tenant.tenant}:${environment}:${label}`, uuidv5.URL);
   return db.transaction(async (tx) => {

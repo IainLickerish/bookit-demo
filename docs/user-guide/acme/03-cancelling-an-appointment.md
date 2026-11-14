@@ -8,6 +8,8 @@ audience: patient
 # Cancelling an Acme Physio session
 
 Open **My bookings** at `/bookings`, find the session and select **Cancel**.
+Review the current time, duration and cancellation consequences, then select
+**Confirm cancellation**. Use **Back to my bookings** to leave without cancelling.
 Check that it moves to the past and cancelled list. A cancelled time becomes
 available for another patient.
 

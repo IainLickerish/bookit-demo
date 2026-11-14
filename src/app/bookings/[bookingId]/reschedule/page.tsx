@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
+import { clinicWords } from '@/lib/clinic-words';
 import { formatSlot, localDateOf } from '@/lib/time';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
@@ -9,7 +10,6 @@ import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
 import { DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
-import { rescheduleAction } from '../../actions';
 
 export default async function ReschedulePage({
   params,
@@ -18,9 +18,10 @@ export default async function ReschedulePage({
   params: Promise<{ bookingId: string }>;
   searchParams: SearchParams;
 }) {
-  const patient = await requirePatient();
   const { bookingId } = await params;
+  const patient = await requirePatient(`/bookings/${bookingId}/reschedule`);
   const query = await searchParams;
+  const words = clinicWords();
   const db = getDatabase();
   const clock = getClock();
   const booking = await findBookingForPatient(db, patient.id, bookingId);
@@ -39,8 +40,8 @@ export default async function ReschedulePage({
   const path = `/bookings/${booking.id}/reschedule`;
 
   return (
-    <section>
-      <h1>Reschedule your appointment</h1>
+    <section className="reminder-journey">
+      <h1>Reschedule your {words.appointment}</h1>
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
@@ -51,7 +52,8 @@ export default async function ReschedulePage({
         <span className="font-medium" data-testid="current-when">
           {formatSlot(booking.startsAt, view.settings.timeZone)}
         </span>{' '}
-        with {booking.practitionerName}.
+        with {booking.practitionerName}, your {words.practitioner}. Duration:{' '}
+        {(booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000} minutes.
       </p>
       {!changeable ? (
         <p className="alert" data-testid="not-reschedulable">
@@ -73,19 +75,16 @@ export default async function ReschedulePage({
             <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
               {choices.map((slot) => (
                 <li key={slot.id}>
-                  <form action={rescheduleAction}>
-                    <input type="hidden" name="bookingId" value={booking.id} />
-                    <input type="hidden" name="newSlotId" value={slot.id} />
-                    <button
-                      type="submit"
-                      className="button-secondary w-full"
-                      data-testid="reschedule-to"
-                      data-slot-id={slot.id}
-                      data-starts-at={slot.startsAt.toISOString()}
-                    >
-                      {formatSlot(slot.startsAt, view.settings.timeZone)}
-                    </button>
-                  </form>
+                  <Link
+                    href={`/bookings/${booking.id}/review?slot=${slot.id}`}
+                    prefetch={false}
+                    className="button-secondary w-full"
+                    data-testid="reschedule-to"
+                    data-slot-id={slot.id}
+                    data-starts-at={slot.startsAt.toISOString()}
+                  >
+                    {formatSlot(slot.startsAt, view.settings.timeZone)}
+                  </Link>
                 </li>
               ))}
             </ul>

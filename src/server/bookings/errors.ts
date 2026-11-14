@@ -27,6 +27,10 @@ export const BOOKING_ERRORS = {
     status: 404,
     message: 'We could not find that booking.',
   },
+  booking_changed: {
+    status: 409,
+    message: 'Your booking has changed. Please check its current details before trying again.',
+  },
   booking_not_active: {
     status: 409,
     message: 'That booking is already cancelled.',
