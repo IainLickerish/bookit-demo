@@ -113,6 +113,49 @@ async function signIn(browser: Browser, clinic: ComposeTenant, localPart: string
   return context;
 }
 
+test('both clinic names and role-specific shared navigation fit phones and laptops', async ({ browser }) => {
+  test.setTimeout(90_000);
+  for (const clinic of [acme, beacon]) {
+    for (const role of ['patient1', 'admin'] as const) {
+      const context = await signIn(browser, clinic, role);
+      try {
+        const page = context.pages()[0]!;
+        for (const width of [320, 720, 1440]) {
+          await page.setViewportSize({ width, height: 900 });
+          const name = page.getByTestId('clinic-name');
+          await expect(name).toHaveText(clinic.tenant.settings.clinicName);
+          await expect(name).toHaveCSS('font-family', /Fraunces/);
+          const navigation = page.getByRole('navigation', { name: 'Main', exact: true });
+          await expect(navigation).toHaveCSS('font-family', /Figtree/);
+          const destinations = role === 'patient1' ? ['nav-book', 'nav-my-bookings'] : ['nav-admin'];
+          for (const id of ['clinic-name', ...destinations, 'sign-out']) {
+            const control = page.getByTestId(id);
+            await expect(control).toBeVisible();
+            const box = (await control.boundingBox())!;
+            expect(box.x).toBeGreaterThanOrEqual(0);
+            expect(box.x + box.width).toBeLessThanOrEqual(width);
+            expect(box.width).toBeGreaterThanOrEqual(44);
+            expect(box.height).toBeGreaterThanOrEqual(44);
+          }
+          await expect(page.getByTestId(role === 'patient1' ? 'nav-admin' : 'nav-my-bookings')).toHaveCount(0);
+          expect(
+            await page.getByTestId('site-header').evaluate((header) => header.scrollWidth <= header.clientWidth),
+          ).toBe(true);
+          await expect(page.getByTestId('page-content')).toHaveCSS('max-width', role === 'admin' ? '1120px' : '720px');
+        }
+        await page.getByTestId(role === 'patient1' ? 'nav-book' : 'nav-admin').click();
+        await expect(page).toHaveURL(`${clinic.url}/${role === 'patient1' ? 'slots' : 'admin'}`);
+        await page.getByTestId('sign-out').click();
+        await expect(page).toHaveURL(`${clinic.url}/auth/sign-in`);
+        await expect(page.getByTestId('clinic-name')).toHaveText(clinic.tenant.settings.clinicName);
+        await expect(page.getByRole('navigation', { name: 'Main', exact: true })).toHaveCount(0);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+});
+
 test('REQ-18.1-06 both local Compose tenants expose distinct identity, virtual time and local SDK receipt', async () => {
   for (const clinic of [acme, beacon]) {
     const publicOrigin = await clinic.command(['exec', '-T', 'bookit', 'node', '-p', 'process.env.BOOKIT_PUBLIC_URL']);
