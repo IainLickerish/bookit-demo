@@ -19,6 +19,14 @@ export async function startTestDatabase(poolSize = 25): Promise<TestDatabase> {
   const url = container.getConnectionUri();
   await runMigrations(url);
   const handle = createDatabase(url, { max: poolSize });
+  // Pool.end() can resolve before its idle clients have finished disconnecting.
+  // Wait for their end events before stopping PostgreSQL underneath them.
+  const connectionsClosing = new Set<Promise<void>>();
+  handle.pool.on('connect', (client) => {
+    const closed = new Promise<void>((resolve) => client.once('end', resolve));
+    connectionsClosing.add(closed);
+    void closed.then(() => connectionsClosing.delete(closed));
+  });
   return {
     url,
     db: handle.db,
@@ -26,6 +34,7 @@ export async function startTestDatabase(poolSize = 25): Promise<TestDatabase> {
     container,
     async stop() {
       await handle.pool.end();
+      await Promise.all(connectionsClosing);
       await container.stop();
     },
   };
