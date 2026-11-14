@@ -5,7 +5,7 @@ import type { ClinicSettings } from '@/server/settings';
 import { SETTINGS_SAVED, settingsErrorText } from '../../messages';
 import { saveSettingsAction } from './actions';
 
-export function SettingsForm({ settings, saved }: { settings: ClinicSettings; saved: boolean }) {
+export function SettingsForm({ settings }: { settings: ClinicSettings }) {
   const [state, action, pending] = useActionState(saveSettingsAction, {});
   const [values, setValues] = useState({
     clinicName: settings.clinicName,
@@ -16,7 +16,7 @@ export function SettingsForm({ settings, saved }: { settings: ClinicSettings; sa
   });
   return (
     <>
-      {(state.saved || saved) && !state.error ? (
+      {state.saved ? (
         <p role="status" className="notice" data-testid="admin-settings-saved">
           {SETTINGS_SAVED}
         </p>
@@ -26,7 +26,8 @@ export function SettingsForm({ settings, saved }: { settings: ClinicSettings; sa
           {settingsErrorText(state.error)}
         </p>
       ) : null}
-      <form action={action} className="mt-6 space-y-4">
+      {/* Server actions reset forms even after validation fails. Keep entered settings for correction. */}
+      <form action={action} onReset={(event) => event.preventDefault()} className="mt-6 space-y-4">
         <label>
           Clinic name
           <input

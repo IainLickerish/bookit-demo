@@ -87,25 +87,41 @@ test('Staff can correct a failed settings submission without re-entering their r
     };
   });
   const choice = original.reminders === 'on' ? 'off' : 'on';
-  await step(staff, 'Change the reminder choice and enter an invalid time zone', async () => {
-    await staff.getByTestId('admin-reminders').selectOption(choice);
-    await staff.getByTestId('admin-time-zone').fill('Not/AZone');
-    await staff.getByTestId('admin-clinic-name').fill('Reminder settings check');
-    await staff.getByTestId('admin-save-settings').click();
-  });
-  await step(staff, 'See what needs correcting with the entered choices still present', async () => {
-    await expect(staff.getByTestId('admin-settings-error')).toContainText('valid IANA time zone');
-    await expect(staff.getByTestId('admin-settings-saved')).toHaveCount(0);
-    await expect(staff.getByTestId('admin-reminders')).toHaveValue(choice);
-    await expect(staff.getByTestId('admin-time-zone')).toHaveValue('Not/AZone');
-    await expect(staff.getByTestId('admin-clinic-name')).toHaveValue('Reminder settings check');
-  });
-  await step(staff, 'Reopen settings and see that the failed submission changed no saved values', async () => {
-    await staff.getByRole('link', { name: 'Back to bookings' }).click();
-    await staff.getByTestId('admin-settings-link').click();
-    await expect(staff.getByTestId('admin-reminders')).toHaveValue(original.reminders);
-    await expect(staff.getByTestId('admin-time-zone')).toHaveValue(original.timeZone);
-    await expect(staff.getByTestId('admin-clinic-name')).toHaveValue(original.name);
-  });
-  await staff.context().close();
+  try {
+    await step(staff, 'Change the reminder choice and enter an invalid time zone', async () => {
+      await staff.getByTestId('admin-reminders').selectOption(choice);
+      await staff.getByTestId('admin-time-zone').fill('Not/AZone');
+      await staff.getByTestId('admin-clinic-name').fill('Reminder settings check');
+      await staff.getByTestId('admin-save-settings').click();
+    });
+    await step(staff, 'See what needs correcting with the entered choices still present', async () => {
+      await expect(staff.getByTestId('admin-settings-error')).toContainText('valid IANA time zone');
+      await expect(staff.getByTestId('admin-settings-saved')).toHaveCount(0);
+      await expect(staff.getByTestId('admin-reminders')).toHaveValue(choice);
+      await expect(staff.getByTestId('admin-time-zone')).toHaveValue('Not/AZone');
+      await expect(staff.getByTestId('admin-clinic-name')).toHaveValue('Reminder settings check');
+    });
+    await step(staff, 'Correct only the time zone and save the retained choices', async () => {
+      await staff.getByTestId('admin-time-zone').fill(original.timeZone);
+      await staff.getByTestId('admin-save-settings').click();
+      await expect(staff.getByTestId('admin-settings-saved')).toContainText('Clinic settings saved.');
+    });
+    await step(staff, 'Reopen settings and see the corrected submission saved', async () => {
+      await staff.getByRole('link', { name: 'Back to bookings' }).click();
+      await staff.getByTestId('admin-settings-link').click();
+      await expect(staff.getByTestId('admin-reminders')).toHaveValue(choice);
+      await expect(staff.getByTestId('admin-time-zone')).toHaveValue(original.timeZone);
+      await expect(staff.getByTestId('admin-clinic-name')).toHaveValue('Reminder settings check');
+    });
+  } finally {
+    await step(staff, 'Restore the original clinic settings', async () => {
+      await staff.goto('/admin/settings');
+      await staff.getByTestId('admin-reminders').selectOption(original.reminders);
+      await staff.getByTestId('admin-time-zone').fill(original.timeZone);
+      await staff.getByTestId('admin-clinic-name').fill(original.name);
+      await staff.getByTestId('admin-save-settings').click();
+      await expect(staff.getByTestId('admin-settings-saved')).toContainText('Clinic settings saved.');
+    });
+    await staff.context().close();
+  }
 });

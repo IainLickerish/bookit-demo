@@ -63,7 +63,7 @@ it('only the current clinic’s staff can read and save its reminder choice', as
   active = acme;
   for (token of ['', 'forged', patientToken, expiredToken, beaconToken]) {
     const target = token === patientToken ? '/bookings' : '/auth/sign-in';
-    await expect(AdminSettingsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(`redirect:${target}`);
+    await expect(AdminSettingsPage()).rejects.toThrow(`redirect:${target}`);
     await expect(saveSettingsAction({}, form)).rejects.toThrow(`redirect:${target}`);
     expect(await loadClinicSettings(acme.db)).toEqual(before);
   }
