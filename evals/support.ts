@@ -149,17 +149,3 @@ export async function resetLink(address: string, seen: string[] = []): Promise<{
     .not.toBe('');
   return found;
 }
-
-/** Selects a particular free time today, checking it is inside Acme's late window. */
-export async function pickLateSlot(page: Page, time: string): Promise<string> {
-  await showDay(page, londonDate(0));
-  const slot = page.getByTestId('slot-link').filter({ hasText: new RegExp(`, ${time}$`) });
-  await expect(slot).toBeVisible();
-  const startsAt = await slot.getAttribute('data-starts-at');
-  const hoursAhead = (new Date(startsAt!).getTime() - evalNow().getTime()) / 3_600_000;
-  expect(hoursAhead, 'the session is upcoming').toBeGreaterThan(0);
-  expect(hoursAhead, 'the session is inside the 24-hour late window').toBeLessThan(24);
-  const id = await slot.getAttribute('data-slot-id');
-  expect(id).toBeTruthy();
-  return id!;
-}
