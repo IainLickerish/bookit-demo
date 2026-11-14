@@ -45,7 +45,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           <Link
             href={`/bookings/${booking.id}/calendar`}
             prefetch={false}
-            className="button-secondary mt-3 inline-flex min-h-12 items-center"
+            className="button-secondary button-secondary-pine mt-3"
             data-testid="add-to-calendar"
           >
             Add to calendar

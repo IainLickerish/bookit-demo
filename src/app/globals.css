@@ -114,8 +114,19 @@
     background-color: #164a3c;
   }
   .calendar-panel .button,
-  .calendar-panel .button-secondary {
+  .button-secondary-pine {
     @apply inline-flex min-h-12 items-center rounded-full;
+  }
+  .button-secondary-pine {
+    color: #1d5c4b;
+    border-color: #1d5c4b;
+  }
+  .button-secondary-pine:hover {
+    background-color: #f1eee8;
+  }
+  .button-secondary-pine:focus-visible {
+    outline: 2px solid #1d5c4b;
+    outline-offset: 3px;
   }
   .notice-sage {
     color: #16241f;

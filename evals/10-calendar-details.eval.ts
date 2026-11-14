@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { checkCalendarSecondary } from './calendar-controls';
 import {
   ADMIN,
   PATIENT_2,
@@ -164,7 +165,12 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       return row.getByRole('cell').allTextContents();
     });
     const path = await step(page, 'Open Add to calendar and copy with both browser copy controls', async () => {
+      await checkCalendarSecondary(
+        bookingRow(page, 'upcoming-bookings', appointment.when).getByTestId('add-to-calendar'),
+        'rgb(255, 255, 255)',
+      );
       const details = await openDetails(page, appointment);
+      await checkCalendarSecondary(page.getByTestId('calendar-back'), 'rgb(250, 248, 244)');
       await copyAndCheck(page, details);
       expect(details).toContain(`Start: ${appointment.when}`);
       const fonts = await page.evaluate(async () => ({

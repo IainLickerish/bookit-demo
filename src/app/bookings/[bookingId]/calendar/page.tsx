@@ -38,7 +38,12 @@ export default async function CalendarPage({ params }: { params: Promise<{ booki
         {CALENDAR_MESSAGES.manualUpdate}
       </p>
       <CopyCalendarDetails details={details} />
-      <Link href="/bookings" prefetch={false} className="button-secondary" data-testid="calendar-back">
+      <Link
+        href="/bookings"
+        prefetch={false}
+        className="button-secondary button-secondary-pine"
+        data-testid="calendar-back"
+      >
         Back to My bookings
       </Link>
     </section>
