@@ -46,32 +46,89 @@ test('Staff can save reminders as on or off and see the saved choice when reopen
 
 test('Only signed-in staff of the current clinic can view or change its reminder choice.', async ({ browser }) => {
   const staff = await sessionFor(browser, ADMIN);
-  await step(staff, 'See that clinic staff have the reminder setting', async () => {
-    await staff.goto('/admin/settings');
-    await expect(staff.getByTestId('admin-reminders')).toBeVisible();
-    await expect(staff.getByTestId('admin-save-settings')).toBeVisible();
-  });
-  await staff.context().close();
   const visitor = await (await browser.newContext()).newPage();
-  await step(visitor, 'Try opening clinic settings while signed out', async () => {
-    await visitor.goto('/admin/settings');
-    await expect(visitor).toHaveURL(/\/auth\/sign-in$/);
-    await expect(visitor.getByTestId('admin-reminders')).toHaveCount(0);
-    await expect(visitor.getByTestId('admin-save-settings')).toHaveCount(0);
-  });
-  const client = await sessionFor(browser, PATIENT_2);
-  await step(client, 'Try opening clinic settings as a client', async () => {
-    await client.goto('/admin/settings');
-    await expect(client).toHaveURL(/\/bookings$/);
-    await expect(client.getByTestId('admin-reminders')).toHaveCount(0);
-    await expect(client.getByTestId('admin-save-settings')).toHaveCount(0);
-  });
-  await step(client, 'See a way to continue managing your own bookings', async () => {
-    await expect(client.getByTestId('nav-book')).toBeVisible();
-    await expect(client.getByTestId('nav-admin')).toHaveCount(0);
-  });
-  await visitor.context().close();
-  await client.context().close();
+  const contexts = [staff.context(), visitor.context()];
+  let original: string | undefined;
+  try {
+    const submission = await step(staff, 'Save a different reminder choice as clinic staff', async () => {
+      await staff.goto('/admin/settings');
+      original = await staff.getByTestId('admin-reminders').inputValue();
+      await staff.getByTestId('admin-reminders').selectOption(original === 'on' ? 'off' : 'on');
+      // Capture the real form submission, including its current action reference and encoded arguments.
+      // Only public action headers are replayed, never the staff session cookie.
+      const submitted = staff.waitForRequest(
+        (request) =>
+          request.method() === 'POST' &&
+          new URL(request.url()).pathname === '/admin/settings' &&
+          Boolean(request.headers()['next-action']),
+      );
+      await staff.getByTestId('admin-save-settings').click();
+      const request = await submitted;
+      await expect(staff.getByTestId('admin-settings-saved')).toContainText('Clinic settings saved.');
+      const data = request.postDataBuffer();
+      const contentType = request.headers()['content-type'];
+      const action = request.headers()['next-action'];
+      if (data === null || !contentType || !action) {
+        throw new Error('The settings submission must contain its form body and action headers.');
+      }
+      return {
+        url: request.url(),
+        data,
+        headers: {
+          'content-type': contentType,
+          'next-action': action,
+          accept: 'text/x-component',
+          origin: new URL(request.url()).origin,
+        },
+        maxRedirects: 0,
+      };
+    });
+    await step(staff, 'Restore the saved choice before checking who can change it', async () => {
+      await staff.reload();
+      await staff.getByTestId('admin-reminders').selectOption(original!);
+      await staff.getByTestId('admin-save-settings').click();
+      await expect(staff.getByTestId('admin-settings-saved')).toContainText('Clinic settings saved.');
+      await staff.reload();
+      await expect(staff.getByTestId('admin-reminders')).toHaveValue(original!);
+    });
+    await step(visitor, 'Try opening and saving clinic settings while signed out', async () => {
+      await visitor.goto('/admin/settings');
+      await expect(visitor).toHaveURL(/\/auth\/sign-in$/);
+      await expect(visitor.getByTestId('admin-reminders')).toHaveCount(0);
+      await expect(visitor.getByTestId('admin-save-settings')).toHaveCount(0);
+      const response = await visitor.request.post(submission.url, submission);
+      expect(response.headers()['x-action-redirect']).toContain('/auth/sign-in');
+    });
+    const client = await sessionFor(browser, PATIENT_2);
+    contexts.push(client.context());
+    await step(client, 'Try opening and saving clinic settings as a client', async () => {
+      await client.goto('/admin/settings');
+      await expect(client).toHaveURL(/\/bookings$/);
+      await expect(client.getByTestId('admin-reminders')).toHaveCount(0);
+      await expect(client.getByTestId('admin-save-settings')).toHaveCount(0);
+      const response = await client.request.post(submission.url, submission);
+      expect(response.headers()['x-action-redirect']).toContain('/bookings');
+      await expect(client.getByTestId('nav-book')).toBeVisible();
+      await expect(client.getByTestId('nav-admin')).toHaveCount(0);
+    });
+    await step(staff, 'Reopen settings as staff and see that neither attempt changed the saved choice', async () => {
+      await staff.goto('/admin/settings');
+      await expect(staff.getByTestId('admin-reminders')).toHaveValue(original!);
+    });
+  } finally {
+    try {
+      if (original !== undefined) {
+        await step(staff, 'Leave the original reminder choice saved', async () => {
+          await staff.goto('/admin/settings');
+          await staff.getByTestId('admin-reminders').selectOption(original!);
+          await staff.getByTestId('admin-save-settings').click();
+          await expect(staff.getByTestId('admin-settings-saved')).toContainText('Clinic settings saved.');
+        });
+      }
+    } finally {
+      await Promise.all(contexts.map((context) => context.close()));
+    }
+  }
 });
 
 test('Staff can correct a failed settings submission without re-entering their reminder choice.', async ({
