@@ -124,16 +124,22 @@ it('upgrades existing bookings and settings, retains reminder history, and suppo
     includeContactInConfirmation: settings.includeContactInConfirmation,
     remindersEnabled: true,
   });
-  const beforeRecovery = await database.db.select().from(bookings);
   // Recovery keeps the additive schema. These are the previous app's field projections and writes.
   expect((await pool.query('select id, patient_id, slot_id, status, reschedule_count from booking')).rowCount).toBe(3);
   await pool.query(
     'update clinic_settings set clinic_name = $1, late_cancellation_hours = $2, updated_at = $3 where id = 1',
     ['Recovered Clinic', 24, clock.now()],
   );
+  // The previous app can still create bookings, omitting all new reminder fields.
+  await pool.query(
+    `insert into booking (id, patient_id, slot_id, status, late_cancellation, phone, reschedule_count, created_at, updated_at, cancelled_at) values ($1, $2, $3, 'confirmed', false, null, 0, $4, $4, null)`,
+    [id(10), id(1), id(3), clock.now()],
+  );
+  const beforeRecovery = await database.db.select().from(bookings).orderBy(bookings.id);
+  expect(beforeRecovery).toHaveLength(4);
   // Returning to the new app reruns migrations without resetting either history or staff choice.
   await runMigrations(database.url);
-  expect(await database.db.select().from(bookings)).toEqual(beforeRecovery);
+  expect(await database.db.select().from(bookings).orderBy(bookings.id)).toEqual(beforeRecovery);
   expect(await database.db.select().from(bookingReminders)).toEqual([{ ...reservation, sentAt: clock.now() }]);
   expect((await database.db.select().from(clinicSettings))[0]).toMatchObject({
     clinicName: 'Recovered Clinic',

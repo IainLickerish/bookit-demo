@@ -84,7 +84,7 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
       .update(bookings)
       .set({ status: 'cancelled', cancelledAt: clock.now() })
       .where(eq(bookings.id, booking!.id));
-    await a.db.update(clinicSettings).set({ clinicName: 'Acme Admin Changed' });
+    await a.db.update(clinicSettings).set({ clinicName: 'Acme Admin Changed', remindersEnabled: true });
     const hashesBefore = (await a.db.select().from(users)).map((row) => row.passwordHash).sort();
     const results = await Promise.all(
       [1, 2].map(() =>
@@ -98,7 +98,10 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
     expect(results[0]).toEqual(results[1]);
     expect(results[0]).toMatchObject({ outcome: 'unchanged', counts: { users: 4, bookings: 3 } });
     expect((await a.db.select().from(users)).map((row) => row.passwordHash).sort()).toEqual(hashesBefore);
-    expect((await a.db.select().from(clinicSettings))[0]?.clinicName).toBe('Acme Admin Changed');
+    expect((await a.db.select().from(clinicSettings))[0]).toMatchObject({
+      clinicName: 'Acme Admin Changed',
+      remindersEnabled: true,
+    });
     expect((await a.db.select().from(bookings).where(eq(bookings.id, booking!.id)))[0]?.status).toBe('cancelled');
   });
   it('refuses foreign-tenant/environment/config seeding and container identity, retaining all data', async () => {

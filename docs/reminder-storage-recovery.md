@@ -59,7 +59,7 @@ creates fictional confirmed, cancelled and moved bookings, upgrades using the
 normal migrator, and compares saved records. It checks empty installation,
 concurrent duplicate reservation refusal, references, sending-time validation and
 history retention after moving and cancelling. It rehearses previous-version
-booking reads and settings writes against the upgraded schema, then reapplies
+booking reads, new bookings and settings writes against the upgraded schema, then reapplies
 migrations and checks bookings, history and preference survive.
 
 `tests/unit/reminder-settings.test.ts` checks that both tenant fingerprint inputs

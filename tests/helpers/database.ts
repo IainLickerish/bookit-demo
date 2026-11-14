@@ -13,7 +13,7 @@ export interface TestDatabase {
   stop(): Promise<void>;
 }
 
-/** A migrated PostgreSQL in a throwaway container. */
+/** A throwaway PostgreSQL; upgrade tests can opt out of initial migration. */
 export async function startTestDatabase(poolSize = 25, migrate = true): Promise<TestDatabase> {
   const container = await new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('bookit').start();
   const url = container.getConnectionUri();
