@@ -1,4 +1,4 @@
-import { expect, type Page, type Route } from '@playwright/test';
+import { expect, type Browser, type Page, type Route } from '@playwright/test';
 import { bookingRow, evalNow, givePhone, londonDate } from './support';
 
 /** Only use copies explicitly supplied by the runner. A second clinic is optional. */
@@ -155,4 +155,50 @@ export async function revisitSavedResult(page: Page): Promise<void> {
   await expect(page).toHaveURL(destination);
   await expect(page.getByTestId('notice')).toHaveText(message);
   await expect(page.getByTestId('booking-error')).toHaveCount(0);
+}
+
+export function emailLinks(text: string, bookingId: string) {
+  const move = /^Reschedule: (\S+)$/m.exec(text)?.[1];
+  const cancel = /^Cancel: (\S+)$/m.exec(text)?.[1];
+  expect(move).toBeTruthy();
+  expect(cancel).toBeTruthy();
+  // Like recovery checks, follow the actual email's paths in the supplied
+  // copy. Its public origin can differ from the factory's forwarded address.
+  expect(new URL(move!).pathname).toBe(`/bookings/${bookingId}/reschedule`);
+  expect(new URL(cancel!).pathname).toBe(`/bookings/${bookingId}/review`);
+  expect(new URL(move!).origin).toBe(new URL(cancel!).origin);
+  return { move: new URL(move!).pathname, cancel: new URL(cancel!).pathname };
+}
+
+export function isLateCancellation(journey: Journey): boolean {
+  return journey.booked!.startsAt.getTime() - evalNow().getTime() < journey.clinic.lateCancellationHours * 3_600_000;
+}
+
+type Journey = {
+  clinic: ReminderClinic;
+  page: Page;
+  visitor: Page;
+  booked?: Awaited<ReturnType<typeof bookReminderTime>>;
+  links?: ReturnType<typeof emailLinks>;
+  movedWhen?: string;
+};
+
+export async function openJourneys(browser: Browser, baseURL: string): Promise<Journey[]> {
+  const journeys: Journey[] = [];
+  for (const clinic of reminderClinics(baseURL)) {
+    const options = { baseURL: clinic.baseURL, viewport: { width: 390, height: 844 } };
+    const context = await browser.newContext(options);
+    const visitorContext = await browser.newContext(options);
+    context.setDefaultTimeout(30_000);
+    visitorContext.setDefaultTimeout(30_000);
+    journeys.push({ clinic, page: await context.newPage(), visitor: await visitorContext.newPage() });
+  }
+  return journeys;
+}
+
+export async function closeJourneys(journeys: Journey[]) {
+  for (const j of journeys) {
+    await j.visitor.context().close();
+    await j.page.context().close();
+  }
 }

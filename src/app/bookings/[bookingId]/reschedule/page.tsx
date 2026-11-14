@@ -95,7 +95,7 @@ export default async function ReschedulePage({
         </>
       )}
       <p className="mt-6 text-sm">
-        <Link href="/bookings" prefetch={false} className="underline">
+        <Link href="/bookings" prefetch={false} className="touch-link" data-testid="reschedule-back">
           Back to my bookings
         </Link>
       </p>

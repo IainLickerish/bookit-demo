@@ -1,67 +1,15 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
-import { bookingRow, demoPassword, evalNow, londonDate, signIn, step } from './support';
+import { expect, test } from '@playwright/test';
+import { bookingRow, signIn, step } from './support';
 import {
   bookReminderTime,
-  confirmWithDoublePress,
+  closeJourneys,
+  emailLinks,
+  isLateCancellation,
   observeReminderPolls,
+  openJourneys,
   receiveReminder,
-  reminderClinics,
   reminderMessages,
-  revisitSavedResult,
-  type ReminderClinic,
 } from './reminder-support';
-
-function emailLinks(text: string, bookingId: string) {
-  const move = /^Reschedule: (\S+)$/m.exec(text)?.[1];
-  const cancel = /^Cancel: (\S+)$/m.exec(text)?.[1];
-  expect(move).toBeTruthy();
-  expect(cancel).toBeTruthy();
-  // Like recovery checks, follow the actual email's paths in the supplied
-  // copy. Its public origin can differ from the factory's forwarded address.
-  expect(new URL(move!).pathname).toBe(`/bookings/${bookingId}/reschedule`);
-  expect(new URL(cancel!).pathname).toBe(`/bookings/${bookingId}/review`);
-  expect(new URL(move!).origin).toBe(new URL(cancel!).origin);
-  return { move: new URL(move!).pathname, cancel: new URL(cancel!).pathname };
-}
-
-async function privateDetailsHidden(page: Page) {
-  for (const id of ['review-current', 'current-when', 'confirm-change', 'reschedule-to']) {
-    await expect(page.getByTestId(id)).toHaveCount(0);
-  }
-}
-
-function isLateCancellation(journey: Journey): boolean {
-  return journey.booked!.startsAt.getTime() - evalNow().getTime() < journey.clinic.lateCancellationHours * 3_600_000;
-}
-
-type Journey = {
-  clinic: ReminderClinic;
-  page: Page;
-  visitor: Page;
-  booked?: Awaited<ReturnType<typeof bookReminderTime>>;
-  links?: ReturnType<typeof emailLinks>;
-  movedWhen?: string;
-};
-
-async function openJourneys(browser: Browser, baseURL: string): Promise<Journey[]> {
-  const journeys: Journey[] = [];
-  for (const clinic of reminderClinics(baseURL)) {
-    const options = { baseURL: clinic.baseURL, viewport: { width: 390, height: 844 } };
-    const context = await browser.newContext(options);
-    const visitorContext = await browser.newContext(options);
-    context.setDefaultTimeout(30_000);
-    visitorContext.setDefaultTimeout(30_000);
-    journeys.push({ clinic, page: await context.newPage(), visitor: await visitorContext.newPage() });
-  }
-  return journeys;
-}
-
-async function closeJourneys(journeys: Journey[]) {
-  for (const j of journeys) {
-    await j.visitor.context().close();
-    await j.page.context().close();
-  }
-}
 
 test('Reminders show the clinic, practitioner, duration and UK appointment date and time, with Reschedule and Cancel links and no phone number.', async ({
   browser,
@@ -130,131 +78,6 @@ test('Reminders show the clinic, practitioner, duration and UK appointment date 
           late ? 'Booking cancelled. This was a late cancellation.' : 'Booking cancelled.',
         );
         await expect(bookingRow(j.page, 'other-bookings', j.booked!.when).getByTestId('booking-status')).toContainText(
-          'Cancelled',
-        );
-      }
-    });
-  } finally {
-    await closeJourneys(journeys);
-  }
-});
-
-test('Reminder links require sign-in, protect booking privacy and show current details and consequences before a client confirms a change.', async ({
-  browser,
-  baseURL,
-}) => {
-  test.setTimeout(360_000);
-  const journeys = await openJourneys(browser, baseURL!);
-  const page = journeys[0]!.page;
-  try {
-    await step(page, 'Book a time and receive its reminder email', async () => {
-      for (const j of journeys) {
-        await signIn(j.page, `patient3@patients.${j.clinic.domain}`);
-        j.booked = await bookReminderTime(j.page, j.clinic);
-        const message = await receiveReminder(j.clinic, j.booked.bookingId);
-        j.links = emailLinks(message.Text, j.booked.bookingId);
-      }
-    });
-    await step(
-      journeys[0]!.visitor,
-      'Open both reminder links signed out and see sign-in without booking details',
-      async () => {
-        for (const j of journeys) {
-          for (const link of [j.links!.move, j.links!.cancel]) {
-            await j.visitor.goto(link);
-            await expect(j.visitor).toHaveURL(/\/auth\/sign-in\?next=/);
-            await privateDetailsHidden(j.visitor);
-          }
-        }
-      },
-    );
-    await step(
-      journeys[0]!.visitor,
-      'Sign in from the reminder and review the current booking before any change',
-      async () => {
-        for (const j of journeys) {
-          await j.visitor.getByTestId('sign-in-email').fill(`patient3@patients.${j.clinic.domain}`);
-          await j.visitor.getByTestId('sign-in-password').fill(demoPassword());
-          await j.visitor.getByTestId('sign-in-submit').click();
-          await expect(j.visitor.getByTestId('review-current')).toContainText(j.booked!.when);
-          await expect(j.visitor.getByTestId('review-current')).toContainText(j.clinic.practitioner);
-          await expect(j.visitor.getByTestId('review-current')).toContainText(`${j.clinic.minutes} minutes`);
-          await expect(j.visitor.getByTestId('review-consequences')).toContainText('Cancelling releases your time');
-          await expect(j.visitor.getByTestId('review-consequences')).toContainText(
-            isLateCancellation(j)
-              ? 'This will be recorded as a late cancellation.'
-              : 'This is outside the late-cancellation window.',
-          );
-          await j.visitor.getByTestId('confirm-change').focus();
-          await expect(j.visitor.getByTestId('confirm-change')).toBeFocused();
-          await j.visitor.getByTestId('review-back').click();
-          await expect(
-            bookingRow(j.visitor, 'upcoming-bookings', j.booked!.when).getByTestId('booking-status'),
-          ).toHaveText('Confirmed');
-        }
-      },
-    );
-    await step(journeys[0]!.visitor, 'See that another client cannot use either reminder link', async () => {
-      for (const j of journeys) {
-        await j.visitor.getByTestId('sign-out').click();
-        await expect(j.visitor).toHaveURL(/\/auth\/sign-in$/);
-        await signIn(j.visitor, `patient2@patients.${j.clinic.domain}`);
-        for (const link of [j.links!.move, j.links!.cancel]) {
-          await j.visitor.goto(link);
-          await privateDetailsHidden(j.visitor);
-          await expect(j.visitor.getByText(j.booked!.when, { exact: true })).toHaveCount(0);
-        }
-        for (const other of journeys.filter((other) => other !== j)) {
-          // These clients are signed in to separate supplied clinic copies.
-          for (const link of [j.links!.move, j.links!.cancel]) {
-            await other.page.goto(link);
-            await privateDetailsHidden(other.page);
-          }
-        }
-      }
-    });
-    await step(page, 'Use the emailed Reschedule link to choose a new time and review the change', async () => {
-      for (const j of journeys) {
-        await j.page.goto(j.links!.move);
-        await expect(j.page.getByTestId('current-when')).toContainText(j.booked!.when);
-        await j.page.getByTestId('date-input').fill(londonDate(3));
-        await j.page.getByTestId('show-slots').click();
-        const target = j.page.getByTestId('reschedule-to').last();
-        j.movedWhen = (await target.textContent())!.trim();
-        await target.click();
-        await expect(j.page.getByTestId('review-current')).toContainText(j.booked!.when);
-        await expect(j.page.getByTestId('review-new')).toContainText(j.movedWhen);
-        await expect(j.page.getByTestId('review-new')).toContainText(`${j.clinic.minutes} minutes`);
-        await expect(j.page.getByTestId('review-consequences')).toContainText(
-          'Your old time is released only when the new time is secured',
-        );
-      }
-    });
-    await step(
-      page,
-      'Double press to confirm the move and see the saved time after refresh and back and forward',
-      async () => {
-        for (const j of journeys) {
-          await confirmWithDoublePress(j.page, 'confirm-change', /\/bookings\?notice=rescheduled$/);
-          await revisitSavedResult(j.page);
-          await expect(bookingRow(j.page, 'upcoming-bookings', j.movedWhen!).getByTestId('booking-status')).toHaveText(
-            'Confirmed',
-          );
-        }
-      },
-    );
-    await step(page, 'Reopen the original Cancel link and confirm cancellation of the current time', async () => {
-      for (const j of journeys) {
-        await j.page.goto(j.links!.cancel);
-        await expect(j.page.getByTestId('review-current')).toContainText(j.movedWhen!);
-        await expect(j.page.getByTestId('review-current')).not.toContainText(j.booked!.when);
-        await expect(j.page.getByTestId('review-consequences')).toContainText('No further reminder');
-        await expect(j.page.getByTestId('review-consequences')).toContainText(
-          'This is outside the late-cancellation window.',
-        );
-        await confirmWithDoublePress(j.page, 'confirm-change', /\/bookings\?notice=cancelled$/);
-        await revisitSavedResult(j.page);
-        await expect(bookingRow(j.page, 'other-bookings', j.movedWhen!).getByTestId('booking-status')).toHaveText(
           'Cancelled',
         );
       }

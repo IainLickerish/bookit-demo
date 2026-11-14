@@ -36,19 +36,19 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           Show times
         </button>
       </form>
-      <div className="flex items-center justify-between text-sm">
+      <div className="day-navigation flex items-center justify-between text-sm">
         {view.date > view.today ? (
-          <Link href={dayLink(previous)} prefetch={false} data-testid="previous-day">
+          <Link href={dayLink(previous)} prefetch={false} className="touch-link" data-testid="previous-day">
             ← Previous day
           </Link>
         ) : (
           <span />
         )}
-        <span className="font-medium" data-testid="shown-date">
+        <span className="day-navigation-date font-medium" data-testid="shown-date">
           {formatLocalDate(view.date)}
         </span>
         {view.date < view.lastDate ? (
-          <Link href={dayLink(next)} prefetch={false} data-testid="next-day">
+          <Link href={dayLink(next)} prefetch={false} className="touch-link" data-testid="next-day">
             Next day →
           </Link>
         ) : (
