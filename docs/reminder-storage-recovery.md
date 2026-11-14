@@ -1,7 +1,8 @@
-# Reminder storage and recovery, step 1
+# Reminder storage, sending and recovery
 
-This step stores a clinic preference and reminder history. It does not send
-reminders, run unattended checks or add reminder action links.
+Step 1 adds the clinic preference and durable history. Step 2 runs unattended
+checks in the long-lived Node application and sends reminders through the existing
+demo mail service. Direct reminder action destinations remain for step 3.
 
 ## Decided
 
@@ -12,8 +13,8 @@ reminders, run unattended checks or add reminder action links.
   reservation time and optional confirmed sending time. It copies no names,
   addresses, phone numbers, email content or private links (PS-6, PS-7).
 - A booking has at most one reservation, enforced in storage. An unconfirmed
-  sending time must not be interpreted as permission to resend. Delivery rules
-  and handling uncertain delivery belong to step 2.
+  sending time must not be interpreted as permission to resend. Delivery uncertainty is
+  handled by retaining this reservation and never automatically retrying it.
 - Moving or cancelling a booking does not erase its history. Bookings without
   history remain without history during upgrade. This step never invents a send.
 - The clinic settings screen and save action both check the current signed-in
@@ -33,8 +34,8 @@ column with a false default. It neither updates nor deletes booking rows.
 
 ## Recover by returning to the previous application
 
-1. Stop the new application for the affected clinic. No reminder worker exists in
-   this step, so there is no extra process to stop.
+1. Stop the new application for the affected clinic. The reminder loop runs
+   inside each Node application process, so stop every new application instance.
 2. Start the previous application version against the same clinic database and
    existing mounted credentials. **Keep the new table, column and migration
    journal. Do not run DROP statements or remove a migration entry.** The added
@@ -42,7 +43,8 @@ column with a false default. It neither updates nor deletes booking rows.
    leave it alone.
 3. Sign in as that clinic's staff, check its bookings and save a normal setting.
    Previous code will not show the reminder switch; its saved choice and history
-   remain in storage. No reminder email is sent by either version in this step.
+   remain in storage. The previous
+   application has no reminder loop. Keep unconfirmed reservations intact.
 4. When returning to the new version, run `bun run db:migrate` again and restart it.
    Check bookings and the saved reminder choice. Migration reruns leave data intact.
 
@@ -66,3 +68,49 @@ migrations and checks bookings, history and preference survive.
 remain byte-for-byte equivalent after parsing. The settings integration test uses
 separate disposable clinic databases and real sessions to check foreign, patient,
 expired, forged and removed-staff access, through the page and save action.
+
+## Sending decisions for step 2
+
+- Each running Node application starts one serial loop after startup checks. It
+  checks immediately and then every 10 seconds after the previous pass finishes.
+  Multiple instances are safe because the database allows only one reservation
+  per booking. No browser request, public trigger, extra credential or external
+  scheduler is needed. Run the existing `bun run start` or Compose service. This
+  design assumes the repository's long-lived Node deployment, not serverless
+  functions (EN-1, EN-4).
+- A confirmed booking is due when it is still upcoming and at most 24 elapsed
+  hours away. Checks catch up after downtime and handle bookings made inside the
+  window. They never send for started bookings. A pass handles up to 50 candidates
+  in time order, then the next pass continues (PR-7, PR-14).
+- The ticket explicitly requires UK time, so reminder emails always use
+  Europe/London, including clock changes, even if staff change the clinic's
+  display time zone. This follows the owner's words for this change over PR-7's
+  general clinic-zone rule. Existing screens and confirmation emails are unchanged.
+- A durable reservation commits before SMTP is contacted. A second transaction
+  locks the setting and booking, rereads current details and sends while those
+  locks are held. Moves, cancellations and switching reminders off are therefore
+  ordered before or after sending. If the current booking or setting changed
+  before SMTP, only this invocation's known unused reservation is released. The
+  next pass can follow the moved booking's new time (PR-14, PR-15).
+- After contacting SMTP, a failed or missing acknowledgement, failed outcome
+  write or process loss leaves an unconfirmed reservation. It is never retried
+  automatically. This can mean a missing email, but avoids two reminders when
+  the first may already have arrived. Moving a booking never restores its
+  reminder allowance after an attempted or uncertain send. My bookings remains
+  the place to check details (PR-9, EN-6).
+- SMTP connections, greetings and idle sockets have 10-second timeouts. Disabled
+  mail transport makes no reservation. Only fictional .test senders and recipients
+  are accepted, through the existing Mailpit service. Emails contain no phone
+  numbers or private tokens. Logs contain event names, booking references and
+  hashed recipients, never email bodies or raw SMTP errors (PR-21, PS-6, PS-7).
+- Emails put the clinic first and use its own session or appointment and
+  practitioner wording. Their only management link is the existing signed-in
+  My bookings page using BOOKIT_PUBLIC_URL. Explicit reminder action destinations
+  and booking confirmation changes remain outside step 2 (DS-1, DS-7, DS-8, PR-1).
+
+`tests/integration/reminder-sending.int.test.ts` covers timing, moves, cancellation,
+switch-off, repeated and overlapping passes, fresh database connections, process
+loss, uncertain mail acceptance, outcome-write failures, race rechecks, lock
+ordering, clinic isolation and local SMTP. Unit checks cover UK clock changes and
+serial unattended scheduling. The owner checks in `evals/11-reminder-emails.eval.ts`
+wait for mail from the real loop without triggering it themselves.

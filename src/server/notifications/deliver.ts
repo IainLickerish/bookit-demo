@@ -8,7 +8,7 @@ export interface MailSettings {
   from: string;
 }
 
-export type EmailKind = 'confirmation' | 'password_reset';
+export type EmailKind = 'confirmation' | 'password_reset' | 'reminder';
 
 /**
  * Sends one email and logs `email.<kind>.sent` or `email.<kind>.failed` with
@@ -26,6 +26,10 @@ export async function deliverEmail(
   const fields = { ...refs, recipient_hash: emailHash(email.to), mailer: mail.mailer.kind };
   try {
     const sent = await mail.mailer.send(email);
+    if (kind === 'reminder' && sent.messageId === null) {
+      log.warn({ event: 'email.reminder.unconfirmed', ...fields }, 'Reminder delivery was not confirmed');
+      return false;
+    }
     log.info(
       { event: `email.${kind}.sent`, ...fields, message_id: sent.messageId },
       mail.mailer.kind === 'disabled' ? 'Email not sent: no SMTP server configured' : 'Email sent',
@@ -36,7 +40,9 @@ export async function deliverEmail(
       { event: `email.${kind}.failed`, ...fields, error_name: error instanceof Error ? error.name : 'unknown' },
       'Email failed',
     );
-    reportError(error, { operation: `${kind}_email` });
+    reportError(kind === 'reminder' ? new Error('Reminder delivery could not be confirmed.') : error, {
+      operation: `${kind}_email`,
+    });
     return false;
   }
 }

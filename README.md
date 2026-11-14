@@ -204,3 +204,16 @@ failing-then-passing tests live in SupportAgents under `demo/bookit-expected/`.
 BookIt's ordinary tests exercise unaffected cancellation/export/display cases and
 must pass both on this baseline and after each expected fix. The tenant seed keeps
 its Unicode names and DST reference slots so those defects remain reproducible.
+
+### Reminder emails
+
+The running Node application checks for due reminder emails every 10 seconds,
+without needing a page visit or a separate scheduled job. Clinic staff enable or
+disable them in **Clinic settings**. Reminders use the existing configured demo
+SMTP service and only accept `.test` addresses. A confirmed upcoming booking is
+due within 24 elapsed hours of its current start; checks catch up after downtime.
+Each booking can have only one attempt. Unconfirmed delivery is not retried.
+No reminder is sent without SMTP configuration. See
+[reminder storage and recovery](docs/reminder-storage-recovery.md) for deployment,
+uncertain delivery, locking and recovery decisions. Direct reminder booking action
+links remain for the next step.

@@ -93,7 +93,8 @@ export function SettingsForm({ settings }: { settings: ClinicSettings }) {
           </select>
         </label>
         <p id="reminder-email-hint" className="text-sm">
-          Save your clinic’s reminder choice. Reminder emails are not being sent yet.
+          Send one reminder email about 24 hours before each booking. Bookings made within 24 hours receive a reminder
+          at the next check.
         </p>
         <button disabled={pending} type="submit" className="button" data-testid="admin-save-settings">
           Save settings

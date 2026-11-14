@@ -44,7 +44,12 @@ export const disabledMailer: Mailer = {
 
 /** Sends through an SMTP server such as Mailpit (`smtp://mailpit:1025`). */
 export function createSmtpMailer(url: string): Mailer {
-  const transport = nodemailer.createTransport(url);
+  const transport = nodemailer.createTransport({
+    url,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 10_000,
+  });
   return {
     kind: 'smtp',
     async send(email) {

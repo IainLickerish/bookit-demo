@@ -23,5 +23,13 @@ settings**. Choose **On** or **Off** under **Reminder emails** and select **Save
 settings**. Reopen settings to check the saved choice. Reminders start off and
 only your clinic’s staff can change this choice.
 
-This saves your preference for reminder emails. Reminder emails are not being
-sent yet. Booking confirmation emails continue as before.
+When reminders are on, each upcoming confirmed booking is checked every 10 seconds
+and can receive one reminder within 24 hours of its start. The reminder uses the
+latest saved time and practitioner and shows UK time. A booking made inside that
+window receives its reminder at the next check. Cancelled and started bookings
+receive no reminder. Switching reminders off stops later checks from sending.
+
+A reminder whose delivery cannot be confirmed is not sent again, even after a
+move. Check **My bookings** for the latest booking details. Reminder emails link
+there; direct reschedule and cancellation links are not included yet.
+Booking confirmation emails continue as before.
