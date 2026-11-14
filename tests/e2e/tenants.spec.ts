@@ -214,7 +214,17 @@ test('both clinics keep staff tables contained and use shared settings and fallb
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       }
       await page.getByTestId('admin-settings-link').click();
-      await expect(page.getByTestId('admin-settings-form')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('admin-settings-card')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('admin-settings-card').getByTestId('admin-settings-form')).toBeVisible();
+      for (const [query, notice] of [
+        ['error=unavailable', 'admin-settings-error'],
+        ['saved=1', 'admin-settings-saved'],
+      ] as const) {
+        await page.goto(`${clinic.url}/admin/settings?${query}`);
+        const card = page.getByTestId('admin-settings-card');
+        await expect(card.getByTestId(notice)).toBeVisible();
+        await expect(card.getByTestId('admin-settings-form')).toHaveCSS('box-shadow', 'none');
+      }
       await expect(page.getByTestId('admin-time-zone')).toHaveAttribute('aria-describedby', 'time-zone-hint');
       await expect(page.getByTestId('admin-save-settings')).toHaveText('Save settings');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

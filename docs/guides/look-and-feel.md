@@ -120,9 +120,10 @@ zoom, the table stays inside that area and the rest of the page stays within the
 must remain visible. Empty selections keep the existing message inside the table card; invalid selections keep
 the existing problem banner and available filter controls (DS-4, DS-5).
 
-Clinic settings uses the 720px reading width with one white form card, labelled fields and the existing checkbox.
-The time-zone hint is linked to its field. Save confirmation and general validation errors stay above the card,
-with their existing words and announcement roles. The booking count is also announced after filtering.
+Clinic settings uses the 720px reading width with one white card containing its notices and form, including
+labelled fields and the existing checkbox. Save confirmation and general errors sit above the fields inside that
+same card, with their existing words and announcement roles. The form has no separate card styling, so cards are
+never nested. The time-zone hint is linked to its field. The booking count is also announced after filtering.
 
 Errors and missing pages use the same white card and serif title, with the existing recovery action presented
 as a pine pill. Reuse any existing explanatory sentence in the short header. Never display an error's private

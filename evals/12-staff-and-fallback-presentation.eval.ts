@@ -97,18 +97,23 @@ test('Clinic bookings keeps its table inside a keyboard scroll area without maki
 test('Clinic settings presents its existing fields, notices and actions in a white card with visible keyboard focus.', async ({
   page,
 }) => {
+  const card = page.getByTestId('admin-settings-card');
+  const form = card.getByTestId('admin-settings-form');
   const before = await step(page, 'Open clinic settings on a laptop', async () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await signIn(page, ADMIN);
     await page.getByTestId('nav-admin').click();
     await page.getByTestId('admin-settings-link').click();
-    await whiteCard(page.getByTestId('admin-settings-form'));
-    await expect(page.getByTestId('admin-time-zone')).toHaveAttribute('aria-describedby', 'time-zone-hint');
+    await whiteCard(card);
+    await expect(form).toBeVisible();
+    await expect(form).toHaveCSS('box-shadow', 'none');
+    await expect(form).toHaveCSS('border-radius', '0px');
+    await expect(form.getByTestId('admin-time-zone')).toHaveAttribute('aria-describedby', 'time-zone-hint');
     return {
-      name: await page.getByTestId('admin-clinic-name').inputValue(),
-      zone: await page.getByTestId('admin-time-zone').inputValue(),
-      hours: await page.getByTestId('admin-late-hours').inputValue(),
-      contact: await page.getByTestId('admin-include-contact').isChecked(),
+      name: await form.getByTestId('admin-clinic-name').inputValue(),
+      zone: await form.getByTestId('admin-time-zone').inputValue(),
+      hours: await form.getByTestId('admin-late-hours').inputValue(),
+      contact: await form.getByTestId('admin-include-contact').isChecked(),
     };
   });
   await step(page, 'Tab through the existing settings fields and save button', async () => {
@@ -121,30 +126,36 @@ test('Clinic settings presents its existing fields, notices and actions in a whi
       'admin-save-settings',
     ]) {
       await page.keyboard.press('Tab');
-      await pineFocus(page.getByTestId(id));
+      await pineFocus(form.getByTestId(id));
     }
   });
   await step(page, 'See the existing error after entering an invalid time zone', async () => {
-    await page.getByTestId('admin-time-zone').fill('Invalid/Clinic');
-    await page.getByTestId('admin-save-settings').click();
-    await expect(page.getByTestId('admin-settings-error')).toContainText('Enter a clinic name, a valid IANA time zone');
-    await expect(page.getByTestId('admin-settings-error')).toHaveCSS('background-color', 'rgb(252, 235, 232)');
-    await whiteCard(page.getByTestId('admin-settings-form'));
+    await form.getByTestId('admin-time-zone').fill('Invalid/Clinic');
+    await form.getByTestId('admin-save-settings').click();
+    await expect(card.getByTestId('admin-settings-error')).toContainText('Enter a clinic name, a valid IANA time zone');
+    await expect(card.getByTestId('admin-settings-error')).toHaveCSS('background-color', 'rgb(252, 235, 232)');
+    await whiteCard(card);
+    await expect(form).toBeVisible();
+    await expect(form).toHaveCSS('box-shadow', 'none');
+    await expect(form).toHaveCSS('border-radius', '0px');
   });
   await step(page, 'Save the original values in the phone layout and see the existing confirmation', async () => {
     await page.setViewportSize({ width: 320, height: 740 });
-    await page.getByTestId('admin-clinic-name').fill(before.name);
-    await page.getByTestId('admin-time-zone').fill(before.zone);
-    await page.getByTestId('admin-late-hours').fill(before.hours);
-    await page.getByTestId('admin-include-contact').setChecked(before.contact);
-    await page.getByTestId('admin-save-settings').click();
-    await expect(page.getByTestId('admin-settings-saved')).toContainText('Clinic settings saved.');
-    await expect(page.getByTestId('admin-settings-saved')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
-    await expect(page.getByTestId('admin-clinic-name')).toHaveValue(before.name);
-    await expect(page.getByTestId('admin-time-zone')).toHaveValue(before.zone);
-    await expect(page.getByTestId('admin-late-hours')).toHaveValue(before.hours);
-    expect(await page.getByTestId('admin-include-contact').isChecked()).toBe(before.contact);
-    await whiteCard(page.getByTestId('admin-settings-form'));
+    await form.getByTestId('admin-clinic-name').fill(before.name);
+    await form.getByTestId('admin-time-zone').fill(before.zone);
+    await form.getByTestId('admin-late-hours').fill(before.hours);
+    await form.getByTestId('admin-include-contact').setChecked(before.contact);
+    await form.getByTestId('admin-save-settings').click();
+    await expect(card.getByTestId('admin-settings-saved')).toContainText('Clinic settings saved.');
+    await expect(card.getByTestId('admin-settings-saved')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
+    await expect(form.getByTestId('admin-clinic-name')).toHaveValue(before.name);
+    await expect(form.getByTestId('admin-time-zone')).toHaveValue(before.zone);
+    await expect(form.getByTestId('admin-late-hours')).toHaveValue(before.hours);
+    expect(await form.getByTestId('admin-include-contact').isChecked()).toBe(before.contact);
+    await whiteCard(card);
+    await expect(form).toBeVisible();
+    await expect(form).toHaveCSS('box-shadow', 'none');
+    await expect(form).toHaveCSS('border-radius', '0px');
     await fitsScreen(page);
   });
   await step(page, 'Return to clinic bookings with the existing back link', async () => {
