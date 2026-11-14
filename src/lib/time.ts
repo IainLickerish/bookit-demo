@@ -117,6 +117,11 @@ export function localTimeFromMinutes(minutes: number): string {
  * time that occurs twice (clocks going back), returns the earlier instant.
  */
 export function zonedTimeToUtc(localDate: string, localTime: string, timeZone: string): Date | null {
+  return zonedTimeCandidates(localDate, localTime, timeZone)[0] ?? null;
+}
+
+/** All matching instants, so staff input can reject repeated clock-change times. */
+export function zonedTimeCandidates(localDate: string, localTime: string, timeZone: string): Date[] {
   const [year, month, day] = parseLocalDate(localDate);
   const [hour, minute] = parseLocalTime(localTime);
   const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute);
@@ -132,8 +137,7 @@ export function zonedTimeToUtc(localDate: string, localTime: string, timeZone: s
       );
     })
     .sort((a, b) => a - b);
-  const first = matches[0];
-  return first === undefined ? null : new Date(first);
+  return matches.map((instant) => new Date(instant));
 }
 
 export function localDateOf(instant: Date, timeZone: string): string {

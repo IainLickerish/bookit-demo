@@ -6,6 +6,7 @@ import { currentUser } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { signOut } from './auth/actions';
 import './globals.css';
+import { figtree, fraunces } from './fonts';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const [settings, user] = await Promise.all([loadClinicSettings(getDatabase()), currentUser()]);
   return (
     <html lang="en-GB">
-      <body className="min-h-screen bg-slate-50 text-slate-900">
+      <body className={`${figtree.variable} ${fraunces.variable} min-h-screen bg-slate-50 text-slate-900`}>
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
             <Link href="/" prefetch={false} className="font-semibold" data-testid="clinic-name">

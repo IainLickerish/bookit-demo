@@ -24,3 +24,17 @@ export function errorText(code: string | undefined): string | null {
 }
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export const BLOCK_MESSAGES = {
+  saved: 'Blocked time saved.',
+  invalid: 'The blocked time could not be saved. Correct the fields below and try again.',
+  practitioner: 'Choose a practitioner from this clinic.',
+  invalid_time: 'Enter a valid date and time in the clinic’s time zone.',
+  skipped_time: 'This time is skipped when the clocks go forward. Choose a time before or after the clock change.',
+  repeated_time: 'This time occurs twice when the clocks go back. Choose a time before or after the repeated hour.',
+  end_order: 'Enter an end after the start.',
+  reason_long: 'Keep the reason to 500 characters or fewer.',
+  noConflicts: 'No confirmed bookings overlap this blocked time.',
+  conflicts:
+    'Confirmed bookings overlap this blocked time. Contact the clients to arrange another time. Their bookings have not been changed.',
+} as const;

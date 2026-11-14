@@ -7,7 +7,8 @@ import { isUniqueViolation } from '../errors';
 import { composeConfirmation } from '../notifications/confirmation';
 import { deliverEmail, type MailSettings } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
-import { findBookableSlot } from '../slots/queries';
+import { findBookableSlot, isSlotBlocked } from '../slots/queries';
+import { lockPractitioner } from '../practitioners';
 import { findUserById } from '../users';
 import { BookingError } from './errors';
 import { findBookingForPatient, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
@@ -39,6 +40,9 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     if (!slot) {
       throw new BookingError('slot_not_found');
     }
+    await lockPractitioner(tx, slot.practitionerId);
+    // This read must happen after acquiring the lock, using a fresh snapshot.
+    if (await isSlotBlocked(tx, slot)) throw new BookingError('slot_blocked');
     assertSlotBookable(slot.startsAt, now, settings);
     const id = newId(deps.clock);
     try {

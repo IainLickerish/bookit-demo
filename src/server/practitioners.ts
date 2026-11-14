@@ -1,9 +1,20 @@
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Executor } from '@/db/client';
+import type { Executor, Transaction } from '@/db/client';
 import { practitioners } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
 import { minutesOfLocalTime } from '@/lib/time';
+
+/** Serialize block saves, bookings and moves for this practitioner until commit. */
+export async function lockPractitioner(tx: Transaction, id: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: practitioners.id })
+    .from(practitioners)
+    .where(eq(practitioners.id, id))
+    .for('update');
+  return row !== undefined;
+}
 
 const localTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
 

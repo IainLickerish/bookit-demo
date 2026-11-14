@@ -30,3 +30,119 @@
     @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
   }
 }
+
+/* Staff time management uses the current owner palette and self-hosted typefaces. */
+body:has(.staff-page) {
+  background: #faf8f4;
+  color: #16241f;
+  font-family: var(--font-figtree), sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+body:has(.staff-page) header {
+  border-color: #e6e1d8;
+}
+body:has(.staff-page) a {
+  color: #1d5c4b;
+}
+body:has(.staff-page) [data-testid='clinic-name'],
+.staff-page h1,
+.staff-page h2 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+body:has(.staff-page) [data-testid='clinic-name'] {
+  font-size: 22px;
+}
+body:has(.staff-page) main {
+  padding: 32px 20px;
+}
+.staff-page h1 {
+  font-size: 32px;
+}
+.staff-page h2 {
+  margin-top: 32px;
+  margin-bottom: 16px;
+  font-size: 22px;
+}
+.staff-page .staff-card h2 {
+  margin-top: 0;
+}
+.staff-page .staff-card {
+  border: 1px solid #e6e1d8;
+  border-radius: 20px;
+  background: #fff;
+  padding: 24px;
+  box-shadow: 0 2px 8px #16241f08;
+}
+.staff-page label,
+.staff-page button,
+.staff-page a {
+  font-size: 15px;
+  font-weight: 500;
+}
+.staff-page input,
+.staff-page select {
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid #8c9792;
+  border-radius: 12px;
+  background: #fff;
+  color: #16241f;
+  font-size: 16px;
+}
+.staff-page .button,
+.staff-page .button-secondary {
+  min-height: 48px;
+  border-radius: 999px;
+  padding: 12px 24px;
+}
+.staff-page .button {
+  background: #1d5c4b;
+  color: #fff;
+}
+.staff-page .button:hover {
+  background: #164a3c;
+}
+.staff-page .button-secondary {
+  border-color: #8c9792;
+  background: #fff;
+}
+.staff-page .button-secondary:hover {
+  background: #f1eee8;
+}
+.staff-page .notice,
+.staff-page .alert,
+.staff-page .attention {
+  border: 0;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 16px;
+}
+.staff-page .notice {
+  background: #e9f1ec;
+  color: #1d5c4b;
+}
+.staff-page .attention {
+  background: #fdf3e2;
+  color: #92400e;
+}
+.staff-page .alert {
+  background: #fcebe8;
+  color: #a8261b;
+}
+.staff-page .field-error {
+  margin-top: 8px;
+  color: #a8261b;
+  font-size: 15px;
+}
+body:has(.staff-page) :focus-visible {
+  outline: 2px solid #1d5c4b;
+  outline-offset: 3px;
+}
+@media (max-width: 480px) {
+  .staff-page h1 {
+    font-size: 28px;
+  }
+}

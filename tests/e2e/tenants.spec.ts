@@ -292,3 +292,69 @@ test('REQ-18.1-06 container build requires GIT_COMMIT and the production image r
     writeTenantEvidence(directory, results, logs.join('\n'), acme.canaries);
   }
 });
+
+test('blocked time and its save action are private to each clinic’s staff', async ({ browser }) => {
+  const a = await signIn(browser, acme, 'admin');
+  const b = await signIn(browser, beacon, 'admin');
+  const visitor = await browser.newContext();
+  const patient = await signIn(browser, acme, 'patient1');
+  try {
+    const captured = new Map<string, { body: Buffer; contentType: string; action: string }>();
+    for (const [context, clinic] of [
+      [a, acme],
+      [b, beacon],
+    ] as const) {
+      const page = context.pages()[0]!;
+      await page.goto(`${clinic.url}/admin`);
+      await page.getByTestId('admin-blocks-link').click();
+      const label = clinic.tenant.branding.practitionerLabel;
+      await expect(page.getByLabel(label, { exact: false })).toBeVisible();
+      await page.getByTestId('block-practitioner').selectOption({ label: clinic.tenant.practitioners[0]!.name });
+      await page.getByTestId('block-start').fill('2026-11-30T13:00');
+      await page.getByTestId('block-end').fill('2026-11-30T14:00');
+      const reason = `Private holiday at ${clinic.tenant.tenant}`;
+      await page.getByTestId('block-reason').fill(reason);
+      const request = page.waitForRequest(
+        (req) => req.method() === 'POST' && new URL(req.url()).pathname === '/admin/blocks',
+      );
+      await page.getByTestId('block-save').click();
+      const posted = await request;
+      captured.set(clinic.tenant.tenant, {
+        body: posted.postDataBuffer()!,
+        contentType: posted.headers()['content-type']!,
+        action: posted.headers()['next-action']!,
+      });
+      await expect(page.getByTestId('block-saved')).toBeVisible();
+      await expect(page.getByTestId('block-row').filter({ hasText: reason })).toHaveCount(1);
+    }
+    for (const [own, clinic, foreign] of [
+      [a, acme, b],
+      [b, beacon, a],
+    ] as const) {
+      const reason = `Private holiday at ${clinic.tenant.tenant}`;
+      const posted = captured.get(clinic.tenant.tenant)!;
+      expect(posted.action).toBeTruthy();
+      for (const denied of [visitor, foreign, ...(clinic === acme ? [patient] : [])]) {
+        const page = await denied.newPage();
+        await page.goto(`${clinic.url}/admin/blocks`);
+        await expect(page).not.toHaveURL(`${clinic.url}/admin/blocks`);
+        await expect(page.getByTestId('block-form')).toHaveCount(0);
+        await expect(page.locator('body')).not.toContainText(reason);
+        const response = await denied.request.post(`${clinic.url}/admin/blocks`, {
+          headers: { 'Next-Action': posted.action, 'Content-Type': posted.contentType, Origin: clinic.url },
+          data: posted.body,
+          maxRedirects: 0,
+        });
+        expect(response.headers()['x-action-redirect']).toMatch(/\/(auth\/sign-in|bookings)/);
+        expect(await response.text()).not.toContain(reason);
+        await page.close();
+      }
+      const page = own.pages()[0]!;
+      await page.goto(`${clinic.url}/admin/blocks`);
+      await expect(page.getByTestId('block-row').filter({ hasText: reason })).toHaveCount(1);
+      await expect(page.locator('main')).not.toContainText(`Private holiday at ${clinic === acme ? 'beacon' : 'acme'}`);
+    }
+  } finally {
+    await Promise.all([a.close(), b.close(), visitor.close(), patient.close()]);
+  }
+});

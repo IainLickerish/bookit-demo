@@ -2,7 +2,8 @@ import { and, eq } from 'drizzle-orm';
 import { bookings, slots } from '@/db/schema';
 import { isUniqueViolation } from '../errors';
 import { loadClinicSettings } from '../settings';
-import { findBookableSlot } from '../slots/queries';
+import { findBookableSlot, isSlotBlocked } from '../slots/queries';
+import { lockPractitioner } from '../practitioners';
 import type { BookingDependencies } from './book';
 import { BookingError } from './errors';
 import { findBookingForPatient, isUuid, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
@@ -24,6 +25,9 @@ export async function rescheduleBooking(
   const now = deps.clock.now();
   const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
+    const target = await findBookableSlot(tx, request.newSlotId);
+    // All booking writes take the practitioner lock before any booking row lock.
+    if (target) await lockPractitioner(tx, target.practitionerId);
     const [locked] = await tx
       .select({
         status: bookings.status,
@@ -39,10 +43,10 @@ export async function rescheduleBooking(
       throw new BookingError('booking_not_found');
     }
     assertReschedulable(locked, request.newSlotId, now, settings);
-    const target = await findBookableSlot(tx, request.newSlotId);
     if (!target) {
       throw new BookingError('slot_not_found');
     }
+    if (await isSlotBlocked(tx, target)) throw new BookingError('slot_blocked');
     assertSlotBookable(target.startsAt, now, settings);
     try {
       await tx

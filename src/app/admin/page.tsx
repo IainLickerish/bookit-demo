@@ -33,6 +33,11 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
     <section>
       <h1>Clinic bookings</h1>
       <p>
+        <Link href="/admin/blocks" prefetch={false} className="underline" data-testid="admin-blocks-link">
+          Block out time
+        </Link>
+      </p>
+      <p>
         <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
           Clinic settings
         </Link>
