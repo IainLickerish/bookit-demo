@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 export async function step<T>(page: Page, name: string, body: () => Promise<T>): Promise<T> {
@@ -148,4 +149,16 @@ export async function resetLink(address: string, seen: string[] = []): Promise<{
     )
     .not.toBe('');
   return found;
+}
+
+/** Download the currently filtered bookings through the staff page. */
+export async function downloadBookings(page: Page): Promise<string> {
+  const downloading = page.waitForEvent('download');
+  await page.getByTestId('admin-export').click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toBe('bookings.csv');
+  expect(await download.failure()).toBeNull();
+  const path = await download.path();
+  expect(path, 'the bookings file is downloaded').not.toBeNull();
+  return readFile(path!, 'utf8');
 }

@@ -168,8 +168,22 @@ test('REQ-18.2-01 admin pages and downloaded exports contain only their own seed
       await page.goto(`${clinic.url}/admin`);
       await expect(page.locator('table')).toContainText(ownName);
       await expect(page.locator('table')).not.toContainText(foreignName);
-      // Ordinary export coverage uses an empty selection; the seeded Unicode
-      // export regression is exercised externally by SupportAgents' DEF-02 test.
+      await page.getByTestId('admin-date').fill('2026-10-20');
+      await page.getByTestId('admin-status').selectOption('confirmed');
+      await page.getByTestId('admin-filter').click();
+      const expectedRows = await page.getByTestId('admin-booking-row').count();
+      expect(expectedRows).toBeGreaterThan(0);
+      const downloading = page.waitForEvent('download');
+      await page.getByTestId('admin-export').click();
+      const download = await downloading;
+      expect(download.suggestedFilename()).toBe('bookings.csv');
+      expect(await download.failure()).toBeNull();
+      const downloaded = readFileSync((await download.path())!);
+      expect([...downloaded.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+      const text = downloaded.toString('utf8');
+      expect(text).toContain(ownName);
+      expect(text).not.toContain(foreignName);
+      expect(text.trimEnd().split('\r\n')).toHaveLength(expectedRows + 1);
       const exported = await context.request.get(`${clinic.url}/api/admin/export?date=2026-10-21&status=cancelled`);
       expect(exported.status()).toBe(200);
       const csv = await exported.body();

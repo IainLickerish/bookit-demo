@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { users } from '@/db/schema';
+import { bookings, users } from '@/db/schema';
 import { createSession } from '@/server/auth/session';
 import { adminReportResponse } from '@/server/admin/http';
 import { updateAdminSettings } from '@/server/admin/settings';
@@ -76,7 +76,7 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
 }
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
-  it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
+  it('exports fictional Unicode names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
@@ -104,6 +104,31 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     expect(await summary.json()).toEqual({ total: 1, confirmed: 0, cancelled: 1, lateCancellations: 1 });
     const empty = await report(`type=bookings&practitionerId=${clinic.practitioners.weekdays}`, adminToken, 'report');
     expect(await empty.json()).toEqual({ bookings: [] });
+  });
+  it('exports exactly the filtered Unicode bookings or only headings, without changing stored records', async () => {
+    const before = await acme.db.select().from(bookings).orderBy(bookings.id);
+    const namesBefore = await acme.db.select().from(users).orderBy(users.id);
+    for (const [status, index] of [
+      ['confirmed', 1],
+      ['cancelled', 2],
+    ] as const) {
+      const response = await report(`practitionerId=${fixture.practitionerId}&date=2026-10-25&status=${status}`);
+      expect(response.status).toBe(200);
+      const csv = Buffer.from(await response.arrayBuffer()).toString('utf8');
+      expect(csv.trimEnd().split('\r\n')).toHaveLength(2);
+      expect(csv).toContain(`"${fixture.bookingIds[index]}"`);
+      expect(csv).toContain(`"${ADMIN_PATIENT_NAMES[index]}"`);
+      for (const id of fixture.bookingIds.filter((id) => id !== fixture.bookingIds[index])) {
+        expect(csv).not.toContain(id);
+      }
+    }
+    const empty = await report(`practitionerId=${clinic.practitioners.weekdays}&date=2026-10-25&status=confirmed`);
+    expect(empty.status).toBe(200);
+    expect(Buffer.from(await empty.arrayBuffer()).toString('utf8')).toBe(
+      '\uFEFF"Booking ID","Patient","Practitioner","Start (UTC)","End (UTC)","Status","Late cancellation","Phone"\r\n',
+    );
+    expect(await acme.db.select().from(bookings).orderBy(bookings.id)).toEqual(before);
+    expect(await acme.db.select().from(users).orderBy(users.id)).toEqual(namesBefore);
   });
   it('refuses missing, forged, expired and patient sessions before reading data', async () => {
     for (const token of ['', 'forged', patientToken]) {

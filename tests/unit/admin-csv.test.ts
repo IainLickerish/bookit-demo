@@ -9,7 +9,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
     const csv = bookingsCsv([
       {
         id: 'booking-1',
-        patientName: 'Zoe Bronte, "Lukasz"\nSiobhan O Briain',
+        patientName: 'Zoë Brontë, "Łukasz"\nSiobhán Ó Briain',
         practitionerId: 'p1',
         practitionerName: 'Pat',
         startsAt: new Date('2026-10-25T09:00:00Z'),
@@ -22,11 +22,34 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
     const bytes = Buffer.from(csv, 'utf8');
     expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     expect(bytes.toString('utf8')).toBe(csv);
-    expect(csv).toContain('"Zoe Bronte, ""Lukasz""\nSiobhan O Briain"');
+    expect(csv).toContain('"Zoë Brontë, ""Łukasz""\nSiobhán Ó Briain"');
     expect(csv).toContain('"2026-10-25T09:00:00.000Z"');
     expect(csv.endsWith('\r\n')).toBe(true);
     expect(bookingsCsv([]).split('\r\n')).toHaveLength(2);
   });
+  it.each(['Zoë Brontë', 'Łukasz Wiśniewski', 'Siobhán Ó Briain', '李小明', 'سارة', 'Zoe\u0308'])(
+    'preserves Unicode spelling, existing columns and stored values for %s',
+    (patientName) => {
+      const row = {
+        id: 'booking-unicode',
+        patientName,
+        practitionerId: 'p1',
+        practitionerName: 'Dr Élodie, "Clinic"',
+        startsAt: new Date('2026-10-25T01:15:00Z'),
+        endsAt: new Date('2026-10-25T02:00:00Z'),
+        status: 'cancelled' as const,
+        lateCancellation: true,
+        phone: '+44 7700 900123',
+      };
+      const before = structuredClone(row);
+      const csv = bookingsCsv([row]);
+      expect(csv).toBe(
+        '\uFEFF"Booking ID","Patient","Practitioner","Start (UTC)","End (UTC)","Status","Late cancellation","Phone"\r\n' +
+          `"booking-unicode","${patientName}","Dr Élodie, ""Clinic""","2026-10-25T01:15:00.000Z","2026-10-25T02:00:00.000Z","cancelled","yes","'+44 7700 900123"\r\n`,
+      );
+      expect(row).toEqual(before);
+    },
+  );
   it.each(['=1+1', '+SUM(1,2)', '-1+2', '@SUM(1,2)', '  =HYPERLINK("x")', '\t=1+1', '\r=1+1'])(
     'exports formula-leading text as inert quoted text: %j',
     (value) => {
