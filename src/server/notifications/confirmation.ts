@@ -60,7 +60,7 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
       {
         filename: 'booking.ics',
         content: bookingCalendar(booking, settings),
-        contentType: 'text/calendar; charset=utf-8; method=PUBLISH',
+        contentType: 'text/calendar; charset=utf-8',
       },
     ],
   };

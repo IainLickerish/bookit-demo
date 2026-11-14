@@ -84,14 +84,14 @@ describe('calendar imports', () => {
       expect(email.attachments).toEqual([
         {
           filename: 'booking.ics',
-          contentType: 'text/calendar; charset=utf-8; method=PUBLISH',
+          contentType: 'text/calendar; charset=utf-8',
           content: bookingCalendar(booking, settings),
         },
       ]);
       expect(email.text).toContain('Duration: 45 minutes');
       expect(email.text.startsWith(`${settings.clinicName}\n`)).toBe(true);
       expect(email.subject).toMatch(moved ? /^Booking moved:/ : /^Booking confirmed:/);
-      expect(email.attachments![0]!.content).not.toMatch(/900123|Calendar Client|calendar@|ATTENDEE|ORGANIZER/);
+      expect(email.attachments![0]!.content).not.toMatch(/900123|Calendar Client|calendar@|ATTENDEE|ORGANIZER|METHOD:/);
     }
   });
 });

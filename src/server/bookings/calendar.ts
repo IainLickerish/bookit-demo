@@ -36,7 +36,11 @@ function calendarInstant(instant: Date): string {
     .replace(/\.\d{3}Z$/, 'Z');
 }
 
-/** A portable calendar import, without patient details or an invitation to anyone else. */
+/**
+ * A portable calendar import, without patient details or scheduling messages.
+ * RFC 5545 section 3.7.2: omitting METHOD makes this a snapshot for manual import.
+ * https://www.rfc-editor.org/rfc/rfc5545.html#section-3.7.2
+ */
 export function bookingCalendar(booking: BookingView, settings: ClinicSettings): string {
   const duration = (booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000;
   const description = [
@@ -50,7 +54,6 @@ export function bookingCalendar(booking: BookingView, settings: ClinicSettings):
       'VERSION:2.0',
       'PRODID:-//BookIt//Booking calendar//EN',
       'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
       'BEGIN:VEVENT',
       `UID:${booking.id}@bookit.test`,
       `DTSTAMP:${calendarInstant(booking.updatedAt)}`,

@@ -36,7 +36,7 @@ export async function calendarDownloadResponse(
     return new Response(bookingCalendar(booking, settings), {
       headers: {
         ...privateHeaders,
-        'Content-Type': 'text/calendar; charset=utf-8; method=PUBLISH',
+        'Content-Type': 'text/calendar; charset=utf-8',
         'Content-Disposition': 'attachment; filename="booking.ics"',
       },
     });

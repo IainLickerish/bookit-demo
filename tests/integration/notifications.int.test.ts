@@ -126,7 +126,7 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
     expect(smtp.messages).toHaveLength(2);
     for (const [index, saved] of [booking, moved].entries()) {
       const raw = smtp.messages[index]!.raw;
-      expect(raw).toMatch(/Content-Type: text\/calendar; charset=utf-8; method=PUBLISH/i);
+      expect(raw).toMatch(/Content-Type: text\/calendar; charset=utf-8/i);
       expect(raw).toMatch(/Content-Disposition: attachment; filename=booking.ics/i);
       // Nodemailer encodes file attachments as base64, independently of the text part.
       const part = raw.split(/(?=Content-Type: text\/calendar)/i)[1]!;

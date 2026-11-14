@@ -17,7 +17,7 @@ than a real mail service. If a message is missing, check **My bookings** at
 `bella@beacondental.test`.
 
 Booking and move emails include a `booking.ics` calendar file with the clinic,
-practitioner, date, time and appointment length. Open it in Google Calendar, Outlook
+clinician, date, time and appointment length. Open it in Google Calendar, Outlook
 or Apple Calendar. The calendar shows the correct UK time when set to Europe/London;
 if you travel, your calendar may show the equivalent local time.
 

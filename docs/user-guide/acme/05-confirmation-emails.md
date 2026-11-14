@@ -17,7 +17,7 @@ your current appointment status if an email is missing. Ask Alice Archer at
 `alice@acmephysio.test` for clinic assistance.
 
 Booking and move emails include a `booking.ics` calendar file with the clinic,
-practitioner, date, time and session length. Open it in Google Calendar, Outlook
+physiotherapist, date, time and session length. Open it in Google Calendar, Outlook
 or Apple Calendar. The calendar shows the correct UK time when set to Europe/London;
 if you travel, your calendar may show the equivalent local time.
 

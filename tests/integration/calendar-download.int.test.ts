@@ -58,7 +58,7 @@ describe('private client calendar downloads for both clinics', () => {
     const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: (await freeSlots(index))[0]!.id });
     const response = await calendarDownloadResponse(database.db, clock, ownerToken, booking.id);
     expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toBe('text/calendar; charset=utf-8; method=PUBLISH');
+    expect(response.headers.get('content-type')).toBe('text/calendar; charset=utf-8');
     expect(response.headers.get('content-disposition')).toBe('attachment; filename="booking.ics"');
     expect(await response.text()).toBe(bookingCalendar(booking, clinic.settings));
     for (const [token, status] of [
@@ -114,7 +114,8 @@ describe('private client calendar downloads for both clinics', () => {
   it('refuses cancelled and past bookings and expired sessions', async () => {
     const { database, clinic, deps, ownerToken } = clinics[0]!;
     const slots = await freeSlots(0);
-    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slots[0]!.id });
+    const cancellable = slots.find((slot) => slot.startsAt > new Date('2026-10-22T07:00:00Z'))!;
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: cancellable.id });
     await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
     expect((await calendarDownloadResponse(database.db, clock, ownerToken, booking.id)).status).toBe(404);
     const past = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slots[1]!.id });
