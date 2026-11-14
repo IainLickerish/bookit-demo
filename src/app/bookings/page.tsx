@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
-import { formatSlot } from '@/lib/time';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
+import { DateTile } from '../date-tile';
+import { SlotText } from '../slot-text';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
 
@@ -29,21 +30,25 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+      className="card booking-list-card"
       data-testid="booking-row"
       data-booking-id={booking.id}
       data-status={booking.status}
     >
-      <div>
-        <p className="font-medium" data-testid="booking-when">
-          {formatSlot(booking.startsAt, settings.timeZone)}
+      <DateTile instant={booking.startsAt} timeZone={settings.timeZone} />
+      <div className="booking-copy">
+        <p className="booking-time" data-testid="booking-when">
+          <SlotText instant={booking.startsAt} timeZone={settings.timeZone} />
         </p>
-        <p className="text-sm text-slate-600">
-          With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
+        <p className="booking-practitioner">
+          With {booking.practitionerName} ·{' '}
+          <span className={`status-pill status-${booking.status}`} data-testid="booking-status">
+            {statusText(booking)}
+          </span>
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="booking-actions">
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -64,8 +69,10 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   );
 
   return (
-    <section>
-      <h1>My bookings</h1>
+    <section className="client-page">
+      <header className="page-header" data-testid="client-page-header">
+        <h1>My bookings</h1>
+      </header>
       {notice ? (
         <p role="status" className="notice" data-testid="notice">
           {notice}
@@ -78,7 +85,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       ) : null}
       <h2>Upcoming</h2>
       {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">
+        <p className="card empty-state" data-testid="no-upcoming">
           You have no upcoming appointments.{' '}
           <Link href="/slots" prefetch={false} className="underline">
             Book one
@@ -86,14 +93,14 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           .
         </p>
       ) : (
-        <ul className="space-y-2" data-testid="upcoming-bookings">
+        <ul className="booking-list" data-testid="upcoming-bookings">
           {upcoming.map((b) => row(b, true))}
         </ul>
       )}
       {others.length > 0 ? (
         <>
           <h2>Past and cancelled</h2>
-          <ul className="space-y-2" data-testid="other-bookings">
+          <ul className="booking-list" data-testid="other-bookings">
             {others.map((b) => row(b, false))}
           </ul>
         </>

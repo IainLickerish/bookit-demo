@@ -39,14 +39,16 @@ export default async function ReschedulePage({
   const path = `/bookings/${booking.id}/reschedule`;
 
   return (
-    <section>
-      <h1>Reschedule your appointment</h1>
+    <section className="client-page booking-step">
+      <header className="page-header" data-testid="client-page-header">
+        <h1>Reschedule your appointment</h1>
+      </header>
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
         </p>
       ) : null}
-      <p className="mb-2">
+      <p className="card current-booking">
         Currently booked:{' '}
         <span className="font-medium" data-testid="current-when">
           {formatSlot(booking.startsAt, view.settings.timeZone)}
@@ -63,14 +65,16 @@ export default async function ReschedulePage({
         </p>
       ) : (
         <>
-          <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
+          <p className="move-limit" data-testid="reschedules-remaining">
             You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
           </p>
           <DayPicker view={view} path={path} />
           {choices.length === 0 ? (
-            <p data-testid="no-slots">No free times on this day. Try another day.</p>
+            <p className="card empty-state" data-testid="no-slots">
+              No free times on this day. Try another day.
+            </p>
           ) : (
-            <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
+            <ul className="time-grid" data-testid="slot-list">
               {choices.map((slot) => (
                 <li key={slot.id}>
                   <form action={rescheduleAction}>
@@ -78,7 +82,7 @@ export default async function ReschedulePage({
                     <input type="hidden" name="newSlotId" value={slot.id} />
                     <button
                       type="submit"
-                      className="button-secondary w-full"
+                      className="button-secondary time-choice"
                       data-testid="reschedule-to"
                       data-slot-id={slot.id}
                       data-starts-at={slot.startsAt.toISOString()}
@@ -92,7 +96,7 @@ export default async function ReschedulePage({
           )}
         </>
       )}
-      <p className="mt-6 text-sm">
+      <p className="page-back-link">
         <Link href="/bookings" prefetch={false} className="underline">
           Back to my bookings
         </Link>

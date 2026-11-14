@@ -8,9 +8,11 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
   const dayLink = (date: string) => `${path}?${new URLSearchParams({ practitioner: practitionerId, date }).toString()}`;
   const previous = addDaysToLocalDate(view.date, -1);
   const next = addDaysToLocalDate(view.date, 1);
+  const shownDate = formatLocalDate(view.date);
+  const dateBreak = shownDate.indexOf(',') + 1;
   return (
-    <div className="mb-6 space-y-4">
-      <form method="get" action={path} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+    <div className="day-picker">
+      <form method="get" action={path} className="card day-filters" data-testid="day-filters">
         <label>
           Practitioner
           <select name="practitioner" defaultValue={practitionerId} data-testid="practitioner-select">
@@ -32,11 +34,13 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
             data-testid="date-input"
           />
         </label>
-        <button type="submit" className="button-secondary" data-testid="show-slots">
-          Show times
-        </button>
+        <div className="mobile-action-bar" data-testid="day-action-bar">
+          <button type="submit" className="button" data-testid="show-slots">
+            Show times
+          </button>
+        </div>
       </form>
-      <div className="flex items-center justify-between text-sm">
+      <div className="day-navigation" data-testid="day-navigation">
         {view.date > view.today ? (
           <Link href={dayLink(previous)} prefetch={false} data-testid="previous-day">
             ← Previous day
@@ -44,8 +48,8 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
         ) : (
           <span />
         )}
-        <span className="font-medium" data-testid="shown-date">
-          {formatLocalDate(view.date)}
+        <span className="chosen-day" data-testid="shown-date" aria-current="date">
+          <span>{shownDate.slice(0, dateBreak)}</span> <span>{shownDate.slice(dateBreak).trimStart()}</span>
         </span>
         {view.date < view.lastDate ? (
           <Link href={dayLink(next)} prefetch={false} data-testid="next-day">

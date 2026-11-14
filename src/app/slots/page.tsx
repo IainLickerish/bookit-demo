@@ -15,19 +15,23 @@ export default async function SlotsPage({ searchParams }: { searchParams: Search
     date: single(params.date),
   });
   return (
-    <section>
-      <h1>Book an appointment</h1>
+    <section className="client-page booking-step">
+      <header className="page-header" data-testid="client-page-header">
+        <h1>Book an appointment</h1>
+      </header>
       <DayPicker view={view} path="/slots" />
       {view.slots.length === 0 ? (
-        <p data-testid="no-slots">No free times on this day. Try another day.</p>
+        <p className="card empty-state" data-testid="no-slots">
+          No free times on this day. Try another day.
+        </p>
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
+        <ul className="time-grid" data-testid="slot-list">
           {view.slots.map((slot) => (
             <li key={slot.id}>
               <Link
                 href={`/book/${slot.id}`}
                 prefetch={false}
-                className="button-secondary block text-center"
+                className="button-secondary time-choice"
                 data-testid="slot-link"
                 data-slot-id={slot.id}
                 data-starts-at={slot.startsAt.toISOString()}

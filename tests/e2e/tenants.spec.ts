@@ -156,6 +156,44 @@ test('both clinic names and role-specific shared navigation fit phones and lapto
   }
 });
 
+test('both clinics use the client cards and phone actions without changing their labels', async ({ browser }) => {
+  test.setTimeout(90_000);
+  for (const clinic of [acme, beacon]) {
+    const context = await browser.newContext({ viewport: { width: 320, height: 740 } });
+    try {
+      const page = await context.newPage();
+      await page.goto(`${clinic.url}/auth/sign-in`);
+      await expect(page.getByTestId('account-card')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+      await page.getByTestId('forgot-password-link').click();
+      await expect(page.getByTestId('account-card')).toHaveCSS('max-width', '440px');
+      await expect(page.getByTestId('forgot-password-submit')).toHaveText('Email me a reset link');
+      const email = clinic.tenant.accounts.find((account) => account.email.startsWith('patient1@'))!.email;
+      await page.goto(`${clinic.url}/auth/sign-in`);
+      await page.getByTestId('sign-in-email').fill(email);
+      await page.getByTestId('sign-in-password').fill(clinic.accounts[email]!);
+      await page.getByTestId('sign-in-submit').click();
+      await expect(page.getByRole('heading', { name: 'My bookings', exact: true })).toBeVisible();
+      const seeded = page.getByTestId('upcoming-bookings').getByTestId('booking-row');
+      await expect(seeded).toHaveCSS('border-radius', '20px');
+      await expect(seeded.getByTestId('booking-status')).toHaveText('Confirmed');
+      await expect(seeded.getByTestId('booking-date-tile')).toHaveAttribute('aria-hidden', 'true');
+      await page.getByTestId('nav-book').click();
+      await expect(page.getByTestId('day-action-bar')).toHaveCSS('position', 'fixed');
+      const choice = page.getByTestId('slot-link').filter({ hasText: '09:00' });
+      await choice.click();
+      await expect(page.getByTestId('booking-card')).toHaveCSS('max-width', '440px');
+      await expect(page.getByTestId('confirm-booking')).toHaveText('Confirm booking');
+      await expect(page.getByTestId('booking-action-bar')).toHaveCSS('position', 'fixed');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await expect(page.getByTestId('booking-action-bar')).toHaveCSS('position', 'static');
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test('REQ-18.1-06 both local Compose tenants expose distinct identity, virtual time and local SDK receipt', async () => {
   for (const clinic of [acme, beacon]) {
     const publicOrigin = await clinic.command(['exec', '-T', 'bookit', 'node', '-p', 'process.env.BOOKIT_PUBLIC_URL']);

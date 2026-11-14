@@ -4,9 +4,8 @@ BookIt feels calm, assured, warm and quietly premium, like a well-kept private c
 its configured name is the wordmark, with no separate logo. BookIt has its own look, without the Software Factory's
 dark banners, cartoon people or teal. This guide follows the Design policy reviewed on 12 November 2026.
 
-The shared foundation is in place. Individual page layouts, booking cards, day and time choices, mobile action
-bars and page introductions are applied in the later client and staff presentation steps. Those steps preserve
-existing wording and journeys. Emails stay plain text.
+The shared foundation and client and account presentation are in place. Staff booking and settings pages and
+fallback screens are the next presentation step. Existing wording and journeys are preserved. Emails stay plain text.
 
 ## Colours
 
@@ -70,9 +69,11 @@ sections. Tables and phone day strips scroll inside their own areas, never acros
 Reuse the classes in `src/app/globals.css`, rather than creating one-off styles (EN-4).
 
 - `page-header`: a short introduction with the serif title and an existing line explaining the page. An optional
-  `eyebrow` sits above the title. Page-specific introductions are part of the later steps.
+  `eyebrow` can sit above the title. Use existing introductory words where available, without inventing new
+  subtitles in this visual change.
 - `card`: white, 20px corners, a hairline border, 24px padding and a soft, low shadow. Never nest cards. Sign-in and
-  booking confirmation will each use one centred card up to 440px wide in the client presentation step.
+  booking confirmation each use one centred card up to 440px wide. Password recovery, password choice and invalid
+  reset links use that same account card, including their existing notices and errors.
 - `button`: pine with white words, pill corners and at least 48px height. Use one main action per step.
 - `button-secondary`: a white pill with a fine outline and pine words. Allow at most two quieter actions. The
   quietest choice is an underlined pine link.
@@ -82,10 +83,30 @@ Reuse the classes in `src/app/globals.css`, rather than creating one-off styles 
 - `alert`: a pale brick banner with brick text and a decorative outline attention icon. Keep the existing error
   announcement. Icons accompany words and never supply meaning alone.
 
-Later page presentation uses the same policy components: 48px pill time choices with a tick when selected;
-small day cards with a clay today dot and a pine selected outline on stone; booking cards with sage date tiles;
-and Confirmed, Cancelled and Needs attention status pills. Empty lists keep a calm explanation and a useful action.
-Booking steps will have a phone action bar with enough content space above it (DS-4, DS-5).
+## Client and account screens
+
+The home redirects stay as they are: visitors go to sign-in, clients to My bookings and staff see their existing
+administration message. Client pages open with the serif title, and existing notices remain near the top.
+
+- Day controls sit in a white card. The existing previous and next day links surround the chosen day, with its
+  day name above the date, a stone fill and a pine outline. The date picker and available dates keep their rules.
+  This step does not add another day strip or new date navigation.
+- Free times are pill choices with even-width figures. Keep the complete clinic-local date and time, including
+  when a choice wraps on a phone. Choosing a time opens confirmation; a move choice still submits the move
+  immediately. Do not introduce an extra selection or confirmation step as part of the reskin.
+- On phones, Show times and Confirm booking sit in a white bar fixed to the bottom. Leave space after the content
+  and when scrolling to fields or links so the bar cannot cover the last item. On larger screens the same actions
+  sit with their forms. The existing move-time buttons remain in their list.
+- Booking cards show a sage date tile, the complete date with an emphasised time, practitioner and written status.
+  Confirmed is pine on sage; Cancelled, including the existing late label, is muted on stone. Dates in decorative
+  tiles use the clinic's time zone and are hidden from screen readers because the full date is already alongside.
+- Reschedule and Cancel stay with the relevant upcoming booking. Empty bookings and availability keep their
+  existing explanations and ways onward, presented on a white surface. Unavailable times, limits and errors
+  keep their existing words and actions.
+
+The shared header remains the one small clay accent. No new pictures or motion are needed for these screens
+(DS-2 to DS-6). The unchanged wording takes precedence over adding subtitles, location details, new rules or
+extra confirmations suggested by a broader policy. Those are separate product decisions, beyond this visual step.
 
 ## Accessibility and decoration
 

@@ -10,9 +10,11 @@ export default async function HomePage() {
     redirect('/bookings');
   }
   return (
-    <section>
-      <h1>Clinic administration</h1>
-      <p data-testid="admin-home">You are signed in as the clinic admin.</p>
+    <section className="card client-page">
+      <header className="page-header">
+        <h1>Clinic administration</h1>
+        <p data-testid="admin-home">You are signed in as the clinic admin.</p>
+      </header>
     </section>
   );
 }
