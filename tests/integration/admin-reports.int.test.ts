@@ -2,11 +2,16 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { users } from '@/db/schema';
+import { bookings, users } from '@/db/schema';
 import { createSession } from '@/server/auth/session';
 import { adminReportResponse } from '@/server/admin/http';
 import { updateAdminSettings } from '@/server/admin/settings';
+import { listAdminBookings } from '@/server/admin/bookings';
+import { bookSlot } from '@/server/bookings/book';
+import { cancelBooking } from '@/server/bookings/cancel';
+import { findBookingForPatient } from '@/server/bookings/queries';
 import { loadClinicSettings } from '@/server/settings';
+import { listAvailableSlots } from '@/server/slots/queries';
 import { createUser } from '@/server/users';
 import { seedAdminBookings, ADMIN_PATIENT_NAMES } from '../helpers/admin-fixture';
 import { adminEvidenceContext, adminLogEvidence } from '../helpers/admin-evidence';
@@ -14,6 +19,7 @@ import { seedClinic, TEST_PASSWORD, type SeededClinic } from '../helpers/clinic'
 import { manualClock } from '../helpers/clock';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { captureLogs } from '../helpers/logs';
+import { testMail } from '../helpers/mail';
 
 let acme: TestDatabase;
 let beacon: TestDatabase;
@@ -76,6 +82,33 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
 }
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
+  it('keeps late cancellations in their own clinic and staff reports private', async () => {
+    const deps = { db: acme.db, clock, log: logs.log, mail: testMail() };
+    const [slot] = await listAvailableSlots(acme.db, {
+      practitionerId: clinic.practitioners.weekdays,
+      after: clock.now(),
+      until: new Date('2026-10-20T23:00:00Z'),
+    });
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot!.id });
+    try {
+      const beaconBefore = await listAdminBookings(beacon.db, {}, clinic.settings.timeZone);
+      await expect(
+        cancelBooking({ ...deps, db: beacon.db }, { patientId: clinic.patient1.id, bookingId: booking.id }),
+      ).rejects.toMatchObject({ code: 'booking_not_found' });
+      expect(await findBookingForPatient(acme.db, clinic.patient1.id, booking.id)).toEqual(booking);
+
+      await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
+      expect(await listAdminBookings(beacon.db, {}, clinic.settings.timeZone)).toEqual(beaconBefore);
+      const response = await report('type=bookings&date=2026-10-20&status=cancelled', adminToken, 'report');
+      expect(await response.json()).toMatchObject({
+        bookings: [expect.objectContaining({ id: booking.id, status: 'cancelled', lateCancellation: true })],
+      });
+      expect((await report('type=bookings&status=cancelled', patientToken, 'report')).status).toBe(403);
+    } finally {
+      await acme.db.delete(bookings).where(eq(bookings.id, booking.id));
+    }
+  });
+
   it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);
