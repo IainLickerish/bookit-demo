@@ -60,6 +60,30 @@ beforeEach(async () => {
 });
 
 describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () => {
+  it('a late cancellation releases its time but concurrent clients cannot both rebook it', async () => {
+    const available = await listAvailableSlots(database.db, {
+      practitionerId: clinic.practitioners.weekdays,
+      after: clock.now(),
+      until: new Date('2026-10-20T23:00:00Z'),
+    });
+    const slotId = available.find((slot) => slot.startsAt.toISOString() === '2026-10-20T09:30:00.000Z')!.id;
+    const deps = { db: database.db, clock, log: captureLogs(clock).log, mail: testMail() };
+    const original = await bookSlot(deps, { patientId: clinic.patient1.id, slotId });
+    await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: original.id });
+    expect(await confirmedCount(slotId)).toBe(0);
+
+    const results = await Promise.allSettled([
+      bookSlot(deps, { patientId: clinic.patient2.id, slotId }),
+      bookSlot(deps, { patientId: clinic.extraPatientIds[0]!, slotId }),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const refused = results.find((result) => result.status === 'rejected');
+    expect(refused?.reason).toMatchObject({ code: 'slot_unavailable' });
+    expect(await confirmedCount(slotId)).toBe(1);
+    const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, original.id));
+    expect(stored).toMatchObject({ status: 'cancelled', lateCancellation: true });
+  });
+
   it('the database constraint lets only one of two parallel transactions confirm the same slot', async () => {
     const [slotId] = await freeSlotIds(1);
     const [first, second] = [new Client(database.url), new Client(database.url)];
