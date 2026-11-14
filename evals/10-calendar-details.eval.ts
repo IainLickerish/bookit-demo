@@ -82,13 +82,12 @@ async function returnToBookings(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'My bookings', exact: true })).toBeVisible();
 }
 
-// Traverse the actual client navigation history without a reload or fresh visit.
-async function backToCalendar(page: Page, path: string): Promise<void> {
-  for (let visits = 0; visits < 6; visits++) {
-    await page.goBack();
-    if (new URL(page.url()).pathname === path) break;
-  }
-  await expect(page).toHaveURL(new RegExp(`${path}$`));
+// A same-document Back returns before React has restored the destination.
+// Wait for each screen before going back again, as a person would.
+async function backTo(page: Page, path: string, heading: string): Promise<void> {
+  await page.goBack();
+  await expect(page).toHaveURL(new URL(path, page.url()).href);
+  await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
 }
 
 function ukWhen(instant: Date): string {
@@ -231,7 +230,9 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       },
     );
     await step(page, 'Use browser Back to revisit the earlier summary and copy the saved new time', async () => {
-      await backToCalendar(page, path);
+      await backTo(page, `/bookings/${appointment.id}/reschedule`, 'Reschedule your appointment');
+      await backTo(page, '/bookings', 'My bookings');
+      await backTo(page, path, 'Add to calendar');
       const details = await page.getByTestId('calendar-details').inputValue();
       await copyAndCheck(page, details);
       expect(details).toContain(`Start: ${moved.when}`);
@@ -248,7 +249,9 @@ test('Clients can copy calendar details after booking or moving and from upcomin
       const row = bookingRow(page, 'other-bookings', moved.when);
       await expect(row.getByTestId('booking-status')).toHaveText('Cancelled');
       await expect(row.getByTestId('add-to-calendar')).toHaveCount(0);
-      await backToCalendar(page, path);
+      await backTo(page, '/bookings', 'My bookings');
+      await page.goBack();
+      await expect(page).toHaveURL(new URL(path, page.url()).href);
       await expect(page.getByTestId('not-found')).toBeVisible();
       await expect(page.getByTestId('calendar-details')).toHaveCount(0);
     });
