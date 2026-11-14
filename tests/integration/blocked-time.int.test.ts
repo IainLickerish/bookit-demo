@@ -28,6 +28,7 @@ import {
   reviewBlockedTime,
 } from '@/server/admin/blocked-time';
 import { bookSlot } from '@/server/bookings/book';
+import { cancelBooking } from '@/server/bookings/cancel';
 import { lockDiary } from '@/server/bookings/diary-lock';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
@@ -197,6 +198,30 @@ describe('staff blocked time and cancellations', () => {
     await expect(
       confirmBlockedTime(database.db, clock, clinic.admin.id, values(), randomUUID(), second.snapshot),
     ).rejects.toMatchObject({ code: 'changed' });
+  });
+
+  it('requires another review after a client cancels an affected booking and preserves that cancellation', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: (await targetSlot()).id });
+    const checked = await reviewBlockedTime(database.db, clock, clinic.admin.id, values());
+    expect(checked.affected.map((affected) => affected.id)).toEqual([booking.id]);
+
+    await cancelBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id });
+    const cancelled = await findBookingForPatient(database.db, clinic.patient1.id, booking.id);
+    expect(cancelled?.status).toBe('cancelled');
+    const id = randomUUID();
+    await expect(
+      confirmBlockedTime(database.db, clock, clinic.admin.id, values(), id, checked.snapshot),
+    ).rejects.toMatchObject({ code: 'changed' });
+    expect(await database.db.select().from(blockedPeriods)).toHaveLength(0);
+    expect(await database.db.select().from(blockedCancellations)).toHaveLength(0);
+    expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toEqual(cancelled);
+
+    const refreshed = await reviewBlockedTime(database.db, clock, clinic.admin.id, values());
+    expect(refreshed.affected).toHaveLength(0);
+    await confirmBlockedTime(database.db, clock, clinic.admin.id, values(), id, refreshed.snapshot);
+    expect(await getBlockedTime(database.db, clinic.admin.id, id)).toMatchObject({ id });
+    expect((await listBlockCancellations(database.db, clinic.admin.id, id)).cancellations).toHaveLength(0);
+    expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toEqual(cancelled);
   });
 
   it('rolls back both the block and cancellations when any save fails', async () => {

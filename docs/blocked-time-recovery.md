@@ -63,56 +63,49 @@ Existing demo databases do not need replacement or reseeding from scratch.
 
 ## Verification in this workspace
 
-Verification repeated on 13 November 2026, starting from commit `255ada3`,
-with Node 24.22.2, Bun 1.4.4 and actionlint 1.7.12. The branch already contained
-the cancellation pagination and index requested by the reviewer. This round
-reviewed that implementation and reran checks; it made no further application,
-migration or test changes.
+Verification repeated on 14 November 2026, starting from commit `22b731a`,
+with Node 24.22.2, Bun 1.4.4 and actionlint 1.7.12. The review covered the whole
+step 1 change already on this branch. No further application or migration changes
+were needed. A regression check now also covers a client cancelling after staff
+review: the stale confirmation must save nothing, preserve that cancellation,
+and require a fresh review before the block can be saved without attributing the
+client's cancellation to the block. This follows EN-5 and acceptance criterion 5.
 
-| Check                                                                           | Result                                                                                   |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `bun install --frozen-lockfile`                                                 | Passed.                                                                                  |
-| `bun run typecheck`                                                             | Passed.                                                                                  |
-| `bun run lint`                                                                  | Passed.                                                                                  |
-| `bun run format:check`                                                          | Passed.                                                                                  |
-| `bun run test:unit`                                                             | All 147 tests passed.                                                                    |
-| `node node_modules/@playwright/test/cli.js test -c evals/ --list --forbid-only` | All 20 owner checks loaded, including this branch's three new checks.                    |
-| `bun run test:integration`                                                      | Failed: 24 passed, 7 failed and 88 not run after setup failures.                         |
-| `bun x playwright test`                                                         | Failed in PostgreSQL setup before any browser journey ran: no working container runtime. |
-| `bun x playwright install --with-deps chromium`                                 | Failed because dependency installation requires root access.                             |
-| `bun x playwright install chromium`                                             | Failed after download attempts returned HTTP 403.                                        |
+| Check                                                                           | Result                                                                                                                               |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `bun install --frozen-lockfile`                                                 | Passed.                                                                                                                              |
+| `bun run typecheck`                                                             | Passed.                                                                                                                              |
+| `bun run lint`                                                                  | Passed.                                                                                                                              |
+| `bun run format:check`                                                          | Passed.                                                                                                                              |
+| `bun run test:unit`                                                             | All 147 tests passed.                                                                                                                |
+| `node node_modules/@playwright/test/cli.js test -c evals/ --list --forbid-only` | All 20 owner checks loaded, including this branch's three new checks.                                                                |
+| `bun run test:integration`                                                      | Failed: 24 passed, 7 failed and 88 unable to run after setup failures, before adding the extra regression case.                      |
+| Focused blocked-time integration suite                                          | Failed during PostgreSQL setup: no working container runtime. All 38 cases were unable to run, including the added regression check. |
+| `bun x playwright test`                                                         | Failed during PostgreSQL setup before any browser journey ran: no working container runtime.                                         |
 
-Docker and Compose are unavailable, no Docker socket is mounted, and creating a
-user namespace fails with “Operation not permitted”. There is no local
-PostgreSQL installation. These prevent running the unchanged container-based
-checks here; no test has been weakened or marked to skip these requirements.
-The owner checks were listed only, following the factory's instruction to leave
-execution against its already-running copy to the factory. Listing checks does
-not establish that a browser journey passes.
+Docker and Compose are unavailable in this workspace. The full integration suite
+finished in 119 seconds; operational script tests also failed because `jq` is
+missing. The 24 passing tests cover operational behaviour, not blocked time.
+All 11 repository browser checks load with `--list --forbid-only`.
+Container-backed tests
+cannot verify the new tables, upgrades, rollback, simultaneous requests or
+pagination here. No check was changed to bypass setup, skipped in source or
+weakened to obtain a passing result. Vitest reports cases whose setup failed as
+skipped; this does not mean those cases passed.
 
-`bun run test:integration` completed in 127 seconds with a failing exit status.
-All 37 blocked-time checks were unable to run because container setup failed,
-including both clinic upgrades, forced rollback, concurrent requests and
-cancellation pagination. The passing tests cover operational behaviour, not
-blocked time. Operational script tests also fail because `jq` is missing. The
-previous round recorded matching infrastructure failures in an unchanged
-`sf-base` worktree; this round does not claim those failures verify the new work.
-All 11 repository browser checks also load with `--list --forbid-only`, but none
-ran. The existing owner checks and `.github/` remain identical to `sf-base`.
-
-Before approval or merging, EN-2 still requires passing integration and browser
-suites in an environment with Docker, Compose, `jq` and Chromium, plus execution
-of the owner checks by the factory. EN-6 also requires checking recovery in that
-environment. Neither migration safety, atomic cancellation nor simultaneous
-request safety has been verified against PostgreSQL here. Both clinic upgrades,
-forced rollback, all 24 concurrent save orders and every cancellation page still
-need passing runtime results. The recovery procedure above has not been
-rehearsed in this workspace. This verification gap remains an approval blocker.
+The factory owns execution of the owner checks against its prepared Acme copy,
+with its fixed clock and fictional fixtures. They were listed here only, as
+requested. Listing them confirms that all files load, but does not establish
+that their browser journeys pass. EN-2 still requires passing runtime results
+before merging, and the EN-6 recovery procedure above has not been rehearsed in
+this workspace. No permission or additional test run is requested from the owner
+by this build.
 
 The three new owner checks cover review and confirmation, reopening saved blocks
 and paged cancellations, access restrictions, changed impact, retained invalid
 entries and stale booking and move screens. The original demo accounts and
-practitioner remain unchanged. The Compose journeys also cover both clinics'
-words and retaining the chosen practitioner through repeated invalid reviews.
-No owner check from `sf-base` has changed. Only this branch's new blocked-time
-check has been extended to cover cancellation pages.
+practitioner remain unchanged. Repository browser journeys cover both clinics'
+words, clinic separation and cancellation pages. Existing owner checks from
+`sf-base`, their shared support file and `.github/` remain unchanged. Only this
+branch's new blocked-time check was extended in earlier rounds to cover saved
+block and cancellation pages; no owner check changed in this round.
