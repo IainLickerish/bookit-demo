@@ -13,6 +13,7 @@ export function reminderClinics(baseURL: string) {
       practitionerWord: 'physiotherapist',
       appointment: 'session',
       minutes: 45,
+      lateCancellationHours: 24,
     },
   ];
   if (process.env.EVAL_BEACON_BASE_URL) {
@@ -26,6 +27,7 @@ export function reminderClinics(baseURL: string) {
       practitionerWord: 'clinician',
       appointment: 'appointment',
       minutes: 30,
+      lateCancellationHours: 48,
     });
   }
   return clinics;
