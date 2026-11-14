@@ -86,6 +86,11 @@ test('Account screens present their existing forms and messages in centred white
       await page.getByTestId('reset-password-confirm').fill('demo-password-not-saved-two');
       await page.getByTestId('reset-password-submit').click();
       await expect(page.getByTestId('reset-password-error')).toContainText('The two passwords do not match.');
+      await expect(page.getByTestId('reset-password-confirm')).toHaveAttribute(
+        'aria-describedby',
+        'reset-password-error',
+      );
+      await expect(page.getByTestId('reset-password-confirm')).toHaveAttribute('aria-invalid', 'true');
       await accountCard(page);
     },
   );
@@ -137,6 +142,17 @@ test('On phones, booking controls and confirmation fit the screen with their mai
     await page.setViewportSize({ width: 1440, height: 900 });
     await expect(page.getByTestId('booking-action-bar')).toHaveCSS('position', 'static');
     await fitsScreen(page);
+  });
+  await step(page, 'See the existing optional phone error beside its field', async () => {
+    await page.getByTestId('book-phone').fill('not-a-phone-number');
+    await page.getByTestId('confirm-booking').click();
+    await expect(page.getByTestId('booking-error')).toContainText(
+      'Please enter a valid phone number, or leave it empty.',
+    );
+    await expect(page.getByTestId('book-phone')).toHaveAttribute('aria-describedby', 'book-phone-error');
+    await expect(page.getByTestId('book-phone')).toHaveAttribute('aria-invalid', 'true');
+    await page.getByTestId('book-phone').clear();
+    await whiteCard(page.getByTestId('booking-card'));
   });
   await step(page, 'Confirm on the phone and see the existing booking result', async () => {
     await page.setViewportSize({ width: 320, height: 740 });

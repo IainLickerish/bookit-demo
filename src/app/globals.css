@@ -398,6 +398,13 @@
     gap: 16px;
   }
 
+  .field-error {
+    margin-top: 8px;
+    margin-bottom: 0;
+    padding: 0;
+    background: transparent;
+  }
+
   .form-stack > .button {
     justify-self: start;
   }

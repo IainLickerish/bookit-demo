@@ -52,35 +52,48 @@ export default async function ResetPasswordPage({
       <header className="page-header" data-testid="client-page-header">
         <h1>Choose a new password</h1>
       </header>
-      {message ? (
-        <p role="alert" className="alert" data-testid="reset-password-error">
-          {message}
-        </p>
-      ) : null}
       <form action={completePasswordResetAction} className="form-stack">
         <input type="hidden" name="token" value={token} />
-        <label>
-          New password
-          <input
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            minLength={MIN_PASSWORD_LENGTH}
-            required
-            data-testid="reset-password-new"
-          />
-        </label>
-        <label>
-          Repeat the new password
-          <input
-            name="confirmation"
-            type="password"
-            autoComplete="new-password"
-            minLength={MIN_PASSWORD_LENGTH}
-            required
-            data-testid="reset-password-confirm"
-          />
-        </label>
+        <div>
+          <label>
+            New password
+            <input
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              minLength={MIN_PASSWORD_LENGTH}
+              required
+              aria-invalid={error === 'weak_password' || undefined}
+              aria-describedby={error === 'weak_password' ? 'reset-password-error' : undefined}
+              data-testid="reset-password-new"
+            />
+          </label>
+          {message && error === 'weak_password' ? (
+            <p role="alert" className="alert field-error" id="reset-password-error" data-testid="reset-password-error">
+              {message}
+            </p>
+          ) : null}
+        </div>
+        <div>
+          <label>
+            Repeat the new password
+            <input
+              name="confirmation"
+              type="password"
+              autoComplete="new-password"
+              minLength={MIN_PASSWORD_LENGTH}
+              required
+              aria-invalid={error === 'mismatch' || undefined}
+              aria-describedby={error === 'mismatch' ? 'reset-password-error' : undefined}
+              data-testid="reset-password-confirm"
+            />
+          </label>
+          {message && error === 'mismatch' ? (
+            <p role="alert" className="alert field-error" id="reset-password-error" data-testid="reset-password-error">
+              {message}
+            </p>
+          ) : null}
+        </div>
         <button type="submit" className="button" data-testid="reset-password-submit">
           Set new password
         </button>
