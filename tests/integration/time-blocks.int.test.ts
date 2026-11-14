@@ -5,6 +5,7 @@ import { MIGRATIONS_FOLDER, runMigrations } from '@/db/migrate';
 import { bookings, practitioners, timeBlocks } from '@/db/schema';
 import { saveTimeBlock, listTimeBlocks } from '@/server/admin/time-blocks';
 import { bookSlot } from '@/server/bookings/book';
+import { cancelBooking } from '@/server/bookings/cancel';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { findBookableSlot, isSlotFree, listAvailableSlots, type SlotView } from '@/server/slots/queries';
@@ -102,10 +103,9 @@ describe('blocked practitioner time', () => {
     const empty = await block('2026-10-22T12:00', '2026-10-22T13:00');
     expect((await listTimeBlocks(database.db)).find((row) => row.id === empty)?.affected).toEqual([]);
     // A later cancellation is no longer a conflict; a block never alters it.
-    await database.db
-      .update(bookings)
-      .set({ status: 'cancelled', cancelledAt: clock.now() })
-      .where(eq(bookings.id, first.id));
+    const cancelled = await cancelBooking(deps(), { patientId: clinic.patient1.id, bookingId: first.id });
+    expect(cancelled.booking.status).toBe('cancelled');
+    expect(await isSlotFree(database.db, first.slotId)).toBe(false);
     expect((await listTimeBlocks(database.db)).find((row) => row.id === id)?.affected.map((row) => row.id)).toEqual([
       second.id,
     ]);

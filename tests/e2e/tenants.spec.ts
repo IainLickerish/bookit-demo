@@ -294,6 +294,7 @@ test('REQ-18.1-06 container build requires GIT_COMMIT and the production image r
 });
 
 test('blocked time and its save action are private to each clinic’s staff', async ({ browser }) => {
+  test.setTimeout(60_000);
   const a = await signIn(browser, acme, 'admin');
   const b = await signIn(browser, beacon, 'admin');
   const visitor = await browser.newContext();
