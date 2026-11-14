@@ -36,8 +36,8 @@ interface Appointment {
 // These helpers only drive the screens. Each call belongs to a person's step below.
 async function book(page: Page, date: string, phone = ''): Promise<Appointment> {
   await showDay(page, date);
-  // Leave the first time free for the owner's existing working-day checks.
-  const slot = page.getByTestId('slot-link').last();
+  // Choose a named time on this journey's date, independent of list ordering.
+  const slot = page.getByTestId('slot-link').filter({ hasText: /, 15:45$/ });
   await expect(slot).toBeVisible();
   const slotId = (await slot.getAttribute('data-slot-id')) ?? '';
   const startsAt = (await slot.getAttribute('data-starts-at')) ?? '';
@@ -57,7 +57,7 @@ async function move(page: Page, appointment: Appointment): Promise<Appointment> 
   await page.getByTestId('nav-my-bookings').click();
   await expect(page).toHaveURL(/\/bookings$/);
   await bookingRow(page, 'upcoming-bookings', appointment.when).getByTestId('reschedule-link').click();
-  const target = page.getByTestId('reschedule-to').last();
+  const target = page.getByTestId('reschedule-to').filter({ hasText: /, 15:00$/ });
   await expect(target).toBeVisible();
   const when = ((await target.textContent()) ?? '').trim();
   const startsAt = (await target.getAttribute('data-starts-at')) ?? '';
