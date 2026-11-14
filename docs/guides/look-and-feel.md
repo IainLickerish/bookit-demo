@@ -93,7 +93,7 @@ Meet WCAG 2.2 AA for the parts being changed: keyboard access, labelled fields, 
 visible pine focus rings, targets at least 44px and use at 200% zoom. Announce results and errors with their existing
 roles. Check the shared header on phones and laptops for clients and staff in both clinics (DS-5).
 
-Icons use simple outlines, 20px, 1.5px strokes and rounded ends, in ink or pine; error icons use the problem colour.
+Icons use simple outlines, 20px, 1.5px strokes and rounded ends, in ink or pine.
 Keep decoration away from important content and hidden from screen readers. No stock photos or clip art.
 The foundation adds no motion. Later motion may only show a change, lasts 150 to 200 milliseconds and switches off
 when reduced motion is requested (DS-6).
