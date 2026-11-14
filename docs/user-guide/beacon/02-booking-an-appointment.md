@@ -14,3 +14,7 @@ confirm your appointment. You can leave the phone number blank.
 You can choose slots up to 220 days ahead, shown in Europe/London time. If another
 patient takes your selected slot first, pick a different one. Once confirmed,
 your dental appointment will appear in **My bookings** at `/bookings`.
+
+After confirming, choose **Add to calendar** beside the confirmation or your upcoming
+appointment in **My bookings**. Import the downloaded `booking.ics` file into Google
+Calendar, Outlook or Apple Calendar.

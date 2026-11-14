@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
@@ -7,6 +8,7 @@ import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
+import { CONFIRMATION_COOKIE } from './confirmation';
 
 function statusText(booking: BookingView): string {
   if (booking.status === 'confirmed') {
@@ -18,12 +20,19 @@ function statusText(booking: BookingView): string {
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   const patient = await requirePatient();
   const params = await searchParams;
-  const notice = noticeText(single(params.notice));
+  const noticeCode = single(params.notice);
+  const notice = noticeText(noticeCode);
   const error = errorText(single(params.error));
   const db = getDatabase();
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
+  const confirmationId = (await cookies()).get(CONFIRMATION_COOKIE)?.value;
+  // The cookie is only a hint. Always match it against this patient's own upcoming bookings.
+  const confirmed =
+    noticeCode === 'booked' || noticeCode === 'rescheduled'
+      ? upcoming.find((booking) => booking.id === confirmationId)
+      : undefined;
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
 
   const row = (booking: BookingView, changeable: boolean) => (
@@ -43,7 +52,14 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/bookings/${booking.id}/calendar`}
+            className="button-secondary calendar-link"
+            data-testid="add-to-calendar"
+          >
+            Add to calendar
+          </a>
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -75,6 +91,27 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
         </p>
+      ) : null}
+      {confirmed ? (
+        <div className="mb-4 space-y-2" data-testid="booking-confirmation">
+          <p>{settings.clinicName}</p>
+          <p data-testid="confirmation-when">{formatSlot(confirmed.startsAt, settings.timeZone)}</p>
+          <p>
+            With {confirmed.practitionerName} · {(confirmed.endsAt.getTime() - confirmed.startsAt.getTime()) / 60_000}{' '}
+            minutes
+          </p>
+          <a
+            href={`/bookings/${confirmed.id}/calendar`}
+            className="button-secondary calendar-link"
+            data-testid="confirmation-add-to-calendar"
+          >
+            Add to calendar
+          </a>
+          <p className="text-sm">Open the calendar file in Google Calendar, Outlook or Apple Calendar.</p>
+          {noticeCode === 'rescheduled' ? (
+            <p className="text-sm">Replace the old entry in your calendar with the new time.</p>
+          ) : null}
+        </div>
       ) : null}
       <h2>Upcoming</h2>
       {upcoming.length === 0 ? (

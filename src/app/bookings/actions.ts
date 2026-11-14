@@ -9,6 +9,7 @@ import { isUuid } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { withoutQueryDetails } from '@/server/errors';
 import { bookingDependencies, requirePatient } from '@/server/request-context';
+import { rememberConfirmation } from './confirmation';
 
 function formText(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -33,11 +34,12 @@ export async function bookAction(formData: FormData): Promise<void> {
   const slotId = formText(formData, 'slotId');
   let destination: string;
   try {
-    await bookSlot(deps, {
+    const booking = await bookSlot(deps, {
       patientId: patient.id,
       slotId,
       phone: formText(formData, 'phone'),
     });
+    await rememberConfirmation(booking.id);
     destination = '/bookings?notice=booked';
   } catch (error) {
     const code = refusalCode(error, deps.log, 'book');
@@ -68,11 +70,12 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
   const bookingId = formText(formData, 'bookingId');
   let destination: string;
   try {
-    await rescheduleBooking(deps, {
+    const booking = await rescheduleBooking(deps, {
       patientId: patient.id,
       bookingId,
       newSlotId: formText(formData, 'newSlotId'),
     });
+    await rememberConfirmation(booking.id);
     destination = '/bookings?notice=rescheduled';
   } catch (error) {
     const code = refusalCode(error, deps.log, 'reschedule');

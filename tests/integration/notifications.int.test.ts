@@ -4,6 +4,8 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
+import { bookingCalendar } from '@/server/bookings/calendar';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { bookSlot } from '@/server/bookings/book';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
@@ -112,6 +114,25 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
       status: booking.status,
       containsPhoneLine: bodyOf(smtp.messages[0]!.raw).includes('Contact phone:'),
     });
+  });
+
+  it('sends importable calendar attachments through SMTP after booking and moving', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
+    const moved = await rescheduleBooking(deps(), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: await freeSlotId(),
+    });
+    expect(smtp.messages).toHaveLength(2);
+    for (const [index, saved] of [booking, moved].entries()) {
+      const raw = smtp.messages[index]!.raw;
+      expect(raw).toMatch(/Content-Type: text\/calendar; charset=utf-8; method=PUBLISH/i);
+      expect(raw).toMatch(/Content-Disposition: attachment; filename=booking.ics/i);
+      // Nodemailer encodes file attachments as base64, independently of the text part.
+      const part = raw.split(/(?=Content-Type: text\/calendar)/i)[1]!;
+      const encoded = part.split('\r\n\r\n')[1]!.split('\r\n--')[0]!;
+      expect(Buffer.from(encoded, 'base64').toString('utf8')).toBe(bookingCalendar(saved, clinic.settings));
+    }
   });
 
   it('keeps the booking when the SMTP server is down, and logs the failure', async () => {

@@ -1,4 +1,12 @@
 export const BOOKING_ERRORS = {
+  calendar_sign_in: {
+    status: 401,
+    message: 'Please sign in as a client and open My bookings to add your booking to your calendar.',
+  },
+  calendar_unavailable: {
+    status: 404,
+    message: 'This booking is not available to add to your calendar. Please check My bookings.',
+  },
   not_a_patient: {
     status: 403,
     message: 'Only patients can book appointments.',

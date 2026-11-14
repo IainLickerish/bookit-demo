@@ -15,3 +15,7 @@ Beacon Dental allows up to **2 reschedules per booking**. The new appointment mu
 be in the future and within the booking horizon. If someone else takes your new
 slot first, your existing appointment stays booked. Please contact reception
 when you need help after reaching the limit.
+
+After a move, choose **Add to calendar** from the confirmation or your upcoming
+appointment. Replace the old entry in your calendar with the new time. A move
+confirmation email also includes the updated calendar file.
