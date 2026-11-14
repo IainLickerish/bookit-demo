@@ -61,6 +61,12 @@ test('Clinic names and headings use local Fraunces, while body text, controls an
     await expect(page.getByRole('heading', { level: 1 })).toHaveCSS('font-family', /Fraunces/);
     await expect(page.getByTestId('forgot-password-submit')).toHaveCSS('font-family', /Figtree/);
   });
+  await step(page, 'Sign in and see the shared navigation in Figtree', async () => {
+    await signIn(page, PATIENT_1);
+    await expect(page.getByTestId('main-navigation')).toHaveCSS('font-family', /Figtree/);
+    await expect(page.getByTestId('nav-book')).toHaveCSS('font-family', /Figtree/);
+    await expect(page.getByTestId('sign-out')).toHaveCSS('font-family', /Figtree/);
+  });
 });
 
 test('The shared header keeps the configured clinic name and existing navigation usable without horizontal scrolling on phones and laptops.', async ({
