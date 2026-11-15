@@ -26,7 +26,7 @@ When the clocks go back, a repeated time uses its first occurrence.
 The saved period appears below the form. Clients cannot see blocked periods,
 reasons or warnings. Any slot that overlaps the period becomes unavailable for
 booking and moving, including from a screen opened earlier. A slot ending at the
-start, or starting at the end, remains available. Other practitioners are unaffected.
+start, or starting at the end, remains available. Other physiotherapists are unaffected.
 
 A warning lists every confirmed booking that overlaps the period, or says that
 none overlap. Existing bookings stay confirmed. Contact the affected clients to
