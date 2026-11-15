@@ -1,6 +1,7 @@
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getDatabase } from '@/db/client';
+import { bookingReturnTo } from '@/lib/booking-paths';
 import { getClock } from '@/lib/clock';
 import { getLogger, type Logger } from '@/lib/logger';
 import { REQUEST_ID_HEADER, ROUTE_HEADER } from '@/lib/request-id';
@@ -45,10 +46,11 @@ export async function currentUser(): Promise<PublicUser | null> {
 }
 
 /** The signed-in patient; anyone else is sent to the sign-in page. */
-export async function requirePatient(): Promise<PublicUser> {
+export async function requirePatient(returnTo?: string): Promise<PublicUser> {
   const user = await currentUser();
   if (!user) {
-    redirect('/auth/sign-in');
+    const destination = bookingReturnTo(returnTo);
+    redirect(destination ? `/auth/sign-in?returnTo=${encodeURIComponent(destination)}` : '/auth/sign-in');
   }
   if (user.role !== 'patient') {
     redirect('/');

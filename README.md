@@ -198,8 +198,9 @@ separate password-reset change. Expected fixes and deliberate-defect tests live
 only in SupportAgents, outside this repository. BookIt's ordinary suite passes
 without changing the Article 08 baseline.
 
-The demonstration baseline also contains late-cancellation, non-ASCII CSV export
-and clock-change slot-label defects. Their reproductions, expected fixes and
+The demonstration baseline contains non-ASCII CSV export and clock-change
+slot-label defects. The reminder change corrects late cancellation when clients
+confirm a cancellation. Their reproductions, expected fixes and
 failing-then-passing tests live in SupportAgents under `demo/bookit-expected/`.
 BookIt's ordinary tests exercise unaffected cancellation/export/display cases and
 must pass both on this baseline and after each expected fix. The tenant seed keeps
@@ -215,5 +216,6 @@ due within 24 elapsed hours of its current start; checks catch up after downtime
 Each booking can have only one attempt. Unconfirmed delivery is not retried.
 No reminder is sent without SMTP configuration. See
 [reminder storage and recovery](docs/reminder-storage-recovery.md) for deployment,
-uncertain delivery, locking and recovery decisions. Direct reminder booking action
-links remain for the next step.
+uncertain delivery, locking and recovery decisions. Separate reschedule and cancel
+links require the booked client to sign in and explicitly confirm any change.
+Opening a link or selecting a new time never changes a booking.

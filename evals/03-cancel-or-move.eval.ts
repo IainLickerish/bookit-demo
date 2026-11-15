@@ -29,6 +29,8 @@ test('A client can move and cancel their own booking, and the old time becomes f
     const movedId = (await target.getAttribute('data-slot-id')) ?? '';
     const movedWhen = ((await target.textContent()) ?? '').trim();
     await target.click();
+    await expect(page.getByTestId('review-new-when')).toContainText(movedWhen);
+    await page.getByTestId('confirm-reschedule').click();
     await expect(page).toHaveURL(/\/bookings\?notice=rescheduled$/);
     await expect(bookingRow(page, 'upcoming-bookings', movedWhen)).toBeVisible();
     return { movedId, movedWhen };
@@ -41,6 +43,8 @@ test('A client can move and cancel their own booking, and the old time becomes f
   await step(page, 'Cancel the session and see its cancelled status', async () => {
     await page.getByTestId('nav-my-bookings').click();
     await bookingRow(page, 'upcoming-bookings', movedWhen).getByTestId('cancel-booking').click();
+    await expect(page.getByTestId('review-current-when')).toContainText(movedWhen);
+    await page.getByTestId('confirm-cancellation').click();
     await expect(page).toHaveURL(/\/bookings\?notice=cancelled$/);
     await expect(bookingRow(page, 'other-bookings', movedWhen).getByTestId('booking-status')).toHaveText('Cancelled');
   });

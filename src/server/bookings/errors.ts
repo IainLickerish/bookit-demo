@@ -39,6 +39,14 @@ export const BOOKING_ERRORS = {
     status: 409,
     message: 'That booking has been rescheduled as many times as the clinic allows. Please contact the clinic.',
   },
+  booking_changed: {
+    status: 409,
+    message: 'Your booking details have changed. Please review them before confirming again.',
+  },
+  review_required: {
+    status: 422,
+    message: 'Please review your booking details before confirming the change.',
+  },
   same_slot: {
     status: 422,
     message: 'Please choose a different slot from your current one.',

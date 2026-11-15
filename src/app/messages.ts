@@ -3,7 +3,7 @@ import { BOOKING_ERRORS, isBookingErrorCode } from '@/server/bookings/errors';
 const NOTICES = {
   booked: 'Booking confirmed.',
   cancelled: 'Booking cancelled.',
-  cancelled_late: 'Booking cancelled. This was a late cancellation.',
+  cancelled_late: 'Booking cancelled as a late cancellation.',
   rescheduled: 'Booking rescheduled.',
 } as const;
 
@@ -32,3 +32,6 @@ export function settingsErrorText(error: string): string {
     ? 'Enter a clinic name, a valid IANA time zone, whole hours from 0 to 336 and a reminder choice of On or Off.'
     : 'Sorry, settings could not be saved. Please try again.';
 }
+
+export const CANCEL_REVIEW_CONSEQUENCE = 'Cancelling releases this time for another client.';
+export const MOVE_REVIEW_CONSEQUENCE = 'Your original time is kept until the new time is saved.';

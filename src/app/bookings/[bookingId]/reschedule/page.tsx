@@ -9,7 +9,6 @@ import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
 import { DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
-import { rescheduleAction } from '../../actions';
 
 export default async function ReschedulePage({
   params,
@@ -18,8 +17,8 @@ export default async function ReschedulePage({
   params: Promise<{ bookingId: string }>;
   searchParams: SearchParams;
 }) {
-  const patient = await requirePatient();
   const { bookingId } = await params;
+  const patient = await requirePatient(`/bookings/${bookingId}/reschedule`);
   const query = await searchParams;
   const db = getDatabase();
   const clock = getClock();
@@ -73,19 +72,16 @@ export default async function ReschedulePage({
             <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
               {choices.map((slot) => (
                 <li key={slot.id}>
-                  <form action={rescheduleAction}>
-                    <input type="hidden" name="bookingId" value={booking.id} />
-                    <input type="hidden" name="newSlotId" value={slot.id} />
-                    <button
-                      type="submit"
-                      className="button-secondary w-full"
-                      data-testid="reschedule-to"
-                      data-slot-id={slot.id}
-                      data-starts-at={slot.startsAt.toISOString()}
-                    >
-                      {formatSlot(slot.startsAt, view.settings.timeZone)}
-                    </button>
-                  </form>
+                  <Link
+                    href={`/bookings/${booking.id}/reschedule/${slot.id}`}
+                    prefetch={false}
+                    className="button-secondary block w-full text-center"
+                    data-testid="reschedule-to"
+                    data-slot-id={slot.id}
+                    data-starts-at={slot.startsAt.toISOString()}
+                  >
+                    {formatSlot(slot.startsAt, view.settings.timeZone)}
+                  </Link>
                 </li>
               ))}
             </ul>

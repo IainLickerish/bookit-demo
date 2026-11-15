@@ -1,3 +1,4 @@
+import { clinicWords } from '@/lib/booking-paths';
 import { formatSlot } from '@/lib/time';
 import type { TenantName } from '@/server/seed/tenant';
 import type { OutgoingEmail } from './mailer';
@@ -12,8 +13,7 @@ export interface ReminderEmailInput {
 }
 
 export function composeReminder(input: ReminderEmailInput): OutgoingEmail {
-  const word = input.tenant === 'acme' ? 'session' : 'appointment';
-  const practitioner = input.tenant === 'acme' ? 'Physiotherapist' : 'Clinician';
+  const { booking: word, practitioner } = clinicWords(input.tenant);
   const when = formatSlot(input.booking.startsAt, 'Europe/London');
   return {
     from: input.from,
@@ -29,7 +29,9 @@ export function composeReminder(input: ReminderEmailInput): OutgoingEmail {
       `${practitioner}: ${input.booking.practitionerName}`,
       `Booking reference: ${input.booking.id}`,
       '',
-      `To reschedule or cancel, sign in and open My bookings: ${new URL('/bookings', input.publicUrl).toString()}`,
+      `Reschedule: ${new URL(`/bookings/${input.booking.id}/reschedule`, input.publicUrl).toString()}`,
+      `Cancel: ${new URL(`/bookings/${input.booking.id}/cancel`, input.publicUrl).toString()}`,
+      'Sign in to review your current booking details and confirm any change.',
       'My bookings shows your latest booking details if an email does not arrive.',
       '',
     ].join('\n'),

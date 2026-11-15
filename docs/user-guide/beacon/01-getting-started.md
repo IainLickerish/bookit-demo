@@ -30,6 +30,8 @@ window receives its reminder at the next check. Cancelled and started bookings
 receive no reminder. Switching reminders off stops later checks from sending.
 
 A reminder whose delivery cannot be confirmed is not sent again, even after a
-move. Check **My bookings** for the latest booking details. Reminder emails link
-there; direct reschedule and cancellation links are not included yet.
+move. Check **My bookings** for the latest booking details. Reminder emails include
+separate **Reschedule** and **Cancel** links. Sign in with the booked client’s
+account to review the current booking. Opening a link changes nothing; a change
+requires your confirmation.
 Booking confirmation emails continue as before.

@@ -67,7 +67,8 @@ test('With reminders enabled, each upcoming confirmed booking receives a reminde
         expect(email.text).toContain(`When: ${booking.when} (UK time)`);
         expect(email.text).toContain(`Physiotherapist: ${PRACTITIONER}`);
         expect(email.text.split(/\r?\n/, 1)[0]?.trim(), 'the first line names the clinic').toBe(booking.clinic);
-        expect(email.text).toContain('To reschedule or cancel, sign in and open My bookings:');
+        expect(email.text).toContain(`/bookings/${booking.id}/reschedule`);
+        expect(email.text).toContain(`/bookings/${booking.id}/cancel`);
         expect(email.text).toContain('/bookings');
       },
     );
@@ -125,6 +126,8 @@ test('Moved bookings receive reminders for their new time when no reminder has a
         );
         expect(target?.when, 'a different free session is within the next 24 hours').toBeTruthy();
         await client.getByTestId('reschedule-to').filter({ hasText: target!.when! }).click();
+        await expect(client.getByTestId('review-new-when')).toContainText(target!.when!);
+        await client.getByTestId('confirm-reschedule').click();
         await expect(client).toHaveURL(/\/bookings\?notice=rescheduled$/);
         await expect(bookingRow(client, 'upcoming-bookings', target!.when!)).toBeVisible();
         return target!.when!;

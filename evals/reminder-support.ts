@@ -2,7 +2,10 @@ import { expect, type Page } from '@playwright/test';
 import { bookSlot, bookingRow, evalNow, londonDate, mailTo, showDay, ADMIN, signIn } from './support';
 
 /** Choose by its displayed start instant, rather than a generated booking identifier or list position. */
-export async function bookDueSession(page: Page, nowInstant = evalNow()): Promise<{ id: string; when: string }> {
+export async function bookDueSession(
+  page: Page,
+  nowInstant = evalNow(),
+): Promise<{ id: string; when: string; slotId: string; startsAt: string }> {
   const now = nowInstant.getTime();
   for (const offset of [0, 1]) {
     await showDay(page, londonDate(offset, nowInstant));
@@ -15,11 +18,11 @@ export async function bookDueSession(page: Page, nowInstant = evalNow()): Promis
     const due = offered.find(
       (slot) => slot.start && Date.parse(slot.start) > now && Date.parse(slot.start) <= now + 86_400_000,
     );
-    if (!due?.id) continue;
+    if (!due?.id || !due.start) continue;
     const when = await bookSlot(page, due.id);
     const id = await bookingRow(page, 'upcoming-bookings', when).getAttribute('data-booking-id');
     expect(id, 'the saved booking has its reference').toBeTruthy();
-    return { id: id!, when };
+    return { id: id!, when, slotId: due.id, startsAt: due.start };
   }
   throw new Error('The fixed demo day must offer a free session within the next 24 hours.');
 }

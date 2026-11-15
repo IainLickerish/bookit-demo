@@ -7,9 +7,20 @@ audience: patient
 
 # Moving your physiotherapy session
 
-In **My bookings** at `/bookings`, select **Reschedule** beside an upcoming session.
-Choose an available date and time, then confirm the move. Check the new time in
-your bookings list. Your old slot is released only when the move succeeds.
+In **My bookings** at `/bookings`, select **Reschedule** beside your upcoming
+session. You can also follow **Reschedule** in a reminder email. Sign in
+with the booked client’s account if asked; you return to that booking.
+
+Choose a free date and time. Check the current and proposed physiotherapist,
+day, date, time and duration on the review page, along with the remaining move
+allowance. Selecting a time does not save a change or reserve it. Choose
+**Confirm reschedule** to save, **Choose a different time** to go back, or
+**Keep my current booking** to leave it unchanged.
+
+After confirmation, check the saved new time in **My bookings**. Your original
+time is released only when the move succeeds. If the booking changed meanwhile,
+review its current details again. An older reminder link always opens the current
+booking, even after a move.
 
 Acme Physio allows up to **3 reschedules per booking**. The new time must be in
 the future and within the booking horizon. If a time is taken while you are

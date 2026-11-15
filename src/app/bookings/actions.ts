@@ -49,15 +49,22 @@ export async function bookAction(formData: FormData): Promise<void> {
 export async function cancelAction(formData: FormData): Promise<void> {
   const patient = await requirePatient();
   const deps = await bookingDependencies();
+  const bookingId = formText(formData, 'bookingId');
+  const expectedSlotId = formText(formData, 'expectedSlotId');
+  const expectedLate = formText(formData, 'expectedLate');
   let destination: string;
   try {
+    if (!isUuid(expectedSlotId) || !['true', 'false'].includes(expectedLate)) throw new BookingError('review_required');
     const result = await cancelBooking(deps, {
       patientId: patient.id,
-      bookingId: formText(formData, 'bookingId'),
+      bookingId,
+      expectedSlotId,
+      expectedLate: expectedLate === 'true',
     });
     destination = result.late ? '/bookings?notice=cancelled_late' : '/bookings?notice=cancelled';
   } catch (error) {
-    destination = `/bookings?error=${refusalCode(error, deps.log, 'cancel')}`;
+    const code = refusalCode(error, deps.log, 'cancel');
+    destination = isUuid(bookingId) ? `/bookings/${bookingId}/cancel?error=${code}` : `/bookings?error=${code}`;
   }
   redirect(destination);
 }
@@ -66,12 +73,15 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
   const patient = await requirePatient();
   const deps = await bookingDependencies();
   const bookingId = formText(formData, 'bookingId');
+  const expectedSlotId = formText(formData, 'expectedSlotId');
   let destination: string;
   try {
+    if (!isUuid(expectedSlotId)) throw new BookingError('review_required');
     await rescheduleBooking(deps, {
       patientId: patient.id,
       bookingId,
       newSlotId: formText(formData, 'newSlotId'),
+      expectedSlotId,
     });
     destination = '/bookings?notice=rescheduled';
   } catch (error) {

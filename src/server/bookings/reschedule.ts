@@ -12,6 +12,7 @@ export interface RescheduleBookingRequest {
   patientId: string;
   bookingId: string;
   newSlotId: string;
+  expectedSlotId?: string;
 }
 
 export async function rescheduleBooking(
@@ -21,7 +22,6 @@ export async function rescheduleBooking(
   if (!isUuid(request.bookingId)) {
     throw new BookingError('booking_not_found');
   }
-  const now = deps.clock.now();
   const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
@@ -37,6 +37,10 @@ export async function rescheduleBooking(
       .for('update', { of: bookings });
     if (!locked) {
       throw new BookingError('booking_not_found');
+    }
+    const now = deps.clock.now();
+    if (request.expectedSlotId !== undefined && request.expectedSlotId !== locked.slotId) {
+      throw new BookingError('booking_changed');
     }
     assertReschedulable(locked, request.newSlotId, now, settings);
     const target = await findBookableSlot(tx, request.newSlotId);

@@ -51,11 +51,13 @@ describe('reminder eligibility and wording', () => {
     expect(email.text).toContain('https://clinic.example.test/bookings');
     expect(email.text).not.toContain('phone');
   });
-  it('uses Beacon’s own words and the existing signed-in bookings destination', () => {
+  it('uses Beacon’s words and separate signed-in booking destinations', () => {
     const email = composeReminder({ ...input, tenant: 'beacon' });
     expect(email.subject).toContain('your appointment');
     expect(email.text).toContain('Clinician: Fictional Practitioner');
-    expect(email.text).toContain('To reschedule or cancel, sign in and open My bookings:');
+    expect(email.text).toContain('Reschedule: https://clinic.example.test/bookings/fictional-booking/reschedule');
+    expect(email.text).toContain('Cancel: https://clinic.example.test/bookings/fictional-booking/cancel');
+    expect(email.text).toContain('Sign in to review your current booking details and confirm any change.');
     expect(email.to).toBe(input.patient.email);
   });
   it('does not call an unconfirmed SMTP result a confirmed reminder', async () => {

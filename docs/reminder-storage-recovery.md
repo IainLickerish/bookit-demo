@@ -2,7 +2,8 @@
 
 Step 1 adds the clinic preference and durable history. Step 2 runs unattended
 checks in the long-lived Node application and sends reminders through the existing
-demo mail service. Direct reminder action destinations remain for step 3.
+demo mail service. Step 3 adds signed-in action destinations and explicit move
+and cancellation review, including correctly saved late cancellations.
 
 ## Decided
 
@@ -23,7 +24,7 @@ demo mail service. Direct reminder action destinations remain for step 3.
   checks still work on restart. Reseeding does not reset the preference (EN-6).
 - Existing user guides and components take precedence only where the supplied
   policies do not specify otherwise. New wording follows DS-7 and DS-8. Existing
-  unrelated styling and booking journeys are outside this step (PR-1, EN-4).
+  unrelated styling and journeys remain outside this change (PR-1, EN-4).
 
 ## Apply
 
@@ -104,9 +105,8 @@ expired, forged and removed-staff access, through the page and save action.
   numbers or private tokens. Logs contain event names, booking references and
   hashed recipients, never email bodies or raw SMTP errors (PR-21, PS-6, PS-7).
 - Emails put the clinic first and use its own session or appointment and
-  practitioner wording. Their only management link is the existing signed-in
-  My bookings page using BOOKIT_PUBLIC_URL. Explicit reminder action destinations
-  and booking confirmation changes remain outside step 2 (DS-1, DS-7, DS-8, PR-1).
+  practitioner wording. Separate reschedule and cancellation links use the
+  configured BOOKIT_PUBLIC_URL, never the request host (DS-1, DS-7, DS-8, PS-6).
 
 `tests/integration/reminder-sending.int.test.ts` covers timing, moves, cancellation,
 switch-off, repeated and overlapping passes, fresh database connections, process
@@ -138,3 +138,37 @@ refused addresses, 50 accounts that are no longer patients and 60 eligible clien
 One check must reach all 60 eligible bookings and repeated checks must send none
 again. Queries remain bounded to 50 rows and skipped candidates cannot starve
 later bookings.
+
+## Safe booking actions for step 3
+
+- Links contain only a booking reference. They grant no authority. Both review
+  pages and confirmation actions require a current patient session in the clinic’s
+  database and check the booking’s owner (PR-15). Staff cannot use client actions.
+- Signed-out clients return after sign-in through an exact allowlist of local
+  booking destinations. External, encoded, query and fragment destinations are
+  refused. No private bearer token or new credential is introduced (PS-6).
+- Opening or prefetching any link, including choosing a proposed time, is read
+  only. The same review pages serve My bookings and reminders. Reviews show the
+  current practitioner, day, date, time and actual duration, consequences and a
+  way to keep the booking (PR-5, PR-7, DS-5).
+- Confirmation requires the reviewed current slot. Cancellation also requires
+  the reviewed late status. Both are rechecked under the booking lock, together
+  with ownership and existing booking rules. Changed details require a fresh
+  review. If a target has been taken, the original booking remains (PR-16, PR-17).
+- Late cancellations are allowed before the start, saved as Cancelled with the
+  late flag and cancellation time, and release the slot before success is shown.
+  The exact configured hour boundary is not late. Started bookings are refused
+  (PR-8). No existing records are rewritten and step 3 needs no migration.
+- Booking confirmation mail stays as before. A separate move confirmation email
+  remains an existing product gap, outside this reminder request (PR-1).
+
+`tests/integration/booking-review.int.test.ts` checks read-only reviews, saved late
+and on-time cancellation, released times, stale reviews, occupied targets, started
+bookings and missing confirmation fields. Real sessions and separate disposable
+clinic databases cover client, staff, missing, forged, expired and foreign access.
+Unit tests check the return destination allowlist and sign-in behaviour.
+`evals/12-reminder-actions.eval.ts` follows actual email links, signs back in,
+reviews and confirms a move, checks a saved late cancellation and released time,
+and replays a forged cancellation as another client and a visitor. Existing
+move/cancel and clock-change evals retain their saved-outcome assertions after
+the new explicit confirmation.
