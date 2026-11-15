@@ -186,11 +186,27 @@ test('Clinic staff can switch reminders off and back on, releasing an unsent rem
         return { ...appointment, reference: await confirm(client, appointment.when) };
       },
     );
-    await step(client, 'Receive the confirmation and keep the booking without a reminder', async () => {
+    await step(client, 'Receive the confirmation and keep reminders off while checking the inbox', async () => {
       await expect
         .poll(async () => (await matchingMail(PATIENT_3, booking.reference, 'Booking confirmed:')).length)
         .toBe(1);
-      expect(await matchingMail(PATIENT_3, booking.reference, 'Booking reminder:')).toHaveLength(0);
+      // Absence needs an observation window: keep the switch off beyond the
+      // scheduler's 10-second interval, checking the inbox throughout. Use
+      // elapsed test time because EVAL_NOW deliberately stays fixed.
+      const observationStarted = performance.now();
+      await expect
+        .poll(
+          async () => ({
+            reminders: (await matchingMail(PATIENT_3, booking.reference, 'Booking reminder:')).length,
+            observedFullInterval: performance.now() - observationStarted >= 15_000,
+          }),
+          {
+            message: 'No reminder arrives while reminders stay off across a scheduled check',
+            timeout: 20_000,
+            intervals: [500],
+          },
+        )
+        .toEqual({ reminders: 0, observedFullInterval: true });
       await client.reload();
       await expect(bookingRow(client, 'upcoming-bookings', booking.when).getByTestId('booking-status')).toHaveText(
         'Confirmed',
