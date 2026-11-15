@@ -80,8 +80,8 @@ expired, forged and removed-staff access, through the page and save action.
   functions (EN-1, EN-4).
 - A confirmed booking is due when it is still upcoming and at most 24 elapsed
   hours away. Checks catch up after downtime and handle bookings made inside the
-  window. They never send for started bookings. A pass handles up to 50 candidates
-  in time order, then the next pass continues (PR-7, PR-14).
+  window. They never send for started bookings. A check processes successive pages of up to 50 candidates
+  in time and booking-reference order, advancing past refused or skipped rows (PR-7, PR-14).
 - The ticket explicitly requires UK time, so reminder emails always use
   Europe/London, including clock changes, even if staff change the clinic's
   display time zone. This follows the owner's words for this change over PR-7's
@@ -114,3 +114,27 @@ loss, uncertain mail acceptance, outcome-write failures, race rechecks, lock
 ordering, clinic isolation and local SMTP. Unit checks cover UK clock changes and
 serial unattended scheduling. The owner checks in `evals/11-reminder-emails.eval.ts`
 wait for mail from the real loop without triggering it themselves.
+
+## Timing eval fixture
+
+The strengthened timing check books outside the window with reminders already on.
+It waits for a completed background check before asserting no reminder, advances
+to the 24-hour boundary, and makes no application requests until mail arrives.
+Background check sequence counters prove that the mail came from the first check
+at the new time. The check retains its email-detail and no-repeat assertions.
+
+`/api/debug/reminder-clock` exists only in an explicitly test-clock build running
+locally with a configured clock file. Normal builds and staging or production
+runs return 404. Both reading and changing it require signed-in clinic staff;
+changes also require the configured same-origin request. It never starts a
+reminder check. Advances are accepted only between checks, and the fixture is
+reset after the eval. The original file is never rewritten: its readability and
+monotonicity checks stay active while an ephemeral in-memory fixture is in use.
+The fixture exists solely to verify this reminder journey under EN-5, not as a
+clinic control or production scheduler.
+
+The pagination regression creates 160 due bookings with equal start times: 50
+refused addresses, 50 accounts that are no longer patients and 60 eligible clients.
+One check must reach all 60 eligible bookings and repeated checks must send none
+again. Queries remain bounded to 50 rows and skipped candidates cannot starve
+later bookings.

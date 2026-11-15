@@ -35,6 +35,14 @@ export function reminderLoop(check: () => Promise<unknown>, onError: (error: unk
 }
 
 const WORKER_KEY = Symbol.for('bookit.reminder-worker');
+const CHECKS_KEY = Symbol.for('bookit.reminder-checks');
+
+/** Diagnostic counters used by the protected test-clock fixture, never a sending trigger. */
+export function reminderCheckStatus(): { started: number; completed: number } {
+  const holder = globalThis as { [CHECKS_KEY]?: { started: number; completed: number } };
+  holder[CHECKS_KEY] ??= { started: 0, completed: 0 };
+  return holder[CHECKS_KEY];
+}
 
 /** Runs in each long-lived Node server, without a public trigger or request dependency. */
 export function startReminderWorker(): void {
@@ -43,15 +51,21 @@ export function startReminderWorker(): void {
   if (holder[WORKER_KEY]) return;
   holder[WORKER_KEY] = reminderLoop(
     async () => {
-      const clock = getClock();
-      await sendDueReminders({
-        db: getDatabase(),
-        clock,
-        log: getLogger().child({ request_id: newId(clock), operation: 'reminders' }),
-        mail: mailSettings(),
-        tenant: tenantName.parse(process.env.BOOKIT_TENANT),
-        publicUrl: publicBaseUrl(),
-      });
+      const checks = reminderCheckStatus();
+      const sequence = ++checks.started;
+      try {
+        const clock = getClock();
+        await sendDueReminders({
+          db: getDatabase(),
+          clock,
+          log: getLogger().child({ request_id: newId(clock), operation: 'reminders' }),
+          mail: mailSettings(),
+          tenant: tenantName.parse(process.env.BOOKIT_TENANT),
+          publicUrl: publicBaseUrl(),
+        });
+      } finally {
+        checks.completed = sequence;
+      }
     },
     (error) => {
       // Do not log raw errors, which may carry query parameters or SMTP content.

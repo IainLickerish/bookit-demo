@@ -91,6 +91,67 @@ describe('durable reminder sending', () => {
     expect(sent).toHaveLength(1);
     expect(JSON.stringify(logs.lines)).not.toMatch(/Patient One|patients\.example\.test|7700/);
   });
+  it('reaches every due booking in one check beyond refused addresses and former patients', async () => {
+    const at = clock.now();
+    const id = (n: number) => `019a0000-0000-7000-8000-${String(n).padStart(12, '0')}`;
+    // 50 refused recipients, then 50 former patients, then 60 eligible bookings.
+    // Equal start times exercise the booking-reference part of the page cursor.
+    const patientRows = Array.from({ length: 160 }, (_, index) => ({
+      id: id(1000 + index),
+      email: index < 50 ? `refused-${index}` : `pagination-${index}@patients.example.test`,
+      name: `Fictional Pagination Client ${index}`,
+      role: index >= 50 && index < 100 ? ('admin' as const) : ('patient' as const),
+      passwordHash: 'unused-fictional-hash',
+      createdAt: at,
+      updatedAt: at,
+    }));
+    const practitionerRows = patientRows.map((_, index) => ({
+      id: id(2000 + index),
+      name: `Pagination Practitioner ${index}`,
+      bio: 'Fictional fixture',
+      workingDays: [1, 2, 3, 4, 5],
+      workdayStart: '09:00',
+      workdayEnd: '17:00',
+      active: true,
+      createdAt: at,
+      updatedAt: at,
+    }));
+    await database.db.insert(users).values(patientRows);
+    await database.db.insert(practitioners).values(practitionerRows);
+    await database.db.insert(slots).values(
+      patientRows.map((_, index) => ({
+        id: id(3000 + index),
+        practitionerId: id(2000 + index),
+        startsAt: new Date('2026-10-20T08:00:00Z'),
+        endsAt: new Date('2026-10-20T08:45:00Z'),
+        createdAt: at,
+      })),
+    );
+    await database.db.insert(bookings).values(
+      patientRows.map((_, index) => ({
+        id: id(4000 + index),
+        patientId: id(1000 + index),
+        slotId: id(3000 + index),
+        status: 'confirmed' as const,
+        lateCancellation: false,
+        rescheduleCount: 0,
+        createdAt: at,
+        updatedAt: at,
+      })),
+    );
+    expect(await sendDueReminders(deps)).toBe(60);
+    expect(sent).toHaveLength(60);
+    expect(new Set(sent.map((email) => email.to))).toEqual(
+      new Set(patientRows.slice(100).map((patient) => patient.email)),
+    );
+    const history = await database.db.select().from(bookingReminders);
+    expect(history).toHaveLength(60);
+    expect(new Set(history.map((row) => row.bookingId))).toEqual(
+      new Set(Array.from({ length: 60 }, (_, index) => id(4100 + index))),
+    );
+    expect(await sendDueReminders(deps)).toBe(0);
+    expect(sent).toHaveLength(60);
+  });
   it('uses the moved time, current practitioner and current clinic details', async () => {
     const booking = await book();
     const target = await slotAt('2026-10-22T08:00:00Z');

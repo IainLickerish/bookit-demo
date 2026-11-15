@@ -1,6 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { ADMIN, PATIENT_2, PATIENT_3, PRACTITIONER, bookingRow, evalNow, sessionFor, step } from './support';
-import { bookDueSession, remindersFor, setReminders, waitForReminder } from './reminder-support';
+import {
+  bookDueSession,
+  bookOutsideReminderWindow,
+  reminderClock,
+  setReminderClock,
+  remindersFor,
+  setReminders,
+  waitForReminder,
+} from './reminder-support';
 
 test('With reminders enabled, each upcoming confirmed booking receives a reminder at the first unattended check within 24 hours of its current start.', async ({
   browser,
@@ -9,38 +17,70 @@ test('With reminders enabled, each upcoming confirmed booking receives a reminde
   let original: string | undefined;
   const contexts = [staff.context()];
   try {
-    await step(staff, 'Switch reminders off while arranging a new session', async () => {
+    const initial = await step(staff, 'Enable reminders before arranging a future session', async () => {
       await staff.goto('/admin/settings');
       original = await staff.getByTestId('admin-reminders').inputValue();
-      await setReminders(staff, 'off');
+      await setReminders(staff, 'on');
+      return reminderClock(staff);
     });
     const client = await sessionFor(browser, PATIENT_2);
     contexts.push(client.context());
-    const booking = await step(client, 'Book a free session within the next 24 hours', async () =>
-      bookDueSession(client),
+    const booking = await step(client, 'Book a session more than 24 hours away', async () =>
+      bookOutsideReminderWindow(client, new Date(initial.now)),
     );
-    await step(staff, 'Switch reminder emails on for the clinic', async () => {
-      await setReminders(staff, 'on');
+    const dueAt = new Date(Date.parse(booking.startsAt) - 86_400_000);
+    await step(client, 'See no reminder after a completed background check just before it is due', async () => {
+      const outside = await setReminderClock(staff, new Date(dueAt.getTime() - 1).toISOString());
+      await expect
+        .poll(async () => (await reminderClock(staff)).completed, {
+          timeout: 30_000,
+          message: 'a full background check runs outside the reminder window',
+        })
+        .toBeGreaterThan(outside.completed);
+      expect(await remindersFor(PATIENT_2, booking.id)).toHaveLength(0);
     });
-    await step(client, 'Receive a reminder with the saved session details in UK time', async () => {
-      const email = await waitForReminder(PATIENT_2, booking.id);
-      expect(email.subject).toBe(`Reminder: your session on ${booking.when}`);
-      expect(email.text).toContain(`When: ${booking.when} (UK time)`);
-      expect(email.text).toContain(`Physiotherapist: ${PRACTITIONER}`);
-      const clinic = await client.getByTestId('clinic-name').textContent();
-      expect(email.text.split(/\r?\n/, 1)[0]?.trim(), 'the first line names the clinic').toBe(clinic?.trim());
-      expect(email.text).toContain('To reschedule or cancel, sign in and open My bookings:');
-      expect(email.text).toContain('/bookings');
-    });
+    await step(
+      client,
+      'Leave the application idle as the booking becomes due and receive its next-check reminder',
+      async () => {
+        const inside = await setReminderClock(staff, dueAt.toISOString());
+        // From this point until mail arrives, query only Mailpit. No application
+        // navigation, booking or settings action can be the sending trigger.
+        const applicationRequests: string[] = [];
+        const origin = new URL(client.url()).origin;
+        const record = (request: { url(): string }) => {
+          if (new URL(request.url()).origin === origin) applicationRequests.push(request.url());
+        };
+        client.context().on('request', record);
+        staff.context().on('request', record);
+        let email;
+        try {
+          email = await waitForReminder(PATIENT_2, booking.id);
+        } finally {
+          client.context().off('request', record);
+          staff.context().off('request', record);
+        }
+        expect(applicationRequests, 'no application request triggers the due reminder').toEqual([]);
+        const delivered = await reminderClock(staff);
+        expect(delivered.started, 'delivery occurs during the first check at the due time').toBe(inside.completed + 1);
+        expect(email.subject).toBe(`Reminder: your session on ${booking.when}`);
+        expect(email.text).toContain(`When: ${booking.when} (UK time)`);
+        expect(email.text).toContain(`Physiotherapist: ${PRACTITIONER}`);
+        expect(email.text.split(/\r?\n/, 1)[0]?.trim(), 'the first line names the clinic').toBe(booking.clinic);
+        expect(email.text).toContain('To reschedule or cancel, sign in and open My bookings:');
+        expect(email.text).toContain('/bookings');
+      },
+    );
     await step(client, 'Receive a later reminder without repeating the first one', async () => {
-      const later = await bookDueSession(client);
+      const later = await bookDueSession(client, dueAt);
       await waitForReminder(PATIENT_2, later.id);
       expect(await remindersFor(PATIENT_2, booking.id)).toHaveLength(1);
     });
   } finally {
     try {
       if (original !== undefined)
-        await step(staff, 'Restore the clinic’s original reminder choice', async () => {
+        await step(staff, 'Restore the fixed demo clock and the clinic’s original reminder choice', async () => {
+          await setReminderClock(staff, null);
           await setReminders(staff, original!);
         });
     } finally {

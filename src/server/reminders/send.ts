@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull, lte } from 'drizzle-orm';
+import { and, asc, eq, gt, isNull, lte, or } from 'drizzle-orm';
 import type { Database, Transaction } from '@/db/client';
 import { bookingReminders, bookings, clinicSettings, practitioners, slots, users } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
@@ -135,44 +135,55 @@ async function sendForBooking(deps: ReminderDependencies, id: string): Promise<b
   });
 }
 
-/** One bounded pass. Every booking is rechecked under locks using the shared clock. */
+/** One check, using bounded pages. Skipped rows never hold up later candidates. */
 export async function sendDueReminders(deps: ReminderDependencies): Promise<number> {
   if (deps.mail.mailer.kind === 'disabled') return 0;
   try {
     const now = deps.clock.now();
-    const candidates = await deps.db
-      .select({ id: bookings.id })
-      .from(bookings)
-      .innerJoin(slots, eq(slots.id, bookings.slotId))
-      .leftJoin(bookingReminders, eq(bookingReminders.bookingId, bookings.id))
-      .where(
-        and(
-          eq(bookings.status, 'confirmed'),
-          gt(slots.startsAt, now),
-          lte(slots.startsAt, addHours(now, 24)),
-          isNull(bookingReminders.bookingId),
-        ),
-      )
-      .orderBy(asc(slots.startsAt), asc(bookings.id))
-      .limit(50);
+    let cursor: { id: string; startsAt: Date } | undefined;
     let sent = 0;
-    for (const booking of candidates) {
-      try {
-        if (await sendForBooking(deps, booking.id)) sent++;
-      } catch (error) {
-        // A durable reservation may already exist. Never remove it after an
-        // unexpected failure: SMTP acceptance or a commit result may be uncertain.
-        const safe = withoutQueryDetails(error);
-        deps.log.error(
-          {
-            event: 'reminder.unconfirmed',
-            booking_id: booking.id,
-            error_name: safe instanceof Error ? safe.name : 'unknown',
-          },
-          'Reminder outcome could not be confirmed',
-        );
-        reportError(safe, { operation: 'reminder' });
+    while (true) {
+      const candidates = await deps.db
+        .select({ id: bookings.id, startsAt: slots.startsAt })
+        .from(bookings)
+        .innerJoin(slots, eq(slots.id, bookings.slotId))
+        .leftJoin(bookingReminders, eq(bookingReminders.bookingId, bookings.id))
+        .where(
+          and(
+            eq(bookings.status, 'confirmed'),
+            gt(slots.startsAt, now),
+            lte(slots.startsAt, addHours(now, 24)),
+            isNull(bookingReminders.bookingId),
+            cursor
+              ? or(
+                  gt(slots.startsAt, cursor.startsAt),
+                  and(eq(slots.startsAt, cursor.startsAt), gt(bookings.id, cursor.id)),
+                )
+              : undefined,
+          ),
+        )
+        .orderBy(asc(slots.startsAt), asc(bookings.id))
+        .limit(50);
+      for (const booking of candidates) {
+        try {
+          if (await sendForBooking(deps, booking.id)) sent++;
+        } catch (error) {
+          // A durable reservation may already exist. Never remove it after an
+          // unexpected failure: SMTP acceptance or a commit result may be uncertain.
+          const safe = withoutQueryDetails(error);
+          deps.log.error(
+            {
+              event: 'reminder.unconfirmed',
+              booking_id: booking.id,
+              error_name: safe instanceof Error ? safe.name : 'unknown',
+            },
+            'Reminder outcome could not be confirmed',
+          );
+          reportError(safe, { operation: 'reminder' });
+        }
       }
+      if (candidates.length < 50) break;
+      cursor = candidates[candidates.length - 1];
     }
     return sent;
   } catch (error) {
