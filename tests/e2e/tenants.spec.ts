@@ -292,3 +292,51 @@ test('REQ-18.1-06 container build requires GIT_COMMIT and the production image r
     writeTenantEvidence(directory, results, logs.join('\n'), acme.canaries);
   }
 });
+
+test('late cancellations stay cancelled after refreshing and another client can book the time in both clinics', async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  for (const clinic of [acme, beacon]) {
+    const context = await signIn(browser, clinic, 'patient1');
+    const otherContext = await signIn(browser, clinic, 'patient2');
+    try {
+      const page = context.pages()[0]!;
+      const other = otherContext.pages()[0]!;
+      await page.goto(`${clinic.url}/slots`);
+      await page.getByTestId('practitioner-select').selectOption({ label: clinic.tenant.practitioners[0]!.name });
+      await page.getByTestId('date-input').fill('2026-10-20');
+      await page.getByTestId('show-slots').click();
+      const slot = page.getByTestId('slot-link').filter({ hasText: /, 15:00$/ });
+      await expect(slot).toBeVisible();
+      const bookingPath = (await slot.getAttribute('href'))!;
+      await slot.click();
+      const when = ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
+      await page.getByTestId('confirm-booking').click();
+      await expect(page).toHaveURL(`${clinic.url}/bookings?notice=booked`);
+      const ownRow = page.getByTestId('booking-row').filter({ hasText: when });
+      await expect(ownRow.getByTestId('booking-status')).toHaveText('Confirmed');
+      await ownRow.getByTestId('cancel-booking').click();
+      await expect(page).toHaveURL(`${clinic.url}/bookings?notice=cancelled_late`);
+      await page.reload();
+      await expect(ownRow.getByTestId('booking-status')).toHaveText('Cancelled (late)');
+
+      await other.goto(`${clinic.url}/slots`);
+      await other.getByTestId('practitioner-select').selectOption({ label: clinic.tenant.practitioners[0]!.name });
+      await other.getByTestId('date-input').fill('2026-10-20');
+      await other.getByTestId('show-slots').click();
+      await expect(other.getByTestId('slot-link').filter({ hasText: when })).toHaveAttribute('href', bookingPath);
+      await other.getByTestId('slot-link').filter({ hasText: when }).click();
+      await other.getByTestId('confirm-booking').click();
+      await expect(other).toHaveURL(`${clinic.url}/bookings?notice=booked`);
+      await expect(other.getByTestId('booking-row').filter({ hasText: when }).getByTestId('booking-status')).toHaveText(
+        'Confirmed',
+      );
+      await page.reload();
+      await expect(ownRow.getByTestId('booking-status')).toHaveText('Cancelled (late)');
+    } finally {
+      await context.close();
+      await otherContext.close();
+    }
+  }
+});

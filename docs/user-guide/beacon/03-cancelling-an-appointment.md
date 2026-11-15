@@ -14,3 +14,6 @@ slot so another patient can use it.
 At Beacon Dental, cancelling less than **48 hours** before the appointment counts
 as a late cancellation. Exactly 48 hours is not late. Once the appointment has
 started, contact reception instead of trying to cancel it in BookIt.
+
+After a late cancellation, your appointment shows **Cancelled (late)** in My bookings,
+including after refreshing the page. Another patient can then book that time.
