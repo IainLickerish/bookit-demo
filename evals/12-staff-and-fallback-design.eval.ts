@@ -33,6 +33,7 @@ test('Clinic bookings presents filters and results in white cards with a stone t
       .filter({ has: page.getByRole('cell', { name: when, exact: true }) });
     await expect(row.getByRole('cell', { name: 'Łukasz Wiśniewski', exact: true })).toBeVisible();
     await expect(row.getByTestId('admin-booking-status')).toContainText('Confirmed');
+    await expect(row.getByTestId('admin-booking-status')).toHaveCSS('border-radius', '9999px');
     await expect(row.getByTestId('admin-booking-status')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
     await expect(row.getByTestId('admin-booking-status')).toHaveCSS('color', 'rgb(29, 92, 75)');
     await expect(page.getByTestId('admin-export')).toHaveAttribute('href', new RegExp(`date=${date}`));
@@ -63,6 +64,7 @@ test('Clinic bookings presents filters and results in white cards with a stone t
       .getByTestId('admin-booking-row')
       .filter({ has: page.getByRole('cell', { name: when, exact: true }) });
     await expect(row.getByTestId('admin-booking-status')).toContainText('Cancelled');
+    await expect(row.getByTestId('admin-booking-status')).toHaveCSS('border-radius', '9999px');
     await expect(row.getByTestId('admin-booking-status')).toHaveCSS('background-color', 'rgb(241, 238, 232)');
     await expect(row.getByTestId('admin-booking-status')).toHaveCSS('color', 'rgb(90, 104, 98)');
   });
