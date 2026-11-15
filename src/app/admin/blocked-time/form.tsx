@@ -16,7 +16,15 @@ export function BlockTimeForm({
   const [state, action, pending] = useActionState(saveBlockedPeriodAction, initial);
   const [values, setValues] = useState(state.values);
   return (
-    <form action={action} className="my-6 space-y-4" aria-busy={pending} noValidate>
+    <form
+      action={action}
+      // React resets forms after an action returns, including validation failures.
+      // Keep entries here; the saved-period key remounts this form after success.
+      onReset={(event) => event.preventDefault()}
+      className="my-6 space-y-4"
+      aria-busy={pending}
+      noValidate
+    >
       {state.message ? (
         <p role="alert" className="alert" data-testid="block-error">
           {state.message}

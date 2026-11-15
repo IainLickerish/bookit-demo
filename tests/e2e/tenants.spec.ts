@@ -272,10 +272,24 @@ test('blocked time controls, reasons and warnings stay with clinic staff in each
       await page.getByTestId('admin-blocked-time-link').click();
       await page.getByTestId('block-practitioner').selectOption({ label: clinic.tenant.practitioners[0]!.name });
       await page.getByTestId('block-start').fill('2026-12-10T10:00');
-      await page.getByTestId('block-end').fill('2026-12-10T11:00');
+      await page.getByTestId('block-end').fill('2026-12-10T09:00');
       await page.getByTestId('block-reason').fill(reason);
       await page.getByTestId('block-save').click();
+      await expect(page.getByTestId('block-end-error')).toContainText('after the start');
+      await expect(
+        page.getByTestId('block-practitioner').getByRole('option', {
+          name: clinic.tenant.practitioners[0]!.name,
+          exact: true,
+        }),
+      ).toHaveJSProperty('selected', true);
+      await expect(page.getByTestId('block-start')).toHaveValue('2026-12-10T10:00');
+      await expect(page.getByTestId('block-end')).toHaveValue('2026-12-10T09:00');
+      await expect(page.getByTestId('block-reason')).toHaveValue(reason);
+      await page.getByTestId('block-end').fill('2026-12-10T11:00');
+      await page.getByTestId('block-save').click();
       await expect(page.getByTestId('block-saved')).toBeVisible();
+      await expect(page.getByTestId('block-error')).toHaveCount(0);
+      await expect(page.getByTestId('block-practitioner')).toHaveValue('');
       const period = page.getByTestId('blocked-period').filter({ hasText: reason });
       await expect(period.getByTestId('block-no-bookings')).toBeVisible();
       await expect(page.getByLabel(clinic.tenant.branding.practitionerLabel, { exact: false })).toBeVisible();
