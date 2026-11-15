@@ -49,7 +49,11 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       </div>
       {booking.status === 'confirmed' ? (
         <div className="flex flex-wrap gap-2">
-          <a href={`/bookings/${booking.id}/calendar`} className="button-secondary" data-testid="add-to-calendar">
+          <a
+            href={`/bookings/${booking.id}/calendar`}
+            className="button-secondary inline-flex min-h-12 items-center"
+            data-testid="add-to-calendar"
+          >
             Add to calendar
           </a>
           {changeable ? (
@@ -94,7 +98,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
               </p>
               <a
                 href={`/bookings/${confirmedBooking.id}/calendar`}
-                className="button-secondary"
+                className="button-secondary inline-flex min-h-12 items-center"
                 data-testid="confirmation-add-to-calendar"
               >
                 Add to calendar

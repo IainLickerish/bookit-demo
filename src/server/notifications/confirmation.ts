@@ -39,7 +39,7 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
     `Dear ${patient.name},`,
     '',
     input.moved
-      ? `Your appointment at ${settings.clinicName} has been moved.`
+      ? `Your booking at ${settings.clinicName} has been moved.`
       : `Your appointment at ${settings.clinicName} is confirmed.`,
     '',
     `When: ${when} (${settings.timeZone})`,

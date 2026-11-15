@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createSession } from '@/server/auth/session';
 import { bookSlot } from '@/server/bookings/book';
+import { cancelBooking } from '@/server/bookings/cancel';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import * as calendar from '@/server/calendar/appointment';
@@ -65,6 +66,10 @@ it('downloads only a signed-in patient’s own confirmed booking with private re
   expect(result.headers.get('content-disposition')).toContain('attachment; filename="appointment.ics"');
   expect(result.headers.get('x-content-type-options')).toBe('nosniff');
   expect(await result.text()).toBe(calendar.appointmentCalendar(booking, clinic.settings));
+  await cancelBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id });
+  const cancelled = await calendarResponse(deps(), owner.token, booking.id);
+  expect(cancelled.status).toBe(404);
+  expect(await cancelled.text()).not.toContain('BEGIN:VCALENDAR');
 });
 
 it('booking and move attachments match the saved booking and the current downloadable calendar', async () => {
