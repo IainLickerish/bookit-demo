@@ -7,17 +7,17 @@ import { requireAdmin } from '@/server/admin/context';
 import { loadClinicSettings } from '@/server/settings';
 import acme from '../../../../tenants/acme.json';
 import beacon from '../../../../tenants/beacon.json';
-import { BLOCK_MESSAGES, type SearchParams } from '../../messages';
+import { BLOCK_MESSAGES, single, type SearchParams } from '../../messages';
 import { BlockTimeForm } from './form';
 
 export default async function BlockedTimePage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
   const db = getDatabase();
-  const [settings, practitioners, periods, params] = await Promise.all([
+  const params = await searchParams;
+  const [settings, practitioners, { periods, olderCursor, isLatest }] = await Promise.all([
     loadClinicSettings(db),
     listAdminPractitioners(db),
-    listBlockedPeriods(db),
-    searchParams,
+    listBlockedPeriods(db, { beforeId: single(params.before), fromId: single(params.saved) }),
   ]);
   const tenant = process.env.BOOKIT_TENANT === 'beacon' ? beacon : acme;
   const practitionerLabel = tenant.branding.practitionerLabel;
@@ -40,7 +40,11 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
       />
       <h2>Saved blocked periods</h2>
       {periods.length === 0 ? (
-        <p data-testid="no-blocks">No blocked periods yet. Use the form above to add one.</p>
+        <p data-testid="no-blocks">
+          {isLatest
+            ? 'No blocked periods yet. Use the form above to add one.'
+            : 'No older blocked periods. View the latest periods to continue.'}
+        </p>
       ) : (
         <ul className="space-y-6" data-testid="blocked-periods">
           {periods.map((period) => (
@@ -76,6 +80,23 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
           ))}
         </ul>
       )}
+      <nav aria-label="Saved blocked periods" className="mt-6 flex flex-wrap gap-4">
+        {olderCursor ? (
+          <Link
+            href={`/admin/blocked-time?before=${olderCursor}`}
+            prefetch={false}
+            className="button-secondary"
+            data-testid="blocks-older"
+          >
+            View older periods
+          </Link>
+        ) : null}
+        {!isLatest ? (
+          <Link href="/admin/blocked-time" prefetch={false} className="button-secondary" data-testid="blocks-latest">
+            View latest periods
+          </Link>
+        ) : null}
+      </nav>
       <p className="mt-6">
         <Link href="/admin" prefetch={false} className="underline" data-testid="block-back">
           Back to clinic bookings

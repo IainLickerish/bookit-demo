@@ -17,7 +17,7 @@ import {
 const SAVE_CRITERION =
   'Clinic staff can save a practitioner’s blocked period with an optional reason and see the result; invalid entries explain what to correct.';
 const SLOTS_CRITERION =
-  'Clients cannot find, book or move into overlapping slots, including from previously opened screens; other practitioners remain available.';
+  'Clients cannot find, book or move into overlapping slots, including from previously opened screens.';
 const WARNING_CRITERION =
   'Staff see every overlapping confirmed booking or a clear no-bookings message; existing bookings remain unchanged.';
 

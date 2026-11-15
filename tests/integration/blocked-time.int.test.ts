@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { MIGRATIONS_FOLDER, runMigrations } from '@/db/migrate';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { bookings, practitionerBlocks } from '@/db/schema';
-import { listBlockedPeriods, saveBlockedPeriod } from '@/server/admin/blocked-time';
+import { BLOCKED_PERIODS_PAGE_SIZE, listBlockedPeriods, saveBlockedPeriod } from '@/server/admin/blocked-time';
 import { bookSlot } from '@/server/bookings/book';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSession, findSessionUser } from '@/server/auth/session';
@@ -61,7 +61,9 @@ it('saves blocks over existing data and lists every confirmed overlap without ch
     .where(eq(bookings.id, third.id));
   const before = await database.db.select().from(bookings);
   await saveBlockedPeriod(database.db, clock, inputFor(a!, addMinutes(a!.endsAt, -1), cancelled!.endsAt));
-  const [period] = await listBlockedPeriods(database.db);
+  const {
+    periods: [period],
+  } = await listBlockedPeriods(database.db);
   expect(period!.bookings.map((row) => row.bookingId)).toEqual([first.id, second.id]);
   expect(await database.db.select().from(bookings)).toEqual(before);
   expect(await isSlotFree(database.db, boundary!.id)).toBe(true);
@@ -104,7 +106,7 @@ it('uses exclusive endpoints and gives an empty warning for a period without con
   expect(await isSlotFree(database.db, before!.id)).toBe(true);
   expect(await isSlotFree(database.db, target!.id)).toBe(false);
   expect(await isSlotFree(database.db, after!.id)).toBe(true);
-  expect((await listBlockedPeriods(database.db))[0]).toMatchObject({ reason: null, bookings: [] });
+  expect((await listBlockedPeriods(database.db)).periods[0]).toMatchObject({ reason: null, bookings: [] });
 });
 
 it('cannot save a foreign practitioner, share staff sessions, blocks or warnings across clinic databases', async () => {
@@ -117,7 +119,7 @@ it('cannot save a foreign practitioner, share staff sessions, blocks or warnings
     fields: { practitionerId: expect.any(String) },
   });
   await saveBlockedPeriod(database.db, clock, inputFor(slot!));
-  expect(await listBlockedPeriods(foreign.db)).toEqual([]);
+  expect((await listBlockedPeriods(foreign.db)).periods).toEqual([]);
   expect(await database.db.select().from(practitionerBlocks)).toHaveLength(1);
 });
 
@@ -128,7 +130,9 @@ it('serialises a block racing a booking: the booking is refused or included in t
     bookSlot(deps(), { patientId: clinic.patient1.id, slotId: slot!.id }),
   ]);
   expect(blocked.status).toBe('fulfilled');
-  const [period] = await listBlockedPeriods(database.db);
+  const {
+    periods: [period],
+  } = await listBlockedPeriods(database.db);
   if (booked.status === 'fulfilled') expect(period!.bookings.map((row) => row.bookingId)).toContain(booked.value.id);
   else {
     expect(booked.reason).toMatchObject({ code: 'slot_blocked' });
@@ -194,11 +198,55 @@ it('upgrades a database containing bookings without changing them and can remove
   );
   await runMigrations(database.url);
   expect(await database.db.select().from(bookings)).toEqual(before);
-  expect(await listBlockedPeriods(database.db)).toEqual([]);
+  expect((await listBlockedPeriods(database.db)).periods).toEqual([]);
   const blockId = await saveBlockedPeriod(database.db, clock, inputFor(target!));
   expect(await isSlotFree(database.db, target!.id)).toBe(false);
   // Rehearse recovery of one erroneous period, retaining all bookings and other data.
   await database.db.delete(practitionerBlocks).where(eq(practitionerBlocks.id, blockId));
   expect(await isSlotFree(database.db, target!.id)).toBe(true);
   expect(await database.db.select().from(bookings)).toEqual(before);
+});
+
+it('pages every saved period once, opens at a saved period and retains every affected booking on each page', async () => {
+  const available = await listAvailableSlots(database.db, {
+    practitionerId: clinic.practitioners.weekdays,
+    after: new Date('2026-10-22T00:00:00Z'),
+    until: new Date('2026-10-28T00:00:00Z'),
+  });
+  const bookingIds: string[] = [];
+  for (const slot of available.slice(0, BLOCKED_PERIODS_PAGE_SIZE + 1)) {
+    bookingIds.push((await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: slot.id })).id);
+  }
+  expect(bookingIds).toHaveLength(BLOCKED_PERIODS_PAGE_SIZE + 1);
+  const ids: string[] = [];
+  for (let i = 0; i < BLOCKED_PERIODS_PAGE_SIZE * 2 + 5; i++) {
+    ids.push(
+      await saveBlockedPeriod(database.db, clock, {
+        ...inputFor(available[0]!, available[0]!.startsAt, available[BLOCKED_PERIODS_PAGE_SIZE]!.endsAt),
+        reason: `Paging training ${i}`,
+      }),
+    );
+  }
+  const seen: string[] = [];
+  let beforeId: string | undefined;
+  do {
+    const page = await listBlockedPeriods(database.db, { beforeId });
+    expect(page.periods.length).toBeLessThanOrEqual(BLOCKED_PERIODS_PAGE_SIZE);
+    expect(page.isLatest).toBe(beforeId === undefined);
+    for (const period of page.periods) {
+      expect(period.bookings.map((booking) => booking.bookingId)).toEqual(bookingIds);
+      expect(period.bookings.every((booking) => booking.blockId === period.id)).toBe(true);
+      seen.push(period.id);
+    }
+    beforeId = page.olderCursor ?? undefined;
+  } while (beforeId);
+  expect(seen).toEqual(ids.toSorted().reverse());
+  expect(new Set(seen).size).toBe(ids.length);
+  const oldestId = seen.at(-1)!;
+  const savedPage = await listBlockedPeriods(database.db, { fromId: oldestId });
+  expect(savedPage.periods.map((period) => period.id)).toEqual([oldestId]);
+  expect(savedPage.olderCursor).toBeNull();
+  const invalidPage = await listBlockedPeriods(database.db, { beforeId: 'invalid' });
+  expect(invalidPage.isLatest).toBe(true);
+  expect(invalidPage.periods.map((period) => period.id)).toEqual(seen.slice(0, BLOCKED_PERIODS_PAGE_SIZE));
 });

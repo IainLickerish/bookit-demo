@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { BLOCK_FIELD_ERRORS } from '@/app/messages';
 import type { Database, Executor } from '@/db/client';
@@ -7,6 +7,7 @@ import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
 import { zonedTimeToUtc } from '@/lib/time';
 import { loadClinicSettings } from '../settings';
+import { isUuid } from '../bookings/queries';
 import { lockPractitioner } from '../slots/blocked';
 
 export const blockInput = z.strictObject({
@@ -73,9 +74,16 @@ export async function saveBlockedPeriod(db: Database, clock: Clock, input: unkno
   });
 }
 
-/** Full confirmed overlap list, with no horizon or date filtering. Never modifies bookings. */
-export async function listBlockedPeriods(db: Executor) {
-  const periods = await db
+export const BLOCKED_PERIODS_PAGE_SIZE = 20;
+
+/** Page by UUIDv7 creation order using the primary index, even when creation times tie.
+ * Every confirmed overlap is returned for the displayed periods, without a booking limit.
+ */
+export async function listBlockedPeriods(db: Executor, query: { beforeId?: string; fromId?: string } = {}) {
+  const fromId = query.fromId ?? '';
+  const beforeId = query.beforeId ?? '';
+  const anchor = isUuid(fromId) ? fromId : isUuid(beforeId) ? beforeId : null;
+  const rows = await db
     .select({
       id: practitionerBlocks.id,
       practitionerName: practitioners.name,
@@ -85,7 +93,14 @@ export async function listBlockedPeriods(db: Executor) {
     })
     .from(practitionerBlocks)
     .innerJoin(practitioners, eq(practitioners.id, practitionerBlocks.practitionerId))
-    .orderBy(desc(practitionerBlocks.createdAt), desc(practitionerBlocks.id));
+    .where(
+      anchor ? (anchor === fromId ? lte(practitionerBlocks.id, anchor) : lt(practitionerBlocks.id, anchor)) : undefined,
+    )
+    .orderBy(desc(practitionerBlocks.id))
+    .limit(BLOCKED_PERIODS_PAGE_SIZE + 1);
+  const periods = rows.slice(0, BLOCKED_PERIODS_PAGE_SIZE);
+  const olderCursor = rows.length > BLOCKED_PERIODS_PAGE_SIZE ? periods.at(-1)!.id : null;
+  if (periods.length === 0) return { periods: [], olderCursor, isLatest: anchor === null };
   const affected = await db
     .select({
       blockId: practitionerBlocks.id,
@@ -105,6 +120,22 @@ export async function listBlockedPeriods(db: Executor) {
     )
     .innerJoin(bookings, and(eq(bookings.slotId, slots.id), eq(bookings.status, 'confirmed')))
     .innerJoin(users, eq(users.id, bookings.patientId))
+    .where(
+      inArray(
+        practitionerBlocks.id,
+        periods.map((period) => period.id),
+      ),
+    )
     .orderBy(asc(slots.startsAt), asc(bookings.id));
-  return periods.map((period) => ({ ...period, bookings: affected.filter((row) => row.blockId === period.id) }));
+  const byPeriod = new Map<string, typeof affected>();
+  for (const booking of affected) {
+    const group = byPeriod.get(booking.blockId);
+    if (group) group.push(booking);
+    else byPeriod.set(booking.blockId, [booking]);
+  }
+  return {
+    periods: periods.map((period) => ({ ...period, bookings: byPeriod.get(period.id) ?? [] })),
+    olderCursor,
+    isLatest: anchor === null,
+  };
 }

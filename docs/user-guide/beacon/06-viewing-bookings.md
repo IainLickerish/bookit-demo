@@ -31,3 +31,8 @@ start, or starting at the end, remains available. Other clinicians are unaffecte
 A warning lists every confirmed booking that overlaps the period, or says that
 none overlap. Existing bookings stay confirmed. Contact the affected clients to
 arrange another time. Return to this page to review saved periods and warnings.
+
+Saved periods appear 20 at a time, newest first. Use **View older periods** to
+review earlier periods, or **View latest periods** to return to the newest ones.
+Each displayed period includes every affected confirmed booking. After saving,
+the list opens at the period you just saved.

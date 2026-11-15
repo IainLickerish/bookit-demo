@@ -318,6 +318,45 @@ test('blocked time controls, reasons and warnings stay with clinic staff in each
   }
 });
 
+test('staff can review older blocked periods and return to the latest periods', async ({ browser }) => {
+  test.setTimeout(180_000);
+  const staff = await signIn(browser, acme, 'admin');
+  const page = staff.pages()[0]!;
+  const reasons = Array.from({ length: 21 }, (_, i) => `Paging journey training ${i + 1}`);
+  try {
+    await page.goto(`${acme.url}/admin/blocked-time`);
+    for (const reason of reasons) {
+      await page.getByTestId('block-practitioner').selectOption({ label: acme.tenant.practitioners[0]!.name });
+      await page.getByTestId('block-start').fill('2026-12-11T10:00');
+      await page.getByTestId('block-end').fill('2026-12-11T11:00');
+      await page.getByTestId('block-reason').fill(reason);
+      await page.getByTestId('block-save').click();
+      await expect(page.getByTestId('block-saved')).toBeVisible();
+      await expect(
+        page.getByTestId('blocked-period').filter({ hasText: reason }).getByTestId('block-no-bookings'),
+      ).toBeVisible();
+    }
+    await page.goto(`${acme.url}/admin/blocked-time`);
+    const latestReasons = await page.getByTestId('block-period-reason').allTextContents();
+    const seen: string[] = [];
+    for (;;) {
+      expect(await page.getByTestId('blocked-period').count()).toBeLessThanOrEqual(20);
+      seen.push(...(await page.getByTestId('block-period-reason').allTextContents()));
+      if (!(await page.getByTestId('blocks-older').count())) break;
+      await page.getByTestId('blocks-older').click();
+      await expect(page.getByTestId('blocks-latest')).toBeVisible();
+    }
+    expect(seen.filter((reason) => reason.startsWith('Reason: Paging journey training ')).sort()).toEqual(
+      reasons.map((reason) => `Reason: ${reason}`).sort(),
+    );
+    await page.getByTestId('blocks-latest').click();
+    await expect(page.getByTestId('blocks-latest')).toHaveCount(0);
+    expect(await page.getByTestId('block-period-reason').allTextContents()).toEqual(latestReasons);
+  } finally {
+    await staff.close();
+  }
+});
+
 test('REQ-18.1-06 container build requires GIT_COMMIT and the production image refuses the virtual clock', async () => {
   test.setTimeout(900_000);
   const directory = tenantEvidenceDirectory('production-build');

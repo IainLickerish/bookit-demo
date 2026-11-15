@@ -24,3 +24,9 @@ Keep the additive table if reverting application code. The previous application
 does not enforce blocked periods, so pause booking access before reverting and
 resolve any saved periods before reopening it. Do not drop the table or edit an
 applied migration as a recovery shortcut.
+
+The staff list reads 20 periods at a time, using the UUIDv7 creation order and the
+existing primary index. Older pages start after the last displayed ID; saving opens
+a page at the saved ID. This also keeps the saved result visible when several
+periods share a creation time. Only displayed periods have their overlaps read.
+Their affected bookings are grouped once, without limiting the bookings per period.
