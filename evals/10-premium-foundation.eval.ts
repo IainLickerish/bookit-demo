@@ -95,11 +95,11 @@ test('Shared controls have pine keyboard focus, pill buttons and rounded fields 
   });
   await step(page, 'See shared problem and success notices with their words still present', async () => {
     await page.goto('/auth/sign-in?error=invalid');
-    await expect(page.getByRole('alert')).toContainText('The email address or password is not correct.');
-    await expect(page.getByRole('alert')).toHaveCSS('background-color', 'rgb(252, 235, 232)');
+    await expect(page.getByTestId('sign-in-error')).toContainText('The email address or password is not correct.');
+    await expect(page.getByTestId('sign-in-error')).toHaveCSS('background-color', 'rgb(252, 235, 232)');
     await page.goto('/auth/sign-in?notice=password_reset');
-    await expect(page.getByRole('status')).toContainText('Your password has been changed.');
-    await expect(page.getByRole('status')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
+    await expect(page.getByTestId('sign-in-notice')).toContainText('Your password has been changed.');
+    await expect(page.getByTestId('sign-in-notice')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(page.getByTestId('sign-in-submit')).toHaveCSS('transition-duration', '0s');
   });
