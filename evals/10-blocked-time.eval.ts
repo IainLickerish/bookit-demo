@@ -28,7 +28,7 @@ test(SAVE_CRITERION, async ({ browser }) => {
   await step(staff, 'Enter a blocked period with an end before its start', async () => {
     await staff.getByTestId('nav-admin').click();
     await fillPeriod(staff, `${date}T12:00`, `${date}T11:00`, 'Validation journey');
-    await staff.getByTestId('block-save').click();
+    await staff.getByTestId('block-save').click({ timeout: 10_000 });
     await expect(staff.getByTestId('block-error')).toContainText('Correct the fields');
     await expect(staff.getByTestId('block-end-error')).toContainText('after the start');
     await expect(staff.getByTestId('block-start')).toHaveValue(`${date}T12:00`);
@@ -37,7 +37,7 @@ test(SAVE_CRITERION, async ({ browser }) => {
   await step(staff, 'Correct the end and save without an optional reason', async () => {
     await staff.getByTestId('block-end').fill(`${date}T13:00`);
     await staff.getByTestId('block-reason').fill('');
-    await staff.getByTestId('block-save').click();
+    await staff.getByTestId('block-save').click({ timeout: 10_000 });
     await expect(staff.getByTestId('block-saved')).toHaveText('Blocked period saved.');
   });
   await step(staff, 'Return to the saved period and see that no bookings overlap it', async () => {
@@ -86,7 +86,7 @@ test(SLOTS_CRITERION, async ({ browser }) => {
     const end = `${String(hour).padStart(2, '0')}:${String(minute! + 2).padStart(2, '0')}`;
     await staff.getByTestId('nav-admin').click();
     await fillPeriod(staff, `${date}T${inside}`, `${date}T${end}`, 'Stale screens journey');
-    await staff.getByTestId('block-save').click();
+    await staff.getByTestId('block-save').click({ timeout: 10_000 });
     await expect(staff.getByTestId('block-saved')).toBeVisible();
   });
   await step(other, 'Try the previously opened booking screen and see that the time is unavailable', async () => {
@@ -129,7 +129,7 @@ test(WARNING_CRITERION, async ({ browser }) => {
   await step(staff, 'Save a blocked period covering the two confirmed sessions', async () => {
     await staff.getByTestId('nav-admin').click();
     await fillPeriod(staff, `${date}T${booked.first.time}`, `${date}T${booked.end}`, 'Affected bookings journey');
-    await staff.getByTestId('block-save').click();
+    await staff.getByTestId('block-save').click({ timeout: 10_000 });
     await expect(staff.getByTestId('block-saved')).toBeVisible();
   });
   await step(staff, 'See both affected bookings and the instruction to contact the clients', async () => {
