@@ -5,6 +5,7 @@ import { cancelBooking } from '@/server/bookings/cancel';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import * as calendar from '@/server/calendar/appointment';
+import * as errorReporting from '@/server/error-reporting';
 import { calendarResponse } from '@/server/calendar/http';
 import { listAvailableSlots } from '@/server/slots/queries';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
@@ -103,7 +104,17 @@ it('calendar generation failures leave newly booked and moved appointments saved
   await rescheduleBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id, newSlotId: target.id });
   expect((await findBookingForPatient(database.db, clinic.patient1.id, booking.id))?.slotId).toBe(target.id);
   const session = await createSession(database.db, clock, clinic.patient1.id);
+  const report = vi.spyOn(errorReporting, 'reportError').mockImplementation(() => {});
+  const savedBefore = await findBookingForPatient(database.db, clinic.patient1.id, booking.id);
   const response = await calendarResponse(deps(), session.token, booking.id);
+  expect(report).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      message: 'Calendar download failed',
+      stack: expect.stringContaining('calendarResponse'),
+    }),
+    { operation: 'calendar.download' },
+  );
+  expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toEqual(savedBefore);
   expect(response.status).toBe(303);
   expect(response.headers.get('location')).toBe('/bookings?error=calendar_unavailable');
   expect((await findBookingForPatient(database.db, clinic.patient1.id, booking.id))?.status).toBe('confirmed');

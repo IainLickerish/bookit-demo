@@ -1,4 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DrizzleQueryError } from 'drizzle-orm/errors';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Database } from '@/db/client';
+import * as bookingQueries from '@/server/bookings/queries';
+import * as sessionQueries from '@/server/auth/session';
+import * as clinicSettings from '@/server/settings';
+import * as errorReporting from '@/server/error-reporting';
+import { DatabaseError } from '@/server/errors';
+import { calendarResponse } from '@/server/calendar/http';
 import type { BookingView } from '@/server/bookings/queries';
 import * as calendar from '@/server/calendar/appointment';
 import { composeConfirmation, sendConfirmation } from '@/server/notifications/confirmation';
@@ -137,5 +145,96 @@ describe('calendar confirmation delivery', () => {
     expect(mailer.sent).toHaveLength(0);
     expect(logs.events()).toContain('email.confirmation.failed');
     expect(JSON.stringify(logs.lines)).not.toMatch(/patients\.example\.test|7700|Calendar Client/);
+  });
+});
+
+describe('calendar download failure reporting', () => {
+  const deps = () => ({
+    db: {} as Database,
+    clock: manualClock('2026-10-20T07:00:00Z'),
+    log: captureLogs(manualClock('2026-10-20T07:00:00Z')).log,
+  });
+  beforeEach(() => {
+    vi.spyOn(sessionQueries, 'findSessionUser').mockResolvedValue({
+      ...input.patient,
+      id: booking.patientId,
+      phone: null,
+      role: 'patient',
+    });
+    vi.spyOn(bookingQueries, 'findBookingForPatient').mockResolvedValue(booking);
+    vi.spyOn(clinicSettings, 'loadClinicSettings').mockResolvedValue(settings);
+    vi.spyOn(errorReporting, 'reportError').mockImplementation(() => {});
+  });
+
+  it('reports generator failures with their code stack but no message, causes or calendar contents', async () => {
+    const privateText = `Calendar Client, calendar@patients.example.test, +44 7700 900001\n${calendar.appointmentCalendar(booking, settings)}`;
+    const failure = Object.assign(new RangeError(privateText, { cause: new Error(privateText) }), {
+      calendar: privateText,
+    });
+    vi.spyOn(calendar, 'appointmentCalendar').mockImplementation(() => {
+      throw failure;
+    });
+    const dependencies = deps();
+    const logs = captureLogs(dependencies.clock);
+    const response = await calendarResponse({ ...dependencies, log: logs.log }, 'private-session-token', booking.id);
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe('/bookings?error=calendar_unavailable');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(errorReporting.reportError).toHaveBeenCalledExactlyOnceWith(expect.any(Error), {
+      operation: 'calendar.download',
+    });
+    const reported = vi.mocked(errorReporting.reportError).mock.calls[0]![0] as Error;
+    expect(reported.message).toBe('Calendar download failed');
+    expect(reported.stack).toContain('calendar.test.ts:');
+    expect(reported.stack).toBe(
+      `Error: Calendar download failed${failure.stack!.slice(`${failure.name}: ${failure.message}`.length)}`,
+    );
+    expect(reported).not.toHaveProperty('cause');
+    expect(reported).not.toHaveProperty('calendar');
+    expect(`${reported.stack} ${JSON.stringify(reported)} ${JSON.stringify(logs.lines)}`).not.toMatch(
+      /Calendar Client|calendar@|7700|BEGIN:VCALENDAR|private-session-token/,
+    );
+    expect(await response.text()).toBe('');
+  });
+
+  it.each(['session', 'booking', 'settings'] as const)(
+    'reports %s database failures without queries, parameters or provider details',
+    async (stage) => {
+      const privateText = 'calendar@patients.example.test +44 7700 900001 private-session-token';
+      const cause = Object.assign(new Error(privateText), { code: '08006', detail: privateText });
+      const failure = new DrizzleQueryError('select * from booking where phone = $1', [privateText], cause);
+      const fail = () => {
+        throw failure;
+      };
+      if (stage === 'session') vi.mocked(sessionQueries.findSessionUser).mockImplementation(fail);
+      if (stage === 'booking') vi.mocked(bookingQueries.findBookingForPatient).mockImplementation(fail);
+      if (stage === 'settings') vi.mocked(clinicSettings.loadClinicSettings).mockImplementation(fail);
+      const response = await calendarResponse(deps(), 'private-session-token', booking.id);
+      expect(response.status).toBe(303);
+      expect(response.headers.get('location')).toBe('/bookings?error=calendar_unavailable');
+      expect(errorReporting.reportError).toHaveBeenCalledExactlyOnceWith(expect.any(DatabaseError), {
+        operation: 'calendar.download',
+      });
+      const reported = vi.mocked(errorReporting.reportError).mock.calls[0]![0] as DatabaseError;
+      expect(reported.code).toBe('08006');
+      expect(reported.stack).toContain('DatabaseError: Database error 08006');
+      expect(reported).not.toHaveProperty('cause');
+      expect(`${reported.stack} ${JSON.stringify(reported)}`).not.toMatch(
+        /patients.example.test|7700|private-session-token|select \*|where phone/,
+      );
+      expect(await response.text()).toBe('');
+    },
+  );
+
+  it('handles non-Error failures without forwarding their values', async () => {
+    vi.spyOn(calendar, 'appointmentCalendar').mockImplementation(() => {
+      throw { calendar: 'BEGIN:VCALENDAR', token: 'private-session-token' };
+    });
+    const response = await calendarResponse(deps(), 'private-session-token', booking.id);
+    expect(response.status).toBe(303);
+    const reported = vi.mocked(errorReporting.reportError).mock.calls[0]![0] as Error;
+    expect(reported).toBeInstanceOf(Error);
+    expect(reported.stack).toContain('Calendar download failed');
+    expect(JSON.stringify(reported)).not.toMatch(/BEGIN:VCALENDAR|private-session-token/);
   });
 });
