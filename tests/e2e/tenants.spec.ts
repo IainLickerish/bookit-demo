@@ -292,3 +292,28 @@ test('REQ-18.1-06 container build requires GIT_COMMIT and the production image r
     writeTenantEvidence(directory, results, logs.join('\n'), acme.canaries);
   }
 });
+
+test('both clinics share the premium header, palette and locally served fonts', async ({ browser }) => {
+  for (const clinic of [acme, beacon]) {
+    const context = await browser.newContext({ viewport: { width: 320, height: 740 } });
+    try {
+      const page = await context.newPage();
+      await page.goto(`${clinic.url}/auth/sign-in`);
+      const name = page.getByTestId('clinic-name');
+      await expect(name).toHaveText(clinic.tenant.settings.clinicName);
+      await expect(name).toHaveCSS('font-family', /Fraunces/);
+      await expect(name).toHaveAttribute('href', '/');
+      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(250, 248, 244)');
+      await expect(page.locator('body')).toHaveCSS('font-family', /Figtree/);
+      await expect(page.getByTestId('site-header')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      for (const family of ['fraunces', 'figtree']) {
+        const font = await context.request.get(`${clinic.url}/fonts/${family}-latin-wght-normal.woff2`);
+        expect(font.status()).toBe(200);
+        expect((await font.body()).subarray(0, 4).toString()).toBe('wOF2');
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    } finally {
+      await context.close();
+    }
+  }
+});

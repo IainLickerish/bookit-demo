@@ -29,7 +29,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+      className="flex flex-wrap items-center justify-between gap-3 rounded border border-line bg-white p-4"
       data-testid="booking-row"
       data-booking-id={booking.id}
       data-status={booking.status}
@@ -38,7 +38,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         <p className="font-medium" data-testid="booking-when">
           {formatSlot(booking.startsAt, settings.timeZone)}
         </p>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted">
           With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
         </p>
       </div>

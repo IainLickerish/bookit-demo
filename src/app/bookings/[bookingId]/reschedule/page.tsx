@@ -63,7 +63,7 @@ export default async function ReschedulePage({
         </p>
       ) : (
         <>
-          <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
+          <p className="mb-6 text-sm text-muted" data-testid="reschedules-remaining">
             You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
           </p>
           <DayPicker view={view} path={path} />
