@@ -15,7 +15,7 @@ export function BlockTimeForm({
   const initial: BlockFormState = { values: { practitionerId: '', start: '', end: '', reason: '' }, errors: {} };
   const [state, action, pending] = useActionState(saveBlockedPeriodAction, initial);
   return (
-    <form action={action} className="my-6 space-y-4" noValidate>
+    <form action={action} className="my-6 space-y-4" aria-busy={pending} noValidate>
       {state.message ? (
         <p role="alert" className="alert" data-testid="block-error">
           {state.message}
@@ -67,7 +67,9 @@ export function BlockTimeForm({
           aria-describedby="block-zone block-end-error"
           data-testid="block-end"
         />
-        <span id="block-end-error">{state.errors.end}</span>
+        <span id="block-end-error" data-testid="block-end-error">
+          {state.errors.end}
+        </span>
       </label>
       <label>
         Reason (optional)

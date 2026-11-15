@@ -30,7 +30,6 @@ export async function rescheduleBooking(
     assertReschedulable(existing, request.newSlotId, now, settings);
     // Lock the target practitioner before the booking, like bookSlot. Recheck the
     // booking below after locking it, because another move may have just finished.
-
     const target = await findBookableSlot(tx, request.newSlotId);
     if (!target) {
       throw new BookingError('slot_not_found');

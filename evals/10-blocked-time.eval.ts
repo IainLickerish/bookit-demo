@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   ADMIN,
   PATIENT_1,
@@ -20,7 +20,7 @@ const SLOTS_CRITERION =
 const WARNING_CRITERION =
   'Staff see every overlapping confirmed booking or a clear no-bookings message; existing bookings remain unchanged.';
 
-async function fillPeriod(page: import('@playwright/test').Page, start: string, end: string, reason: string) {
+async function fillPeriod(page: Page, start: string, end: string, reason: string) {
   await page.getByTestId('admin-blocked-time-link').click();
   await page.getByTestId('block-practitioner').selectOption({ label: PRACTITIONER });
   await page.getByTestId('block-start').fill(start);
@@ -37,7 +37,7 @@ test(SAVE_CRITERION, async ({ browser }) => {
     await fillPeriod(staff, `${date}T12:00`, `${date}T11:00`, 'Validation journey');
     await staff.getByTestId('block-save').click();
     await expect(staff.getByTestId('block-error')).toContainText('Correct the fields');
-    await expect(staff.locator('#block-end-error')).toContainText('after the start');
+    await expect(staff.getByTestId('block-end-error')).toContainText('after the start');
     await expect(staff.getByTestId('block-start')).toHaveValue(`${date}T12:00`);
     await expect(staff.getByTestId('block-reason')).toHaveValue('Validation journey');
   });
@@ -77,14 +77,12 @@ test(SLOTS_CRITERION, async ({ browser }) => {
     async () => {
       const originalWhen = await bookSlot(owner, (await pickFreeSlot(owner, date)).id);
       const target = await pickFreeSlot(other, date);
-      await other.goto(`/book/${target.id}`);
+      await other.getByTestId('slot-link').filter({ hasText: target.time }).click();
       await expect(other.getByTestId('confirm-booking')).toBeVisible();
       await bookingRow(owner, 'upcoming-bookings', originalWhen).getByTestId('reschedule-link').click();
       await owner.getByTestId('date-input').fill(date);
       await owner.getByTestId('show-slots').click();
-      await expect(
-        owner.getByTestId('reschedule-to').and(owner.locator(`[data-slot-id="${target.id}"]`)),
-      ).toBeVisible();
+      await expect(owner.getByTestId('reschedule-to').filter({ hasText: target.time })).toBeVisible();
       return { originalWhen, target };
     },
   );
@@ -103,7 +101,7 @@ test(SLOTS_CRITERION, async ({ browser }) => {
     await expect(other.getByTestId('booking-error')).toContainText('no longer available');
     await expect(other.getByTestId('confirm-booking')).toHaveCount(0);
     await showDay(other, date);
-    await expect(other.getByTestId('slot-link').and(other.locator(`[data-slot-id="${target.id}"]`))).toHaveCount(0);
+    await expect(other.getByTestId('slot-link').filter({ hasText: target.time })).toHaveCount(0);
     expect(await other.getByTestId('slot-link').count()).toBeGreaterThan(0);
     await other.goto('/admin/blocked-time');
     await expect(other).toHaveURL(/\/bookings$/);
@@ -111,10 +109,7 @@ test(SLOTS_CRITERION, async ({ browser }) => {
     await expect(other.getByText('Stale screens journey')).toHaveCount(0);
   });
   await step(owner, 'Try the previously opened move screen and keep the original confirmed booking', async () => {
-    await owner
-      .getByTestId('reschedule-to')
-      .and(owner.locator(`[data-slot-id="${target.id}"]`))
-      .click();
+    await owner.getByTestId('reschedule-to').filter({ hasText: target.time }).click();
     await expect(owner.getByTestId('booking-error')).toContainText('no longer available');
     await expect(owner.getByTestId('current-when')).toHaveText(originalWhen);
     await owner.getByTestId('nav-my-bookings').click();

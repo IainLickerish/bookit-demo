@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import { z } from 'zod';
+import { BLOCK_FIELD_ERRORS } from '@/app/messages';
 import type { Database, Executor } from '@/db/client';
 import { bookings, practitionerBlocks, practitioners, slots, users } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
@@ -41,23 +42,19 @@ export function parseBlockedPeriod(input: unknown, timeZone: string) {
       const field = issue.path[0] as BlockField;
       fields[field] =
         field === 'practitionerId'
-          ? 'Choose a practitioner from the list.'
+          ? BLOCK_FIELD_ERRORS.practitionerId
           : field === 'reason'
-            ? 'Keep the reason to 500 characters or fewer.'
-            : 'Enter a valid date and time.';
+            ? BLOCK_FIELD_ERRORS.reason
+            : BLOCK_FIELD_ERRORS.dateTime;
     }
     throw new InvalidBlockError(fields);
   }
   const startsAt = localInstant(parsed.data.start, timeZone);
   const endsAt = localInstant(parsed.data.end, timeZone);
   const fields: BlockErrors = {};
-  if (!startsAt)
-    fields.start =
-      'Enter a valid start date and time in the clinic’s time zone. This time may be skipped when clocks change.';
-  if (!endsAt)
-    fields.end =
-      'Enter a valid end date and time in the clinic’s time zone. This time may be skipped when clocks change.';
-  if (startsAt && endsAt && endsAt <= startsAt) fields.end = 'Enter an end date and time after the start.';
+  if (!startsAt) fields.start = BLOCK_FIELD_ERRORS.start;
+  if (!endsAt) fields.end = BLOCK_FIELD_ERRORS.end;
+  if (startsAt && endsAt && endsAt <= startsAt) fields.end = BLOCK_FIELD_ERRORS.endBeforeStart;
   if (!startsAt || !endsAt || Object.keys(fields).length) throw new InvalidBlockError(fields);
   return { practitionerId: parsed.data.practitionerId, startsAt, endsAt, reason: parsed.data.reason || null };
 }
@@ -68,7 +65,7 @@ export async function saveBlockedPeriod(db: Database, clock: Clock, input: unkno
     const settings = await loadClinicSettings(tx);
     const values = parseBlockedPeriod(input, settings.timeZone);
     if (!(await lockPractitioner(tx, values.practitionerId))) {
-      throw new InvalidBlockError({ practitionerId: 'Choose a practitioner from the list.' });
+      throw new InvalidBlockError({ practitionerId: BLOCK_FIELD_ERRORS.practitionerId });
     }
     const id = newId(clock);
     await tx.insert(practitionerBlocks).values({ ...values, id, createdAt: clock.now() });

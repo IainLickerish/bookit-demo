@@ -80,13 +80,12 @@ it('removes partial overlaps, keeps touching slots and other practitioners, and 
   expect(await isSlotFree(database.db, target!.id)).toBe(false);
   expect(await isSlotFree(database.db, before!.id)).toBe(true);
   expect(await isSlotFree(database.db, after!.id)).toBe(true);
-  expect(
-    await listAvailableSlots(database.db, {
-      practitionerId: clinic.practitioners.saturdays,
-      after: new Date('2026-10-22T00:00:00Z'),
-      until: new Date('2026-10-23T00:00:00Z'),
-    }),
-  ).not.toHaveLength(0);
+  const otherSlots = await listAvailableSlots(database.db, {
+    practitionerId: clinic.practitioners.saturdays,
+    after: new Date('2026-10-22T00:00:00Z'),
+    until: new Date('2026-10-23T00:00:00Z'),
+  });
+  expect(otherSlots.some((slot) => slot.startsAt < target!.endsAt && slot.endsAt > target!.startsAt)).toBe(true);
   await expect(bookSlot(deps(), { patientId: clinic.patient2.id, slotId: target!.id })).rejects.toMatchObject({
     code: 'slot_blocked',
   });

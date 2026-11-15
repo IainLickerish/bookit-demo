@@ -29,3 +29,12 @@ export const BLOCK_MESSAGES = {
   saved: 'Blocked period saved.',
   invalid: 'The blocked period could not be saved. Correct the fields below and try again.',
 } as const;
+
+export const BLOCK_FIELD_ERRORS = {
+  practitionerId: 'Choose someone from the list.',
+  reason: 'Keep the reason to 500 characters or fewer.',
+  dateTime: 'Enter a valid date and time.',
+  start: 'Enter a valid start date and time in the clinic’s time zone. This time may be skipped when clocks change.',
+  end: 'Enter a valid end date and time in the clinic’s time zone. This time may be skipped when clocks change.',
+  endBeforeStart: 'Enter an end date and time after the start.',
+} as const;
