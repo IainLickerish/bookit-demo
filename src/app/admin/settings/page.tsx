@@ -70,6 +70,21 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           />
           Include contact details in confirmation emails
         </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            name="remindersEnabled"
+            defaultChecked={settings.remindersEnabled}
+            className="w-auto min-h-11 min-w-11"
+            aria-describedby="reminder-hint"
+            data-testid="admin-reminders-enabled"
+          />
+          Send booking reminder emails
+        </label>
+        <p id="reminder-hint" className="text-sm" data-testid="admin-reminders-hint">
+          Send one reminder around 24 hours before each booking. Switching this off stops reminders that have not been
+          sent. Bookings made less than 24 hours ahead receive a reminder shortly after booking.
+        </p>
         <button type="submit" className="button" data-testid="admin-save-settings">
           Save settings
         </button>

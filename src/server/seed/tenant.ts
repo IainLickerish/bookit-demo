@@ -27,7 +27,9 @@ export const tenantSchema = z
     allowedSenderDomains: z.array(text).length(1),
     mailFrom: fictionalEmail,
     branding: z.strictObject({ practitionerLabel: text, welcome: text }),
-    settings: clinicSettingsInput.strict(),
+    // Keep seed identity unchanged when upgrading an existing clinic.
+    // The new reminder setting is supplied by the database default.
+    settings: clinicSettingsInput.omit({ remindersEnabled: true }).strict(),
     supportHours: text,
     tone: text,
     contacts: z

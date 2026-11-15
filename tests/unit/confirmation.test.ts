@@ -14,6 +14,7 @@ import { captureLogs } from '../helpers/logs';
 import { recordingMailer, TEST_MAIL_FROM, testMail } from '../helpers/mail';
 
 const settings: ClinicSettings = {
+  remindersEnabled: true,
   clinicName: 'Test Physio Clinic',
   timeZone: 'Europe/London',
   lateCancellationHours: 24,

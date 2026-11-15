@@ -204,3 +204,40 @@ failing-then-passing tests live in SupportAgents under `demo/bookit-expected/`.
 BookIt's ordinary tests exercise unaffected cancellation/export/display cases and
 must pass both on this baseline and after each expected fix. The tenant seed keeps
 its Unicode names and DST reference slots so those defects remain reproducible.
+
+## Booking reminders
+
+The Node application checks for due reminders on startup and every 10 seconds
+following each completed check, including when nobody visits the site. Keep the
+application running. Each pass handles up to 100 bookings for its configured clinic
+database, using the shared application clock. Reminders are due at 24 elapsed hours
+before the current slot, rather than the same local time on the previous calendar
+day. All reminders show UK time with `formatSlot`, including through clock changes.
+Upcoming bookings made within 24 hours and reminders missed during downtime are
+picked up on the next pass. Started and cancelled bookings are excluded.
+
+Staff control **Send booking reminder emails** in **Clinic settings**. It starts
+on, including for existing bookings. A switch-off takes effect when saved; it may
+wait for a send already in progress. Other clinics keep their own settings and
+reminders. Links use `BOOKIT_PUBLIC_URL` and existing authenticated booking pages.
+SMTP still accepts only fictional `.test` senders and recipients (PR-21).
+
+Migration `0002_fast_tusk.sql` adds `clinic_settings.reminders_enabled` (default
+true) and nullable `booking.reminder_attempted_at`. No booking, account or phone
+is changed. Seed configuration and its fingerprint stay unchanged, allowing
+existing demos to restart. The upgrade test covers a populated pre-change database;
+ordinary integration tests also migrate an empty database (EN-6).
+
+Each reminder attempt is committed before SMTP is contacted. Booking and setting
+locks then protect a fresh eligibility check and the send, preventing stale moves,
+cancellations or a saved switch-off from being ignored. The attempt survives moves,
+restarts and failures. Because SMTP cannot guarantee whether a timed-out delivery
+was accepted, reminders are never retried, even after an uncertain response or a
+crash between claiming and sending. My bookings remains the place to check.
+When SMTP is unconfigured, no attempts are consumed. Logs contain references and
+hashed recipients, never email bodies or addresses (PS-6, EN-4).
+
+To stop reminders, save the clinic switch as off. To roll back the application,
+use the previous image and retain the additive columns and attempt history. Do not
+drop or clear that history: it could cause duplicate reminders on re-upgrade. No
+existing data needs restoring. Apply any later schema correction as a new migration.
