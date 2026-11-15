@@ -149,3 +149,18 @@ export async function resetLink(address: string, seen: string[] = []): Promise<{
     .not.toBe('');
   return found;
 }
+
+/** Download the current staff selection through the page's export link. */
+export async function downloadBookingsCsv(page: Page): Promise<string> {
+  const pending = page.waitForEvent('download');
+  await page.getByTestId('admin-export').click();
+  const download = await pending;
+  expect(download.suggestedFilename()).toBe('bookings.csv');
+  expect(await download.failure()).toBeNull();
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const bytes = Buffer.concat(chunks);
+  expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  return bytes.toString('utf8').replace(/^\uFEFF/u, '');
+}

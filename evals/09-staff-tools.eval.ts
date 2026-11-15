@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, PATIENT_1, bookSlot, londonDate, pickFreeSlot, sessionFor, step } from './support';
+import { ADMIN, PATIENT_1, bookSlot, downloadBookingsCsv, londonDate, pickFreeSlot, sessionFor, step } from './support';
 
 const CLIENT = 'Zoë Brontë';
 
@@ -17,6 +17,12 @@ test("Clinic staff can find a client's booking and change the clinic's settings"
     await staff.getByTestId('admin-date').fill(date);
     await staff.getByTestId('admin-filter').click();
     await expect(staff.getByTestId('admin-booking-row').filter({ hasText: CLIENT })).toContainText('Confirmed');
+  });
+
+  await step(staff, 'Download the filtered bookings and find the client in the CSV', async () => {
+    const csv = await downloadBookingsCsv(staff);
+    expect(csv).toContain(`"${CLIENT}"`);
+    expect(csv).toContain('"confirmed"');
   });
 
   const name = await step(staff, "Change the clinic's name and see it saved", async () => {
