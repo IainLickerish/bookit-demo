@@ -32,7 +32,12 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
         </p>
       ) : null}
       <p>Existing bookings stay confirmed. Check the warnings below and contact any affected clients.</p>
-      <BlockTimeForm practitioners={practitioners} practitionerLabel={label} timeZone={settings.timeZone} />
+      <BlockTimeForm
+        key={typeof params.saved === 'string' ? params.saved : 'new'}
+        practitioners={practitioners}
+        practitionerLabel={label}
+        timeZone={settings.timeZone}
+      />
       <h2>Saved blocked periods</h2>
       {periods.length === 0 ? (
         <p data-testid="no-blocks">No blocked periods yet. Use the form above to add one.</p>
@@ -57,8 +62,11 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
                   <ul>
                     {period.bookings.map((booking) => (
                       <li key={booking.bookingId} data-testid="block-affected-booking">
-                        {booking.patientName}: {formatSlot(booking.startsAt, settings.timeZone)} to{' '}
-                        {formatSlot(booking.endsAt, settings.timeZone)}. Confirmed.
+                        {booking.patientName}:{' '}
+                        <span data-testid="block-affected-start">
+                          {formatSlot(booking.startsAt, settings.timeZone)}
+                        </span>{' '}
+                        to {formatSlot(booking.endsAt, settings.timeZone)}. Confirmed.
                       </li>
                     ))}
                   </ul>

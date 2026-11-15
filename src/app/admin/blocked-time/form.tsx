@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { saveBlockedPeriodAction, type BlockFormState } from './actions';
 
 export function BlockTimeForm({
@@ -14,6 +14,7 @@ export function BlockTimeForm({
 }) {
   const initial: BlockFormState = { values: { practitionerId: '', start: '', end: '', reason: '' }, errors: {} };
   const [state, action, pending] = useActionState(saveBlockedPeriodAction, initial);
+  const [values, setValues] = useState(state.values);
   return (
     <form action={action} className="my-6 space-y-4" aria-busy={pending} noValidate>
       {state.message ? (
@@ -25,7 +26,8 @@ export function BlockTimeForm({
         {practitionerLabel}
         <select
           name="practitionerId"
-          defaultValue={state.values.practitionerId}
+          value={values.practitionerId}
+          onChange={(event) => setValues({ ...values, practitionerId: event.target.value })}
           required
           aria-invalid={!!state.errors.practitionerId}
           aria-describedby="block-practitioner-error"
@@ -48,7 +50,8 @@ export function BlockTimeForm({
         <input
           type="datetime-local"
           name="start"
-          defaultValue={state.values.start}
+          value={values.start}
+          onChange={(event) => setValues({ ...values, start: event.target.value })}
           required
           aria-invalid={!!state.errors.start}
           aria-describedby="block-zone block-start-error"
@@ -61,7 +64,8 @@ export function BlockTimeForm({
         <input
           type="datetime-local"
           name="end"
-          defaultValue={state.values.end}
+          value={values.end}
+          onChange={(event) => setValues({ ...values, end: event.target.value })}
           required
           aria-invalid={!!state.errors.end}
           aria-describedby="block-zone block-end-error"
@@ -75,7 +79,8 @@ export function BlockTimeForm({
         Reason (optional)
         <input
           name="reason"
-          defaultValue={state.values.reason}
+          value={values.reason}
+          onChange={(event) => setValues({ ...values, reason: event.target.value })}
           maxLength={500}
           aria-invalid={!!state.errors.reason}
           aria-describedby="block-reason-error"

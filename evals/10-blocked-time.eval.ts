@@ -33,12 +33,17 @@ test(SAVE_CRITERION, async ({ browser }) => {
     await expect(staff.getByTestId('block-end-error')).toContainText('after the start');
     await expect(staff.getByTestId('block-start')).toHaveValue(`${date}T12:00`);
     await expect(staff.getByTestId('block-reason')).toHaveValue('Validation journey');
+    await expect(staff.getByTestId('block-end')).toHaveValue(`${date}T11:00`);
+    await expect(
+      staff.getByTestId('block-practitioner').getByRole('option', { name: PRACTITIONER, exact: true }),
+    ).toHaveJSProperty('selected', true);
   });
   await step(staff, 'Correct the end and save without an optional reason', async () => {
     await staff.getByTestId('block-end').fill(`${date}T13:00`);
     await staff.getByTestId('block-reason').fill('');
     await staff.getByTestId('block-save').click({ timeout: 10_000 });
     await expect(staff.getByTestId('block-saved')).toHaveText('Blocked period saved.');
+    await expect(staff.getByTestId('block-error')).toHaveCount(0);
   });
   await step(staff, 'Return to the saved period and see that no bookings overlap it', async () => {
     await staff.reload();
@@ -139,7 +144,9 @@ test(WARNING_CRITERION, async ({ browser }) => {
     await expect(period.getByTestId('block-warning')).toContainText('Contact these clients');
     await expect(period.getByTestId('block-affected-booking')).toHaveCount(2);
     for (const when of [booked.firstWhen, booked.secondWhen]) {
-      const row = period.getByTestId('block-affected-booking').filter({ hasText: when });
+      const row = period
+        .getByTestId('block-affected-booking')
+        .filter({ has: staff.getByTestId('block-affected-start').getByText(when, { exact: true }) });
       await expect(row).toContainText('Zoë Brontë');
       await expect(row).toContainText('Confirmed');
     }
