@@ -61,8 +61,11 @@ Sign-in and booking confirmation use a single centred card no wider than 440px. 
 On phones, booking steps place the main action in a fixed bottom bar, with space below the content so nothing is
 hidden. Keep scrolling within tables and phone day strips, without sideways page scrolling (DS-4).
 
-The shared foundation and client and account screens now use these styles. Staff bookings, staff settings and
-fallback screens receive their page layouts in the final step.
+All screens use the shared foundation. Staff bookings use separate filter and result cards, with a stone table
+heading and the existing status words in pills. Keep horizontal scrolling within the focusable table region so
+keyboard users can reach every column at phone widths and 200% zoom. The settings form uses one readable white
+card, with its existing messages above it. Error and page-not-found screens use centred cards, their existing words
+and their existing retry or return action. Neither fallback adds a new destination or recovery step.
 
 Client and account screens keep their existing words and actions. Title headers reuse existing explanations where
 available; they do not add introductory copy. Home retains its redirects to sign-in or My bookings, with the existing

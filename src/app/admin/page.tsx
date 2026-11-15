@@ -30,14 +30,16 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   const rows = invalid ? [] : await listAdminBookings(db, filters, settings.timeZone);
   const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
   return (
-    <section>
-      <h1>Clinic bookings</h1>
-      <p>
-        <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
-          Clinic settings
-        </Link>
-      </p>
-      <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
+    <section data-testid="admin-bookings-page">
+      <header className="page-header">
+        <h1>Clinic bookings</h1>
+        <p>
+          <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
+            Clinic settings
+          </Link>
+        </p>
+      </header>
+      <form method="get" action="/admin" className="card staff-filters" data-testid="admin-filters">
         <label>
           Practitioner
           <select name="practitionerId" defaultValue={filters.practitionerId ?? ''} data-testid="admin-practitioner">
@@ -61,25 +63,35 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
             <option value="cancelled">Cancelled</option>
           </select>
         </label>
-        <button className="button" type="submit" data-testid="admin-filter">
-          Filter bookings
-        </button>
-        <Link href="/admin" prefetch={false} className="button-secondary">
-          Clear filters
-        </Link>
+        <div className="staff-filter-actions">
+          <button className="button" type="submit" data-testid="admin-filter">
+            Filter bookings
+          </button>
+          <Link href="/admin" prefetch={false} className="button-secondary">
+            Clear filters
+          </Link>
+        </div>
       </form>
       {invalid ? (
         <p role="alert" className="alert" data-testid="admin-filter-error">
           Choose a valid practitioner, calendar date and booking status.
         </p>
       ) : (
-        <>
-          <p data-testid="admin-row-count">{rows.length} bookings</p>
-          <a href={`/api/admin/export?${exportQuery}`} className="button-secondary my-3" data-testid="admin-export">
-            Export filtered bookings (CSV)
-          </a>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+        <div className="card staff-results" data-testid="admin-results">
+          <div className="section-toolbar">
+            <p data-testid="admin-row-count">{rows.length} bookings</p>
+            <a href={`/api/admin/export?${exportQuery}`} className="button-secondary" data-testid="admin-export">
+              Export filtered bookings (CSV)
+            </a>
+          </div>
+          <div
+            className="table-scroll"
+            role="region"
+            aria-label={`Clinic bookings in ${settings.timeZone}`}
+            tabIndex={0}
+            data-testid="admin-table-scroll"
+          >
+            <table className="staff-table" data-testid="admin-table">
               <caption className="sr-only">Clinic bookings in {settings.timeZone}</caption>
               <thead>
                 <tr>
@@ -91,24 +103,30 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="border-t" data-testid="admin-booking-row">
-                    <td className="py-3">{row.patientName}</td>
+                  <tr key={row.id} data-testid="admin-booking-row">
+                    <td>{row.patientName}</td>
                     <td>{row.practitionerName}</td>
                     <td>{formatSlot(row.startsAt, settings.timeZone)}</td>
                     <td>
-                      {row.status === 'confirmed'
-                        ? 'Confirmed'
-                        : row.lateCancellation
-                          ? 'Cancelled (late)'
-                          : 'Cancelled'}
+                      <span className={`status-pill status-${row.status}`} data-testid="admin-booking-status">
+                        {row.status === 'confirmed'
+                          ? 'Confirmed'
+                          : row.lateCancellation
+                            ? 'Cancelled (late)'
+                            : 'Cancelled'}
+                      </span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {rows.length === 0 ? <p>No bookings match these filters.</p> : null}
-        </>
+          {rows.length === 0 ? (
+            <p className="empty-state" data-testid="admin-empty">
+              No bookings match these filters.
+            </p>
+          ) : null}
+        </div>
       )}
     </section>
   );

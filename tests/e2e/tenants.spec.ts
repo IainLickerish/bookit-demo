@@ -342,3 +342,34 @@ test('both clinics use the client cards without changing clinic names or booking
     }
   }
 });
+
+test('both clinics use the staff cards and contain table scrolling on phones', async ({ browser }) => {
+  for (const clinic of [acme, beacon]) {
+    const context = await signIn(browser, clinic, 'admin');
+    try {
+      const page = context.pages()[0]!;
+      await page.getByTestId('nav-admin').click();
+      await expect(page.getByTestId('admin-filters')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('admin-results')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      await expect(page.getByTestId('admin-table').locator('thead')).toHaveCSS(
+        'background-color',
+        'rgb(241, 238, 232)',
+      );
+      await expect(page.getByTestId('clinic-name')).toHaveText(clinic.tenant.settings.clinicName);
+      await page.setViewportSize({ width: 320, height: 740 });
+      const table = page.getByTestId('admin-table-scroll');
+      await expect(table).toHaveAttribute('tabindex', '0');
+      await expect(table).toHaveCSS('overflow-x', 'auto');
+      expect(await table.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.getByTestId('admin-settings-link').click();
+      await expect(page.getByTestId('admin-settings-form')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('admin-clinic-name')).toHaveValue(clinic.tenant.settings.clinicName);
+      await page.goto(`${clinic.url}/premium-design-missing-page`);
+      await expect(page.getByTestId('not-found')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('clinic-name')).toHaveText(clinic.tenant.settings.clinicName);
+    } finally {
+      await context.close();
+    }
+  }
+});
