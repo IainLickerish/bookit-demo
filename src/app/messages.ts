@@ -24,3 +24,8 @@ export function errorText(code: string | undefined): string | null {
 }
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export const BLOCK_MESSAGES = {
+  saved: 'Blocked period saved.',
+  invalid: 'The blocked period could not be saved. Correct the fields below and try again.',
+} as const;

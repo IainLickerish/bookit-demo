@@ -257,6 +257,53 @@ test('REQ-18.2-01 patient sees the three-hour appointment, rerun seed preserves 
   }
 });
 
+test('blocked time controls, reasons and warnings stay with clinic staff in each tenant', async ({ browser }) => {
+  for (const [clinic, other] of [
+    [acme, beacon],
+    [beacon, acme],
+  ] as const) {
+    const staff = await signIn(browser, clinic, 'admin');
+    const patient = await signIn(browser, clinic, 'patient1');
+    const visitor = await browser.newContext();
+    const reason = `${clinic.tenant.settings.clinicName} training only`;
+    try {
+      const page = staff.pages()[0]!;
+      await page.goto(`${clinic.url}/admin`);
+      await page.getByTestId('admin-blocked-time-link').click();
+      await page.getByTestId('block-practitioner').selectOption({ label: clinic.tenant.practitioners[0]!.name });
+      await page.getByTestId('block-start').fill('2026-12-10T10:00');
+      await page.getByTestId('block-end').fill('2026-12-10T11:00');
+      await page.getByTestId('block-reason').fill(reason);
+      await page.getByTestId('block-save').click();
+      await expect(page.getByTestId('block-saved')).toBeVisible();
+      const period = page.getByTestId('blocked-period').filter({ hasText: reason });
+      await expect(period.getByTestId('block-no-bookings')).toBeVisible();
+      await expect(page.getByLabel(clinic.tenant.branding.practitionerLabel, { exact: false })).toBeVisible();
+      const clientPage = patient.pages()[0]!;
+      await clientPage.goto(`${clinic.url}/admin/blocked-time`);
+      await expect(clientPage).toHaveURL(`${clinic.url}/bookings`);
+      await expect(clientPage.getByTestId('block-reason')).toHaveCount(0);
+      await expect(clientPage.getByText(reason)).toHaveCount(0);
+      const guest = await visitor.newPage();
+      await guest.goto(`${clinic.url}/admin/blocked-time`);
+      await expect(guest).toHaveURL(`${clinic.url}/auth/sign-in`);
+      await expect(guest.getByText(reason)).toHaveCount(0);
+      const foreignStaff = await signIn(browser, other, 'admin');
+      try {
+        const foreignPage = foreignStaff.pages()[0]!;
+        await foreignPage.goto(`${other.url}/admin/blocked-time`);
+        await expect(foreignPage.getByText(reason)).toHaveCount(0);
+      } finally {
+        await foreignStaff.close();
+      }
+    } finally {
+      await staff.close();
+      await patient.close();
+      await visitor.close();
+    }
+  }
+});
+
 test('REQ-18.1-06 container build requires GIT_COMMIT and the production image refuses the virtual clock', async () => {
   test.setTimeout(900_000);
   const directory = tenantEvidenceDirectory('production-build');

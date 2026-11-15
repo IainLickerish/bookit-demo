@@ -42,6 +42,6 @@ export async function startTestDatabase(poolSize = 25): Promise<TestDatabase> {
 
 export async function emptyDatabase(db: Database): Promise<void> {
   await db.execute(
-    sql`truncate table "booking", "session", "password_reset_token", "slot", "practitioner", "user", "clinic_settings"`,
+    sql`truncate table "practitioner_block", "booking", "session", "password_reset_token", "slot", "practitioner", "user", "clinic_settings"`,
   );
 }

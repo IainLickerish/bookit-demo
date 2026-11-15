@@ -8,6 +8,7 @@ import { composeConfirmation } from '../notifications/confirmation';
 import { deliverEmail, type MailSettings } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
+import { assertSlotNotBlocked } from '../slots/blocked';
 import { findUserById } from '../users';
 import { BookingError } from './errors';
 import { findBookingForPatient, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
@@ -40,6 +41,7 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
       throw new BookingError('slot_not_found');
     }
     assertSlotBookable(slot.startsAt, now, settings);
+    await assertSlotNotBlocked(tx, slot);
     const id = newId(deps.clock);
     try {
       await tx.insert(bookings).values({

@@ -3,6 +3,7 @@ import { bookings, slots } from '@/db/schema';
 import { isUniqueViolation } from '../errors';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
+import { assertSlotNotBlocked } from '../slots/blocked';
 import type { BookingDependencies } from './book';
 import { BookingError } from './errors';
 import { findBookingForPatient, isUuid, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
@@ -24,6 +25,18 @@ export async function rescheduleBooking(
   const now = deps.clock.now();
   const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
+    const existing = await findBookingForPatient(tx, request.patientId, request.bookingId);
+    if (!existing) throw new BookingError('booking_not_found');
+    assertReschedulable(existing, request.newSlotId, now, settings);
+    // Lock the target practitioner before the booking, like bookSlot. Recheck the
+    // booking below after locking it, because another move may have just finished.
+
+    const target = await findBookableSlot(tx, request.newSlotId);
+    if (!target) {
+      throw new BookingError('slot_not_found');
+    }
+    assertSlotBookable(target.startsAt, now, settings);
+    await assertSlotNotBlocked(tx, target);
     const [locked] = await tx
       .select({
         status: bookings.status,
@@ -39,11 +52,6 @@ export async function rescheduleBooking(
       throw new BookingError('booking_not_found');
     }
     assertReschedulable(locked, request.newSlotId, now, settings);
-    const target = await findBookableSlot(tx, request.newSlotId);
-    if (!target) {
-      throw new BookingError('slot_not_found');
-    }
-    assertSlotBookable(target.startsAt, now, settings);
     try {
       await tx
         .update(bookings)
