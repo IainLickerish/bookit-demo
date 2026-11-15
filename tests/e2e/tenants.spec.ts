@@ -292,3 +292,42 @@ test('REQ-18.1-06 container build requires GIT_COMMIT and the production image r
     writeTenantEvidence(directory, results, logs.join('\n'), acme.canaries);
   }
 });
+
+test('calendar downloads work for each clinic and refuse accounts or sessions from the other clinic', async ({
+  browser,
+}) => {
+  const a = await signIn(browser, acme, 'patient1');
+  const b = await signIn(browser, beacon, 'patient1');
+  try {
+    for (const [own, clinic, foreign, otherClinic] of [
+      [a, acme, b, beacon],
+      [b, beacon, a, acme],
+    ] as const) {
+      const page = own.pages()[0]!;
+      await page.goto(`${clinic.url}/bookings`);
+      const row = page.getByTestId('booking-row').filter({ hasText: '11:00' });
+      const link = row.getByTestId('add-to-calendar');
+      await expect(link).toBeVisible();
+      const path = (await link.getAttribute('href'))!;
+      const file = await own.request.get(`${clinic.url}${path}`);
+      expect(file.status()).toBe(200);
+      expect((await file.text()).replace(/\r\n /g, '')).toContain(`LOCATION:${clinic.tenant.settings.clinicName}`);
+      const unknown = await foreign.request.get(`${otherClinic.url}${path}`);
+      expect(unknown.status()).toBe(404);
+      expect(await unknown.text()).not.toContain('BEGIN:VCALENDAR');
+      const unsigned = await browser.newContext();
+      try {
+        const refused = await unsigned.request.get(`${clinic.url}${path}`);
+        expect(refused.status()).toBe(401);
+        await unsigned.addCookies(await foreign.cookies());
+        const foreignSession = await unsigned.request.get(`${clinic.url}${path}`);
+        expect(foreignSession.status()).toBe(401);
+      } finally {
+        await unsigned.close();
+      }
+    }
+  } finally {
+    await a.close();
+    await b.close();
+  }
+});

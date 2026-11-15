@@ -1,5 +1,6 @@
 'use server';
 
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Logger } from '@/lib/logger';
 import { bookSlot } from '@/server/bookings/book';
@@ -8,11 +9,22 @@ import { BookingError, type BookingErrorCode } from '@/server/bookings/errors';
 import { isUuid } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { withoutQueryDetails } from '@/server/errors';
-import { bookingDependencies, requirePatient } from '@/server/request-context';
+import { bookingDependencies, requirePatient, secureCookies } from '@/server/request-context';
 
 function formText(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === 'string' ? value : '';
+}
+
+/** Remember which saved booking the confirmation notice belongs to, without changing its URL. */
+async function rememberConfirmation(bookingId: string): Promise<void> {
+  (await cookies()).set('bookit_booking_confirmation', bookingId, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: await secureCookies(),
+    path: '/bookings',
+    maxAge: 300,
+  });
 }
 
 /** The code of a refused booking operation; anything else is rethrown. */
@@ -33,11 +45,12 @@ export async function bookAction(formData: FormData): Promise<void> {
   const slotId = formText(formData, 'slotId');
   let destination: string;
   try {
-    await bookSlot(deps, {
+    const booking = await bookSlot(deps, {
       patientId: patient.id,
       slotId,
       phone: formText(formData, 'phone'),
     });
+    await rememberConfirmation(booking.id);
     destination = '/bookings?notice=booked';
   } catch (error) {
     const code = refusalCode(error, deps.log, 'book');
@@ -68,11 +81,12 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
   const bookingId = formText(formData, 'bookingId');
   let destination: string;
   try {
-    await rescheduleBooking(deps, {
+    const booking = await rescheduleBooking(deps, {
       patientId: patient.id,
       bookingId,
       newSlotId: formText(formData, 'newSlotId'),
     });
+    await rememberConfirmation(booking.id);
     destination = '/bookings?notice=rescheduled';
   } catch (error) {
     const code = refusalCode(error, deps.log, 'reschedule');

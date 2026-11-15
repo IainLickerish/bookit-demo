@@ -1,4 +1,8 @@
 export const BOOKING_ERRORS = {
+  calendar_unavailable: {
+    status: 503,
+    message: 'Sorry, the calendar file is unavailable. Your booking is saved. Please try again from My bookings.',
+  },
   not_a_patient: {
     status: 403,
     message: 'Only patients can book appointments.',

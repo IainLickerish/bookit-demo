@@ -1,5 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { bookings, slots } from '@/db/schema';
+import { sendConfirmation } from '../notifications/confirmation';
+import { findUserById } from '../users';
 import { isUniqueViolation } from '../errors';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
@@ -22,7 +24,7 @@ export async function rescheduleBooking(
     throw new BookingError('booking_not_found');
   }
   const now = deps.clock.now();
-  const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
+  const { booking, previousSlotId, confirmation } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
       .select({
@@ -63,7 +65,13 @@ export async function rescheduleBooking(
     if (!moved) {
       throw new Error('A booking updated in this transaction could not be read back.');
     }
-    return { booking: moved, previousSlotId: locked.slotId };
+    const patient = await findUserById(tx, request.patientId);
+    if (!patient || patient.role !== 'patient') throw new BookingError('not_a_patient');
+    return {
+      booking: moved,
+      previousSlotId: locked.slotId,
+      confirmation: { booking: moved, patient, settings, from: deps.mail.from, moved: true },
+    };
   });
   deps.log.info(
     {
@@ -75,5 +83,6 @@ export async function rescheduleBooking(
     },
     'Booking rescheduled',
   );
+  await sendConfirmation(confirmation, deps.mail, deps.log);
   return booking;
 }

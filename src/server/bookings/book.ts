@@ -4,8 +4,8 @@ import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
 import type { Logger } from '@/lib/logger';
 import { isUniqueViolation } from '../errors';
-import { composeConfirmation } from '../notifications/confirmation';
-import { deliverEmail, type MailSettings } from '../notifications/deliver';
+import { sendConfirmation } from '../notifications/confirmation';
+import type { MailSettings } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
 import { findUserById } from '../users';
@@ -64,11 +64,10 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     if (!created) {
       throw new Error('A booking inserted in this transaction could not be read back.');
     }
-    // Composed inside the transaction, so a booking is only confirmed if its
-    // confirmation can be written; it is sent once the booking has committed.
+    // Keep the saved snapshot for delivery after commit.
     return {
       booking: created,
-      confirmation: composeConfirmation({ booking: created, patient, settings, from: deps.mail.from }),
+      confirmation: { booking: created, patient, settings, from: deps.mail.from },
     };
   });
   deps.log.info(
@@ -82,6 +81,6 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     'Booking confirmed',
   );
   // A failed email never undoes the booking; the patient still sees it in "My bookings".
-  await deliverEmail(deps.mail, deps.log, confirmation, 'confirmation', { booking_id: booking.id });
+  await sendConfirmation(confirmation, deps.mail, deps.log);
   return booking;
 }
