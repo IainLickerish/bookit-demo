@@ -76,6 +76,32 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
 }
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
+  it('downloads the selected Unicode booking and headings only for an empty selection', async () => {
+    const originalName = ADMIN_PATIENT_NAMES[0]!;
+    const patientName = 'Zoë Brontë, "Łukasz"\nSiobhán Ó Briain';
+    await acme.db.update(users).set({ name: patientName }).where(eq(users.name, originalName));
+    try {
+      const query = `practitionerId=${fixture.practitionerId}&date=2026-10-24`;
+      const response = await report(`${query}&status=confirmed`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+      expect(response.headers.get('content-disposition')).toBe('attachment; filename="bookings.csv"');
+      expect(response.headers.get('cache-control')).toBe('private, no-store');
+      const bytes = Buffer.from(await response.arrayBuffer());
+      expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+      const csv = bytes.toString('utf8');
+      expect(csv).toContain(`"${fixture.bookingIds[0]}","Zoë Brontë, ""Łukasz""\nSiobhán Ó Briain"`);
+      for (const id of fixture.bookingIds.slice(1)) expect(csv).not.toContain(id);
+      const empty = await report(`${query}&status=cancelled`);
+      expect(empty.status).toBe(200);
+      expect(Buffer.from(await empty.arrayBuffer()).toString('utf8')).toBe(
+        '\uFEFF"Booking ID","Patient","Practitioner","Start (UTC)","End (UTC)","Status","Late cancellation","Phone"\r\n',
+      );
+      expect(JSON.stringify(logs.lines)).not.toContain(patientName);
+    } finally {
+      await acme.db.update(users).set({ name: originalName }).where(eq(users.name, patientName));
+    }
+  });
   it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);

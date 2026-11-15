@@ -168,8 +168,11 @@ test('REQ-18.2-01 admin pages and downloaded exports contain only their own seed
       await page.goto(`${clinic.url}/admin`);
       await expect(page.locator('table')).toContainText(ownName);
       await expect(page.locator('table')).not.toContainText(foreignName);
-      // Ordinary export coverage uses an empty selection; the seeded Unicode
-      // export regression is exercised externally by SupportAgents' DEF-02 test.
+      const populated = await context.request.get(`${clinic.url}/api/admin/export`);
+      expect(populated.status()).toBe(200);
+      const populatedCsv = (await populated.body()).toString('utf8');
+      expect(populatedCsv).toContain(ownName);
+      expect(populatedCsv).not.toContain(foreignName);
       const exported = await context.request.get(`${clinic.url}/api/admin/export?date=2026-10-21&status=cancelled`);
       expect(exported.status()).toBe(200);
       const csv = await exported.body();
@@ -181,9 +184,15 @@ test('REQ-18.2-01 admin pages and downloaded exports contain only their own seed
     }
     const foreign = await browser.newContext();
     try {
-      await foreign.addCookies(await a.cookies());
-      const response = await foreign.request.get(`${beacon.url}/api/admin/export`);
-      expect(response.status()).toBe(401);
+      for (const [session, otherClinic] of [
+        [a, beacon],
+        [b, acme],
+      ] as const) {
+        await foreign.clearCookies();
+        await foreign.addCookies(await session.cookies());
+        const response = await foreign.request.get(`${otherClinic.url}/api/admin/export`);
+        expect(response.status()).toBe(401);
+      }
     } finally {
       await foreign.close();
     }

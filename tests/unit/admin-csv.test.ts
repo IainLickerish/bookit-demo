@@ -5,6 +5,25 @@ import { bookingsCsv, csvField } from '@/server/export/csv';
 import { adminLogEvidence } from '../helpers/admin-evidence';
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
+  it.each(['Zoë Brontë', 'Łukasz Wiśniewski', 'Siobhán Ó Briain', '林 明', 'Ζωή', 'Zoe\u0308 Bronte\u0308'])(
+    'preserves non-English client names in UTF-8 CSV: %s',
+    (patientName) => {
+      const csv = bookingsCsv([
+        {
+          id: 'unicode-booking',
+          patientName,
+          practitionerId: 'p1',
+          practitionerName: 'Pat',
+          startsAt: new Date('2026-10-25T09:00:00Z'),
+          endsAt: new Date('2026-10-25T09:45:00Z'),
+          status: 'confirmed',
+          lateCancellation: false,
+          phone: null,
+        },
+      ]);
+      expect(Buffer.from(csv, 'utf8').toString('utf8')).toContain(`"${patientName}"`);
+    },
+  );
   it('writes a BOM, RFC 4180 quotes and CRLF records with embedded newlines', () => {
     const csv = bookingsCsv([
       {
