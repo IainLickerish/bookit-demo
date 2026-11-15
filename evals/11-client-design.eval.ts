@@ -13,11 +13,29 @@ import {
   step,
 } from './support';
 
-async function expectCard(card: Locator): Promise<void> {
+async function expectCard(card: Locator, frame?: Locator): Promise<void> {
   await expect(card).toBeVisible();
   await expect(card).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(card).toHaveCSS('border-radius', '20px');
   await expect(card).not.toHaveCSS('box-shadow', 'none');
+  if (frame) {
+    await expect(card).toHaveCSS('max-width', '440px');
+    const cardBox = await card.boundingBox();
+    const frameBox = await frame.boundingBox();
+    expect(cardBox).not.toBeNull();
+    expect(frameBox).not.toBeNull();
+    expect(frameBox!.width).toBeGreaterThan(cardBox!.width);
+    await expect
+      .poll(
+        async () => {
+          const [cardBounds, frameBounds] = await Promise.all([card.boundingBox(), frame.boundingBox()]);
+          if (!cardBounds || !frameBounds) return Infinity;
+          return Math.abs(cardBounds.x + cardBounds.width / 2 - (frameBounds.x + frameBounds.width / 2));
+        },
+        { message: 'the account card is horizontally centred in the shared content frame' },
+      )
+      .toBeLessThanOrEqual(1);
+  }
 }
 
 async function expectNoSidewaysScroll(page: Page): Promise<void> {
@@ -39,12 +57,18 @@ async function expectBottomAction(page: Page, id: string): Promise<void> {
 test('Sign-in and password recovery screens present their forms and existing messages in centred white cards with serif title headers', async ({
   page,
 }) => {
-  await step(page, 'Open sign in on a phone and see its centred card', async () => {
+  await step(page, 'Open sign in on a phone and see its white card', async () => {
     await page.setViewportSize({ width: 320, height: 740 });
     await page.goto('/auth/sign-in');
     await expectCard(page.getByTestId('sign-in-card'));
     await expect(page.getByTestId('sign-in-card')).toHaveCSS('max-width', '440px');
     await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toHaveCSS('font-family', /Fraunces/);
+    await expectNoSidewaysScroll(page);
+  });
+  const frame = page.getByTestId('page-content');
+  await step(page, 'Widen the window and see the sign-in card centred in the content frame', async () => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expectCard(page.getByTestId('sign-in-card'), frame);
     await expectNoSidewaysScroll(page);
   });
   await step(page, 'See the existing wrong-password message within the card', async () => {
@@ -54,43 +78,50 @@ test('Sign-in and password recovery screens present their forms and existing mes
     await expect(page.getByTestId('sign-in-error')).toContainText('The email address or password is not correct.');
     await expect(page.getByTestId('sign-in-error')).toHaveAttribute('role', 'alert');
     await expect(page.getByTestId('sign-in-email')).toHaveAttribute('aria-describedby', 'sign-in-error');
-    await expectCard(page.getByTestId('sign-in-card'));
+    await expectCard(page.getByTestId('sign-in-card'), frame);
   });
   let path = '';
   await step(page, 'Request a reset link and see the existing neutral reply in the recovery card', async () => {
     const seen = (await mailTo(PATIENT_3)).map((message) => message.ID);
     await page.getByTestId('forgot-password-link').click();
-    await expectCard(page.getByTestId('forgot-password-card'));
+    await expectCard(page.getByTestId('forgot-password-card'), frame);
+    await expect(page.getByRole('heading', { name: 'Reset your password', exact: true })).toHaveCSS(
+      'font-family',
+      /Fraunces/,
+    );
     await page.getByTestId('forgot-password-email').fill(PATIENT_3);
     await page.getByTestId('forgot-password-submit').click();
     await expect(page.getByTestId('forgot-password-sent')).toContainText('If an account uses that email address');
     await expect(page.getByTestId('forgot-password-sent')).toHaveAttribute('role', 'status');
+    await expectCard(page.getByTestId('forgot-password-card'), frame);
     path = (await resetLink(PATIENT_3, seen)).path;
   });
   await step(page, 'Open the private reset link and see the new-password form in one card', async () => {
     await page.goto(path);
-    await expectCard(page.getByTestId('reset-password-card'));
+    await expectCard(page.getByTestId('reset-password-card'), frame);
     await expect(page.getByRole('heading', { name: 'Choose a new password' })).toHaveCSS('font-family', /Fraunces/);
     await page.getByTestId('reset-password-new').fill(demoPassword());
     await page.getByTestId('reset-password-confirm').fill('different-design-check-password');
     await page.getByTestId('reset-password-submit').click();
     await expect(page.getByTestId('reset-password-error')).toContainText('The two passwords do not match.');
-    await expectCard(page.getByTestId('reset-password-card'));
+    await expectCard(page.getByTestId('reset-password-card'), frame);
   });
   await step(page, 'Keep the demonstration password and return to the styled sign-in result', async () => {
     await page.getByTestId('reset-password-new').fill(demoPassword());
     await page.getByTestId('reset-password-confirm').fill(demoPassword());
     await page.getByTestId('reset-password-submit').click();
     await expect(page.getByTestId('sign-in-notice')).toContainText('Your password has been changed.');
-    await expectCard(page.getByTestId('sign-in-card'));
+    await expectCard(page.getByTestId('sign-in-card'), frame);
   });
   await step(page, 'Reopen the used link and see its existing refusal in the same card style', async () => {
     await page.goto(path);
-    await expectCard(page.getByTestId('reset-password-card'));
+    await expectCard(page.getByTestId('reset-password-card'), frame);
     await expect(page.getByTestId('reset-password-invalid')).toContainText(
       'This reset link has expired or has already been used.',
     );
     await expect(page.getByRole('link', { name: 'Request a new link' })).toBeVisible();
+    await page.setViewportSize({ width: 320, height: 740 });
+    await expectCard(page.getByTestId('reset-password-card'));
     await expectNoSidewaysScroll(page);
   });
 });
