@@ -343,7 +343,9 @@ test('staff can review older blocked periods and return to the latest periods', 
       expect(await page.getByTestId('blocked-period').count()).toBeLessThanOrEqual(20);
       seen.push(...(await page.getByTestId('block-period-reason').allTextContents()));
       if (!(await page.getByTestId('blocks-older').count())) break;
+      const olderHref = await page.getByTestId('blocks-older').getAttribute('href');
       await page.getByTestId('blocks-older').click();
+      await expect(page).toHaveURL(`${acme.url}${olderHref}`);
       await expect(page.getByTestId('blocks-latest')).toBeVisible();
     }
     expect(seen.filter((reason) => reason.startsWith('Reason: Paging journey training ')).sort()).toEqual(
