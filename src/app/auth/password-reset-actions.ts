@@ -9,9 +9,8 @@ import { publicBaseUrl, runtimeIdentity } from '@/lib/runtime-identity';
 import { completePasswordReset, requestPasswordReset, type ResetOutcome } from '@/server/auth/password-reset';
 import { getPasswordResetLimiter } from '@/server/auth/rate-limit';
 import { withoutQueryDetails } from '@/server/errors';
-import { deliverEmail } from '@/server/notifications/deliver';
+import { deliverEmail, mailSettings } from '@/server/notifications/deliver';
 import { clientIp, requestLogger } from '@/server/request-context';
-import { mailSettings } from '@/server/notifications/deliver';
 
 function formText(formData: FormData, name: string): string {
   const value = formData.get(name);

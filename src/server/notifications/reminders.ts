@@ -23,12 +23,15 @@ export async function sendDueReminders(deps: ReminderDependencies): Promise<void
     .select({ id: slots.id })
     .from(slots)
     .where(and(gt(slots.startsAt, now), lte(slots.startsAt, new Date(now.getTime() + REMINDER_LEAD_MS))));
+  const eligible = and(
+    eq(bookings.status, 'confirmed'),
+    isNull(bookings.reminderAttemptedAt),
+    inArray(bookings.slotId, dueSlots),
+  );
   const candidates = await deps.db
     .select({ id: bookings.id })
     .from(bookings)
-    .where(
-      and(eq(bookings.status, 'confirmed'), isNull(bookings.reminderAttemptedAt), inArray(bookings.slotId, dueSlots)),
-    )
+    .where(eligible)
     .orderBy(asc(bookings.id))
     .limit(100);
 
@@ -38,7 +41,7 @@ export async function sendDueReminders(deps: ReminderDependencies): Promise<void
     const claimed = await deps.db
       .update(bookings)
       .set({ reminderAttemptedAt: deps.clock.now() })
-      .where(and(eq(bookings.id, candidate.id), isNull(bookings.reminderAttemptedAt)))
+      .where(and(eq(bookings.id, candidate.id), eligible))
       .returning({ patientId: bookings.patientId });
     const owner = claimed[0];
     if (!owner) continue;

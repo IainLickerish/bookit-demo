@@ -75,7 +75,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             type="checkbox"
             name="remindersEnabled"
             defaultChecked={settings.remindersEnabled}
-            className="w-auto min-h-11 min-w-11"
+            className="checkbox"
             aria-describedby="reminder-hint"
             data-testid="admin-reminders-enabled"
           />

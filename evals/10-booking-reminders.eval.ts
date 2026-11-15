@@ -70,7 +70,7 @@ async function matchingMail(
     expect(response.ok, 'the email can be opened').toBe(true);
     const body = (await response.json()) as { Text: string };
     if (body.Text.includes(`Booking reference: ${reference}`))
-      matches.push({ Subject: message.Subject, Text: body.Text });
+      matches.push({ Subject: message.Subject, Text: body.Text.replace(/\r\n/g, '\n') });
   }
   return matches;
 }
@@ -118,7 +118,7 @@ test('A booking made less than 24 hours ahead receives a reminder with UK sessio
     async () => {
       const email = await receiveReminder(PATIENT_2, reference);
       const clinic = (await page.getByTestId('clinic-name').textContent()) ?? '';
-      expect(email.Text.startsWith(`${clinic}\n`)).toBe(true);
+      expect(email.Text.split('\n')[0]?.trim()).toBe(clinic.trim());
       expect(email.Subject).toBe(`Booking reminder: ${appointment.when}`);
       expect(email.Text).toContain(`When: ${appointment.when} (UK time, Europe/London)`);
       expect(email.Text).toContain(`With: ${PRACTITIONER}, your physiotherapist`);

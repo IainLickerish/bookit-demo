@@ -17,6 +17,9 @@
 }
 
 @layer components {
+  .checkbox {
+    @apply min-h-11 min-w-11 w-auto accent-[#1D5C4B] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1D5C4B];
+  }
   .button {
     @apply inline-block rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800;
   }
