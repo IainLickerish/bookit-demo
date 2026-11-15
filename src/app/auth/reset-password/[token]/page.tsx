@@ -32,8 +32,10 @@ export default async function ResetPasswordPage({
   );
   if (!usable) {
     return (
-      <section className="max-w-sm">
-        <h1>Reset your password</h1>
+      <section className="card card-centred account-card" data-testid="reset-password-card">
+        <header className="page-header">
+          <h1>Reset your password</h1>
+        </header>
         <p role="alert" className="alert" data-testid="reset-password-invalid">
           This reset link has expired or has already been used.
         </p>
@@ -46,10 +48,12 @@ export default async function ResetPasswordPage({
   const error = single((await searchParams).error);
   const message = error !== undefined && Object.hasOwn(ERRORS, error) ? ERRORS[error] : null;
   return (
-    <section className="max-w-sm">
-      <h1>Choose a new password</h1>
+    <section className="card card-centred account-card" data-testid="reset-password-card">
+      <header className="page-header">
+        <h1>Choose a new password</h1>
+      </header>
       {message ? (
-        <p role="alert" className="alert" data-testid="reset-password-error">
+        <p role="alert" className="alert" id="reset-password-error" data-testid="reset-password-error">
           {message}
         </p>
       ) : null}
@@ -63,6 +67,8 @@ export default async function ResetPasswordPage({
             autoComplete="new-password"
             minLength={MIN_PASSWORD_LENGTH}
             required
+            aria-invalid={message ? true : undefined}
+            aria-describedby={message ? 'reset-password-error' : undefined}
             data-testid="reset-password-new"
           />
         </label>
@@ -74,10 +80,12 @@ export default async function ResetPasswordPage({
             autoComplete="new-password"
             minLength={MIN_PASSWORD_LENGTH}
             required
+            aria-invalid={message ? true : undefined}
+            aria-describedby={message ? 'reset-password-error' : undefined}
             data-testid="reset-password-confirm"
           />
         </label>
-        <button type="submit" className="button" data-testid="reset-password-submit">
+        <button type="submit" className="button w-full" data-testid="reset-password-submit">
           Set new password
         </button>
       </form>

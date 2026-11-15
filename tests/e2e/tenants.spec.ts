@@ -317,3 +317,28 @@ test('both clinics share the premium header, palette and locally served fonts', 
     }
   }
 });
+
+test('both clinics use the client cards without changing clinic names or booking destinations', async ({ browser }) => {
+  for (const clinic of [acme, beacon]) {
+    const context = await signIn(browser, clinic, 'patient2');
+    try {
+      const page = context.pages()[0]!;
+      await page.setViewportSize({ width: 320, height: 740 });
+      await page.getByTestId('nav-book').click();
+      await expect(page.getByTestId('day-picker')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      await expect(page.getByTestId('day-picker')).toHaveCSS('border-radius', '20px');
+      await expect(page.getByTestId('day-action-bar')).toHaveCSS('position', 'fixed');
+      await expect(page.getByTestId('clinic-name')).toHaveText(clinic.tenant.settings.clinicName);
+      await expect(page.getByTestId('nav-my-bookings')).toHaveAttribute('href', '/bookings');
+      await page.getByTestId('sign-out').click();
+      await expect(page.getByTestId('sign-in-card')).toHaveCSS('max-width', '440px');
+      await expect(page.getByTestId('sign-in-card')).toHaveCSS('border-radius', '20px');
+      await page.getByTestId('forgot-password-link').click();
+      await expect(page.getByTestId('forgot-password-card')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      await expect(page.getByTestId('clinic-name')).toHaveText(clinic.tenant.settings.clinicName);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    } finally {
+      await context.close();
+    }
+  }
+});

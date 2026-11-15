@@ -61,8 +61,19 @@ Sign-in and booking confirmation use a single centred card no wider than 440px. 
 On phones, booking steps place the main action in a fixed bottom bar, with space below the content so nothing is
 hidden. Keep scrolling within tables and phone day strips, without sideways page scrolling (DS-4).
 
-This foundation step supplies the shared frame and reusable styles. Applying page headers, cards, day and time
-choices, booking summaries, status pills and bottom bars to individual screens belongs to the later screen steps.
+The shared foundation and client and account screens now use these styles. Staff bookings, staff settings and
+fallback screens receive their page layouts in the final step.
+
+Client and account screens keep their existing words and actions. Title headers reuse existing explanations where
+available; they do not add introductory copy. Home retains its redirects to sign-in or My bookings, with the existing
+staff home message in a card. Sign-in and password recovery use a single centred card; booking confirmation uses a
+single card with its existing details. Booking lists add decorative date tiles alongside the complete clinic-local
+date and time, with existing status words in pills.
+
+Availability and moving share a day card showing the selected day over its date, retaining Previous day, Next day
+and the date input. Complete slot labels stay in the pill choices. There is no new day strip or selection step.
+On phones, Show times and Confirm booking use fixed bottom bars. Choosing a move still saves immediately through
+the existing time button, so those choices remain together in the grid rather than adding a confirmation stage.
 
 ## Reusable building blocks
 

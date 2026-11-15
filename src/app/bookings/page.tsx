@@ -26,46 +26,59 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
 
-  const row = (booking: BookingView, changeable: boolean) => (
-    <li
-      key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-line bg-white p-4"
-      data-testid="booking-row"
-      data-booking-id={booking.id}
-      data-status={booking.status}
-    >
-      <div>
-        <p className="font-medium" data-testid="booking-when">
-          {formatSlot(booking.startsAt, settings.timeZone)}
-        </p>
-        <p className="text-sm text-muted">
-          With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
-        </p>
-      </div>
-      {changeable ? (
-        <div className="flex gap-2">
-          <Link
-            href={`/bookings/${booking.id}/reschedule`}
-            prefetch={false}
-            className="button-secondary"
-            data-testid="reschedule-link"
-          >
-            Reschedule
-          </Link>
-          <form action={cancelAction}>
-            <input type="hidden" name="bookingId" value={booking.id} />
-            <button type="submit" className="button-secondary" data-testid="cancel-booking">
-              Cancel
-            </button>
-          </form>
+  const row = (booking: BookingView, changeable: boolean) => {
+    const when = formatSlot(booking.startsAt, settings.timeZone);
+    const date = /, (\d{1,2}) (\S+)/.exec(when);
+    return (
+      <li
+        key={booking.id}
+        className="card booking-card"
+        data-testid="booking-row"
+        data-booking-id={booking.id}
+        data-status={booking.status}
+      >
+        <div className="booking-date-tile" aria-hidden="true" data-testid="booking-date-tile">
+          <span>{date?.[1]}</span>
+          <span>{date?.[2]}</span>
         </div>
-      ) : null}
-    </li>
-  );
+        <div className="booking-details">
+          <p className="booking-when" data-testid="booking-when">
+            {when}
+          </p>
+          <p className="booking-meta text-muted">
+            <span>With {booking.practitionerName} · </span>{' '}
+            <span className={`status-pill status-${booking.status}`} data-testid="booking-status">
+              {statusText(booking)}
+            </span>
+          </p>
+        </div>
+        {changeable ? (
+          <div className="booking-card-actions">
+            <Link
+              href={`/bookings/${booking.id}/reschedule`}
+              prefetch={false}
+              className="button-secondary"
+              data-testid="reschedule-link"
+            >
+              Reschedule
+            </Link>
+            <form action={cancelAction}>
+              <input type="hidden" name="bookingId" value={booking.id} />
+              <button type="submit" className="button-secondary" data-testid="cancel-booking">
+                Cancel
+              </button>
+            </form>
+          </div>
+        ) : null}
+      </li>
+    );
+  };
 
   return (
-    <section>
-      <h1>My bookings</h1>
+    <section data-testid="my-bookings-page">
+      <header className="page-header">
+        <h1>My bookings</h1>
+      </header>
       {notice ? (
         <p role="status" className="notice" data-testid="notice">
           {notice}
@@ -78,7 +91,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       ) : null}
       <h2>Upcoming</h2>
       {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">
+        <p className="card empty-state" data-testid="no-upcoming">
           You have no upcoming appointments.{' '}
           <Link href="/slots" prefetch={false} className="underline">
             Book one
@@ -86,14 +99,14 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           .
         </p>
       ) : (
-        <ul className="space-y-2" data-testid="upcoming-bookings">
+        <ul className="booking-list" data-testid="upcoming-bookings">
           {upcoming.map((b) => row(b, true))}
         </ul>
       )}
       {others.length > 0 ? (
         <>
           <h2>Past and cancelled</h2>
-          <ul className="space-y-2" data-testid="other-bookings">
+          <ul className="booking-list" data-testid="other-bookings">
             {others.map((b) => row(b, false))}
           </ul>
         </>

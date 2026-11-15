@@ -39,26 +39,28 @@ export default async function ReschedulePage({
   const path = `/bookings/${booking.id}/reschedule`;
 
   return (
-    <section>
-      <h1>Reschedule your appointment</h1>
-      {error ? (
-        <p role="alert" className="alert" data-testid="booking-error">
-          {error}
+    <section className={changeable && remaining > 0 ? 'has-booking-action' : undefined} data-testid="reschedule-page">
+      <header className="page-header">
+        <h1>Reschedule your appointment</h1>
+        {error ? (
+          <p role="alert" className="alert" data-testid="booking-error">
+            {error}
+          </p>
+        ) : null}
+        <p className="current-booking">
+          Currently booked:{' '}
+          <span className="font-medium" data-testid="current-when">
+            {formatSlot(booking.startsAt, view.settings.timeZone)}
+          </span>{' '}
+          with {booking.practitionerName}.
         </p>
-      ) : null}
-      <p className="mb-2">
-        Currently booked:{' '}
-        <span className="font-medium" data-testid="current-when">
-          {formatSlot(booking.startsAt, view.settings.timeZone)}
-        </span>{' '}
-        with {booking.practitionerName}.
-      </p>
+      </header>
       {!changeable ? (
-        <p className="alert" data-testid="not-reschedulable">
+        <p role="alert" className="alert" data-testid="not-reschedulable">
           This booking can no longer be rescheduled online.
         </p>
       ) : remaining === 0 ? (
-        <p className="alert" data-testid="reschedule-limit">
+        <p role="alert" className="alert" data-testid="reschedule-limit">
           This booking has been rescheduled as many times as the clinic allows. Please contact the clinic.
         </p>
       ) : (
@@ -68,9 +70,11 @@ export default async function ReschedulePage({
           </p>
           <DayPicker view={view} path={path} />
           {choices.length === 0 ? (
-            <p data-testid="no-slots">No free times on this day. Try another day.</p>
+            <p className="card empty-state" data-testid="no-slots">
+              No free times on this day. Try another day.
+            </p>
           ) : (
-            <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
+            <ul className="time-grid" data-testid="slot-list">
               {choices.map((slot) => (
                 <li key={slot.id}>
                   <form action={rescheduleAction}>
@@ -78,7 +82,7 @@ export default async function ReschedulePage({
                     <input type="hidden" name="newSlotId" value={slot.id} />
                     <button
                       type="submit"
-                      className="button-secondary w-full"
+                      className="button-secondary time-choice"
                       data-testid="reschedule-to"
                       data-slot-id={slot.id}
                       data-starts-at={slot.startsAt.toISOString()}

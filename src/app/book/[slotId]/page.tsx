@@ -25,14 +25,16 @@ export default async function BookSlotPage({
   }
   const free = await isSlotFree(db, slot.id);
   return (
-    <section className="max-w-md">
-      <h1>Confirm your booking</h1>
+    <section className={`card card-centred${free ? ' has-booking-action' : ''}`} data-testid="booking-card">
+      <header className="page-header">
+        <h1>Confirm your booking</h1>
+      </header>
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
         </p>
       ) : null}
-      <dl className="mb-6 space-y-1">
+      <dl className="booking-summary mb-6 space-y-4">
         <div>
           <dt className="inline font-medium">With: </dt>
           <dd className="inline" data-testid="book-practitioner">
@@ -41,8 +43,10 @@ export default async function BookSlotPage({
         </div>
         <div>
           <dt className="inline font-medium">When: </dt>
-          <dd className="inline" data-testid="book-when">
-            {formatSlot(slot.startsAt, settings.timeZone)} ({settings.sessionMinutes} minutes)
+          <dd className="chosen-time" data-testid="book-when">
+            <span>
+              {formatSlot(slot.startsAt, settings.timeZone)} ({settings.sessionMinutes} minutes)
+            </span>
           </dd>
         </div>
       </dl>
@@ -59,12 +63,14 @@ export default async function BookSlotPage({
               data-testid="book-phone"
             />
           </label>
-          <button type="submit" className="button" data-testid="confirm-booking">
-            Confirm booking
-          </button>
+          <div className="booking-action-bar" data-testid="booking-action-bar">
+            <button type="submit" className="button" data-testid="confirm-booking">
+              Confirm booking
+            </button>
+          </div>
         </form>
       ) : (
-        <p className="alert" data-testid="slot-taken">
+        <p role="alert" className="alert" data-testid="slot-taken">
           This time is no longer available.
         </p>
       )}

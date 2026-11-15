@@ -13,22 +13,32 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
   const error = single(query.error);
   const passwordReset = single(query.notice) === 'password_reset';
   return (
-    <section className="max-w-sm">
-      <h1>Sign in</h1>
+    <section className="card card-centred account-card" data-testid="sign-in-card">
+      <header className="page-header">
+        <h1>Sign in</h1>
+      </header>
       {passwordReset ? (
         <p role="status" className="notice" data-testid="sign-in-notice">
           Your password has been changed. Sign in with your new password.
         </p>
       ) : null}
       {error === 'invalid' ? (
-        <p role="alert" className="alert" data-testid="sign-in-error">
+        <p role="alert" className="alert" id="sign-in-error" data-testid="sign-in-error">
           The email address or password is not correct.
         </p>
       ) : null}
       <form action={signIn} className="space-y-4">
         <label>
           Email address
-          <input name="email" type="email" autoComplete="username" required data-testid="sign-in-email" />
+          <input
+            name="email"
+            type="email"
+            autoComplete="username"
+            required
+            aria-invalid={error === 'invalid' || undefined}
+            aria-describedby={error === 'invalid' ? 'sign-in-error' : undefined}
+            data-testid="sign-in-email"
+          />
         </label>
         <label>
           Password
@@ -37,10 +47,12 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
             type="password"
             autoComplete="current-password"
             required
+            aria-invalid={error === 'invalid' || undefined}
+            aria-describedby={error === 'invalid' ? 'sign-in-error' : undefined}
             data-testid="sign-in-password"
           />
         </label>
-        <button type="submit" className="button" data-testid="sign-in-submit">
+        <button type="submit" className="button w-full" data-testid="sign-in-submit">
           Sign in
         </button>
       </form>

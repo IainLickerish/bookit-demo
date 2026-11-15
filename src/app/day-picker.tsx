@@ -8,8 +8,10 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
   const dayLink = (date: string) => `${path}?${new URLSearchParams({ practitioner: practitionerId, date }).toString()}`;
   const previous = addDaysToLocalDate(view.date, -1);
   const next = addDaysToLocalDate(view.date, 1);
+  const day = formatLocalDate(view.date);
+  const comma = day.indexOf(',');
   return (
-    <div className="mb-6 space-y-4">
+    <div className="card day-picker" data-testid="day-picker">
       <form method="get" action={path} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <label>
           Practitioner
@@ -32,11 +34,13 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
             data-testid="date-input"
           />
         </label>
-        <button type="submit" className="button-secondary" data-testid="show-slots">
-          Show times
-        </button>
+        <div className="booking-action-bar" data-testid="day-action-bar">
+          <button type="submit" className="button" data-testid="show-slots">
+            Show times
+          </button>
+        </div>
       </form>
-      <div className="flex items-center justify-between text-sm">
+      <div className="day-navigation">
         {view.date > view.today ? (
           <Link href={dayLink(previous)} prefetch={false} data-testid="previous-day">
             ← Previous day
@@ -44,8 +48,8 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
         ) : (
           <span />
         )}
-        <span className="font-medium" data-testid="shown-date">
-          {formatLocalDate(view.date)}
+        <span className="chosen-day" data-testid="shown-date">
+          <span>{day.slice(0, comma + 1)}</span> <span>{day.slice(comma + 2)}</span>
         </span>
         {view.date < view.lastDate ? (
           <Link href={dayLink(next)} prefetch={false} data-testid="next-day">
