@@ -29,6 +29,8 @@ export async function setReminders(page: Page, choice: string): Promise<void> {
   await page.getByTestId('admin-reminders').selectOption(choice);
   await page.getByTestId('admin-save-settings').click();
   await expect(page.getByTestId('admin-settings-saved')).toContainText('Clinic settings saved.');
+  await page.reload();
+  await expect(page.getByTestId('admin-reminders')).toHaveValue(choice);
 }
 
 export async function remindersFor(address: string, bookingId: string): Promise<{ text: string; subject: string }[]> {

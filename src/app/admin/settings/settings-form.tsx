@@ -1,19 +1,12 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
 import type { ClinicSettings } from '@/server/settings';
 import { SETTINGS_SAVED, settingsErrorText } from '../../messages';
 import { saveSettingsAction } from './actions';
 
 export function SettingsForm({ settings }: { settings: ClinicSettings }) {
   const [state, action, pending] = useActionState(saveSettingsAction, {});
-  const [values, setValues] = useState({
-    clinicName: settings.clinicName,
-    timeZone: settings.timeZone,
-    lateCancellationHours: String(settings.lateCancellationHours),
-    includeContactInConfirmation: settings.includeContactInConfirmation,
-    remindersEnabled: settings.remindersEnabled ? 'on' : 'off',
-  });
   return (
     <>
       {state.saved ? (
@@ -32,8 +25,7 @@ export function SettingsForm({ settings }: { settings: ClinicSettings }) {
           Clinic name
           <input
             name="clinicName"
-            value={values.clinicName}
-            onChange={(event) => setValues({ ...values, clinicName: event.target.value })}
+            defaultValue={settings.clinicName}
             maxLength={120}
             required
             data-testid="admin-clinic-name"
@@ -41,13 +33,7 @@ export function SettingsForm({ settings }: { settings: ClinicSettings }) {
         </label>
         <label>
           Time zone
-          <input
-            name="timeZone"
-            value={values.timeZone}
-            onChange={(event) => setValues({ ...values, timeZone: event.target.value })}
-            required
-            data-testid="admin-time-zone"
-          />
+          <input name="timeZone" defaultValue={settings.timeZone} required data-testid="admin-time-zone" />
         </label>
         <p className="text-sm">
           Use an IANA time zone, for example Europe/London. Existing appointment times stay fixed; display and date
@@ -61,8 +47,7 @@ export function SettingsForm({ settings }: { settings: ClinicSettings }) {
             min={0}
             max={336}
             step={1}
-            value={values.lateCancellationHours}
-            onChange={(event) => setValues({ ...values, lateCancellationHours: event.target.value })}
+            defaultValue={settings.lateCancellationHours}
             required
             data-testid="admin-late-hours"
           />
@@ -71,8 +56,7 @@ export function SettingsForm({ settings }: { settings: ClinicSettings }) {
           <input
             type="checkbox"
             name="includeContactInConfirmation"
-            checked={values.includeContactInConfirmation}
-            onChange={(event) => setValues({ ...values, includeContactInConfirmation: event.target.checked })}
+            defaultChecked={settings.includeContactInConfirmation}
             className="w-auto"
             data-testid="admin-include-contact"
           />
@@ -82,8 +66,7 @@ export function SettingsForm({ settings }: { settings: ClinicSettings }) {
           Reminder emails
           <select
             name="remindersEnabled"
-            value={values.remindersEnabled}
-            onChange={(event) => setValues({ ...values, remindersEnabled: event.target.value })}
+            defaultValue={settings.remindersEnabled ? 'on' : 'off'}
             aria-describedby="reminder-email-hint"
             data-testid="admin-reminders"
             className="min-h-12"
