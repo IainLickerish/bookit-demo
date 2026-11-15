@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { fillPeriod } from './blocked-time-support';
 import {
   ADMIN,
   PATIENT_1,
@@ -19,14 +20,6 @@ const SLOTS_CRITERION =
   'Clients cannot find, book or move into overlapping slots, including from previously opened screens; other practitioners remain available.';
 const WARNING_CRITERION =
   'Staff see every overlapping confirmed booking or a clear no-bookings message; existing bookings remain unchanged.';
-
-async function fillPeriod(page: Page, start: string, end: string, reason: string) {
-  await page.getByTestId('admin-blocked-time-link').click();
-  await page.getByTestId('block-practitioner').selectOption({ label: PRACTITIONER });
-  await page.getByTestId('block-start').fill(start);
-  await page.getByTestId('block-end').fill(end);
-  await page.getByTestId('block-reason').fill(reason);
-}
 
 // Each journey owns a separate day, away from the existing key flows.
 test(SAVE_CRITERION, async ({ browser }) => {
