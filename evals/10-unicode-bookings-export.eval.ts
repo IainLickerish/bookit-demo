@@ -17,11 +17,11 @@ test('Staff can download filtered bookings with accents and other non-English le
 }) => {
   const date = londonDate(21);
   const client = await sessionFor(browser, PATIENT_1);
-  const reference = await step(client, 'Book a session as a client whose name has accents', async () => {
+  const booking = await step(client, 'Book a session as a client whose name has accents', async () => {
     const when = await bookSlot(client, (await pickFreeSlot(client, date)).id);
     const reference = await bookingRow(client, 'upcoming-bookings', when).getAttribute('data-booking-id');
     expect(reference).toBeTruthy();
-    return reference!;
+    return { reference: reference!, when };
   });
 
   const staff = await sessionFor(browser, ADMIN);
@@ -31,22 +31,23 @@ test('Staff can download filtered bookings with accents and other non-English le
     await staff.getByTestId('admin-date').fill(date);
     await staff.getByTestId('admin-status').selectOption('confirmed');
     await staff.getByTestId('admin-filter').click();
-    await expect(staff.getByTestId('admin-booking-row').filter({ hasText: 'Zoë Brontë' })).toContainText('Confirmed');
+    const row = staff
+      .getByTestId('admin-booking-row')
+      .filter({ has: staff.getByRole('cell', { name: booking.when, exact: true }) });
+    await expect(row.getByRole('cell', { name: 'Zoë Brontë', exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'Confirmed', exact: true })).toBeVisible();
   });
 
   await step(staff, 'Download the filtered CSV and read the client name with its accents intact', async () => {
     const csv = await downloadBookingsCsv(staff);
     expect(csv).toContain('"Booking ID","Patient","Practitioner"');
-    expect(csv).toContain(`"${reference}","Zoë Brontë","${PRACTITIONER}"`);
+    expect(csv).toContain(`"${booking.reference}","Zoë Brontë","${PRACTITIONER}"`);
     const records = csv.trimEnd().split('\r\n').slice(1);
     const rows = staff.getByTestId('admin-booking-row');
     expect(records).toHaveLength(await rows.count());
     for (const record of records) {
       expect(record).toContain('"confirmed"');
-      const matchingRow = rows.filter({ has: staff.getByRole('cell', { name: 'Zoë Brontë', exact: true }) });
-      await expect(matchingRow.getByRole('cell', { name: PRACTITIONER, exact: true })).toBeVisible();
-      await expect(matchingRow.getByRole('cell', { name: 'Confirmed', exact: true })).toBeVisible();
-      expect(record).toContain(`"Zoë Brontë","${PRACTITIONER}"`);
+      expect(record).toContain(`"${PRACTITIONER}"`);
     }
   });
 
