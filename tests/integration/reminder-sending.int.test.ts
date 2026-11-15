@@ -78,11 +78,15 @@ describe('durable reminder sending', () => {
     });
     // A fresh connection and processor represent another process after a restart.
     const { createDatabase } = await import('@/db/client');
-    const fresh = createDatabase(database.url);
+    const fresh = createDatabase(database.url, { max: 1 });
+    const connection = await fresh.pool.connect();
+    const closed = new Promise<void>((resolve) => connection.once('end', () => resolve()));
+    connection.release();
     try {
       expect(await sendDueReminders({ ...deps, db: fresh.db })).toBe(0);
     } finally {
       await fresh.pool.end();
+      await closed;
     }
     expect(sent).toHaveLength(1);
     expect(JSON.stringify(logs.lines)).not.toMatch(/Patient One|patients\.example\.test|7700/);
@@ -205,6 +209,35 @@ describe('durable reminder sending', () => {
     expect(await sendDueReminders(deps)).toBe(1);
     expect(sent[0]?.text).toContain('Thu, 22 Oct 2026, 09:00');
   });
+  it.each(['cancellation', 'switching reminders off'] as const)(
+    'rechecks %s after committing the reservation',
+    async (change) => {
+      const booking = await book('2026-10-20T08:00:00Z');
+      const transaction = database.db.transaction.bind(database.db);
+      let transactions = 0;
+      const spy = vi.spyOn(database.db, 'transaction').mockImplementation(async (body, options) => {
+        transactions++;
+        if (transactions === 2) {
+          if (change === 'cancellation') {
+            await database.db
+              .update(bookings)
+              .set({ status: 'cancelled', cancelledAt: clock.now(), updatedAt: clock.now() })
+              .where(eq(bookings.id, booking.id));
+          } else {
+            await database.db.update(clinicSettings).set({ remindersEnabled: false });
+          }
+        }
+        return transaction(body, options);
+      });
+      try {
+        expect(await sendDueReminders(deps)).toBe(0);
+      } finally {
+        spy.mockRestore();
+      }
+      expect(sent).toEqual([]);
+      expect(await database.db.select().from(bookingReminders)).toEqual([]);
+    },
+  );
   it('serialises a cancellation against in-flight SMTP, preserving a truthful send snapshot', async () => {
     const booking = await book('2026-10-20T08:00:00Z');
     let release!: () => void;

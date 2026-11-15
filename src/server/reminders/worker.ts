@@ -3,7 +3,7 @@ import { getClock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
 import { getLogger } from '@/lib/logger';
 import { publicBaseUrl } from '@/lib/runtime-identity';
-import { getMailer } from '@/server/notifications/mailer';
+import { mailSettings } from '@/server/notifications/deliver';
 import { tenantName } from '@/server/seed/tenant';
 import { sendDueReminders } from './send';
 
@@ -48,7 +48,7 @@ export function startReminderWorker(): void {
         db: getDatabase(),
         clock,
         log: getLogger().child({ request_id: newId(clock), operation: 'reminders' }),
-        mail: { mailer: getMailer(), from: process.env.BOOKIT_MAIL_FROM?.trim() || 'noreply@bookit.test' },
+        mail: mailSettings(),
         tenant: tenantName.parse(process.env.BOOKIT_TENANT),
         publicUrl: publicBaseUrl(),
       });

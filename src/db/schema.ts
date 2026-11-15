@@ -147,8 +147,9 @@ export const bookings = pgTable(
   ],
 );
 
-/** One durable reservation per booking, retained even after a move or cancellation.
- * A missing sentAt means delivery is unconfirmed, not permission to send again.
+/** One reservation per booking. Attempted or unconfirmed history survives moves and cancellations.
+ * A missing sentAt is not permission to send again. Only the current worker may
+ * release its own fresh reservation when it knows SMTP has not been contacted.
  * Slot identity and time describe the appointment at reservation, not its current time.
  */
 export const bookingReminders = pgTable(

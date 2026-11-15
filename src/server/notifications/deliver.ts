@@ -1,11 +1,16 @@
 import { emailHash, type Logger } from '@/lib/logger';
 import { reportError } from '../error-reporting';
-import type { Mailer, OutgoingEmail } from './mailer';
+import { getMailer, type Mailer, type OutgoingEmail } from './mailer';
 
 export interface MailSettings {
   mailer: Mailer;
   /** The clinic's sender address, from BOOKIT_MAIL_FROM. */
   from: string;
+}
+
+/** Shared sender and transport configuration for requests and unattended checks. */
+export function mailSettings(): MailSettings {
+  return { mailer: getMailer(), from: (process.env.BOOKIT_MAIL_FROM ?? '').trim() || 'noreply@bookit.test' };
 }
 
 export type EmailKind = 'confirmation' | 'password_reset' | 'reminder';
