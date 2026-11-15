@@ -5,7 +5,8 @@ import { listBlockedPeriods } from '@/server/admin/blocked-time';
 import { listAdminPractitioners } from '@/server/admin/bookings';
 import { requireAdmin } from '@/server/admin/context';
 import { loadClinicSettings } from '@/server/settings';
-import { loadTenant } from '@/server/seed/tenant';
+import acme from '../../../../tenants/acme.json';
+import beacon from '../../../../tenants/beacon.json';
 import { BLOCK_MESSAGES, type SearchParams } from '../../messages';
 import { BlockTimeForm } from './form';
 
@@ -18,7 +19,7 @@ export default async function BlockedTimePage({ searchParams }: { searchParams: 
     listBlockedPeriods(db),
     searchParams,
   ]);
-  const tenant = loadTenant(process.env.BOOKIT_TENANT ?? 'acme');
+  const tenant = process.env.BOOKIT_TENANT === 'beacon' ? beacon : acme;
   const practitionerLabel = tenant.branding.practitionerLabel;
   const label = practitionerLabel[0]!.toUpperCase() + practitionerLabel.slice(1);
   return (
