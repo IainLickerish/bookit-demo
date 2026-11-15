@@ -65,6 +65,35 @@ async function counts(db: Executor) {
   };
 }
 
+/** Additive demo data for proving that unavailability belongs to one practitioner.
+ * Keep it separate from tenant configuration so existing demo bindings remain valid.
+ * Never replace a practitioner's edits or touch existing practitioners' slots.
+ */
+async function ensureAvailabilityDemoPractitioner(
+  db: Executor,
+  clock: Clock,
+  tenant: Tenant,
+  id: (label: string) => string,
+): Promise<void> {
+  if (tenant.tenant !== 'acme') return;
+  const practitionerId = id('availability-demo-practitioner');
+  const now = clock.now();
+  const added = await db
+    .insert(practitioners)
+    .values({
+      ...tenant.practitioners[0]!,
+      id: practitionerId,
+      name: 'Robin Physiotherapist',
+      bio: 'Fictional Acme physiotherapist for availability demonstrations.',
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing({ target: practitioners.id })
+    .returning({ id: practitioners.id });
+  if (added.length) await ensureSlotsThroughHorizon(db, clock, practitionerId);
+}
+
 /** Initialise one fictional clinic database atomically. A restart never resets user activity. */
 export async function seedTenant(
   db: Database,
@@ -95,6 +124,7 @@ export async function seedTenant(
       if (bound.tenant !== tenant.tenant || bound.environment !== environment || bound.fingerprint !== fingerprint) {
         throw new Error('Seed database identity or configuration differs; use a separate empty database.');
       }
+      await ensureAvailabilityDemoPractitioner(tx, fixedClock, tenant, id);
       return { tenant: tenant.tenant, environment, outcome: 'unchanged' as const, counts: await counts(tx) };
     }
     const existing = await counts(tx);
@@ -164,6 +194,7 @@ export async function seedTenant(
         cancelledAt: null,
       });
     }
+    await ensureAvailabilityDemoPractitioner(tx, fixedClock, tenant, id);
     await tx.execute(
       sql`insert into bookit_seed_state (singleton, tenant, environment, fingerprint, seeded_at) values (true, ${tenant.tenant}, ${environment}, ${fingerprint}, ${now.toISOString()})`,
     );

@@ -42,9 +42,12 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
   it('creates both clinics atomically, with distinct settings, names, optional phone and a three-hour booking', async () => {
     const resultA = await seedTenant(a.db, clock, { tenant: acme, environment: 'staging', passwords: passwordsA });
     const resultB = await seedTenant(b.db, clock, { tenant: beacon, environment: 'staging', passwords: passwordsB });
-    expect(resultA).toMatchObject({ outcome: 'created', counts: { users: 4, practitioners: 1, bookings: 3 } });
+    expect(resultA).toMatchObject({ outcome: 'created', counts: { users: 4, practitioners: 2, bookings: 3 } });
     expect(resultB).toMatchObject({ outcome: 'created', counts: { users: 4, practitioners: 1, bookings: 3 } });
     expect(resultA.counts.slots).toBeGreaterThan(2000);
+    const [robin] = await a.db.select().from(practitioners).where(eq(practitioners.name, 'Robin Physiotherapist'));
+    expect(robin).toMatchObject({ active: true, workingDays: acme.practitioners[0]!.workingDays });
+    expect(await a.db.select().from(slots).where(eq(slots.practitionerId, robin!.id))).not.toHaveLength(0);
     const rows = await a.db.select().from(users);
     expect(rows.map((row) => row.name)).toEqual(
       expect.arrayContaining(['Zoë Brontë', 'Łukasz Wiśniewski', 'Siobhán Ó Briain']),
@@ -77,6 +80,45 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
       timeZoneOffsetMs(after.startsAt.getTime(), 'Europe/London'),
     );
     expect(localDateOf(after.startsAt, 'Europe/London') <= addDaysToLocalDate('2026-10-20', 220)).toBe(true);
+  });
+  it('adds the availability fixture to an older Acme copy without changing existing activity or its binding', async () => {
+    const [fixture] = await a.db.select().from(practitioners).where(eq(practitioners.name, 'Robin Physiotherapist'));
+    // Recreate the preceding demo data inside this disposable database only.
+    await a.db.delete(slots).where(eq(slots.practitionerId, fixture!.id));
+    await a.db.delete(practitioners).where(eq(practitioners.id, fixture!.id));
+    const originalPractitioners = await a.db.select().from(practitioners).orderBy(practitioners.id);
+    const originalSlots = await a.db.select().from(slots).orderBy(slots.id);
+    const originalBookings = await a.db.select().from(bookings).orderBy(bookings.id);
+    const originalSettings = await a.db.select().from(clinicSettings);
+    const originalUsers = await a.db.select().from(users).orderBy(users.id);
+    const originalBinding = await a.db.execute(sql`select * from bookit_seed_state`);
+    const laterClock = manualClock('2026-10-21T07:00:00Z');
+    const result = await seedTenant(a.db, laterClock, { tenant: acme, environment: 'staging', passwords: passwordsA });
+    expect(result).toMatchObject({ outcome: 'unchanged', counts: { practitioners: 2, bookings: 3, users: 4 } });
+    expect(await a.db.select().from(practitioners).where(eq(practitioners.id, originalPractitioners[0]!.id))).toEqual(
+      originalPractitioners,
+    );
+    expect(
+      await a.db.select().from(slots).where(eq(slots.practitionerId, originalPractitioners[0]!.id)).orderBy(slots.id),
+    ).toEqual(originalSlots);
+    expect(await a.db.select().from(bookings).orderBy(bookings.id)).toEqual(originalBookings);
+    expect(await a.db.select().from(clinicSettings)).toEqual(originalSettings);
+    expect(await a.db.select().from(users).orderBy(users.id)).toEqual(originalUsers);
+    expect((await a.db.execute(sql`select * from bookit_seed_state`)).rows).toEqual(originalBinding.rows);
+    expect(await a.db.select().from(practitioners).where(eq(practitioners.id, fixture!.id))).toHaveLength(1);
+    const fixtureSlots = await a.db.select().from(slots).where(eq(slots.practitionerId, fixture!.id)).orderBy(slots.id);
+    expect(fixtureSlots.length).toBeGreaterThan(0);
+    await a.db
+      .update(practitioners)
+      .set({ bio: 'Edited fictional demonstration biography' })
+      .where(eq(practitioners.id, fixture!.id));
+    await seedTenant(a.db, laterClock, { tenant: acme, environment: 'staging', passwords: passwordsA });
+    expect((await a.db.select().from(practitioners).where(eq(practitioners.id, fixture!.id)))[0]!.bio).toBe(
+      'Edited fictional demonstration biography',
+    );
+    expect(await a.db.select().from(slots).where(eq(slots.practitionerId, fixture!.id)).orderBy(slots.id)).toEqual(
+      fixtureSlots,
+    );
   });
   it('reruns concurrently without duplicates, password rotation or resetting changed bookings/settings', async () => {
     const [booking] = await a.db.select().from(bookings);

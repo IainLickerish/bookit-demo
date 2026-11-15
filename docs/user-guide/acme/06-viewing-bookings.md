@@ -36,3 +36,7 @@ Saved periods appear 20 at a time, newest first. Use **View older periods** to
 review earlier periods, or **View latest periods** to return to the newest ones.
 Each displayed period includes every affected confirmed booking. After saving,
 the list opens at the period you just saved.
+
+The Acme demonstration includes Alex Physiotherapist and Robin Physiotherapist.
+After blocking Alex, you can select Robin in **Book** and check that the same time
+is still available with Robin.

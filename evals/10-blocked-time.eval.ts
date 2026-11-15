@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { fillPeriod } from './blocked-time-support';
+import { fillPeriod, OTHER_PRACTITIONER } from './blocked-time-support';
 import {
   ADMIN,
   PATIENT_1,
@@ -17,7 +17,7 @@ import {
 const SAVE_CRITERION =
   'Clinic staff can save a practitioner’s blocked period with an optional reason and see the result; invalid entries explain what to correct.';
 const SLOTS_CRITERION =
-  'Clients cannot find, book or move into overlapping slots, including from previously opened screens.';
+  'Clients cannot find, book or move into overlapping slots, including from previously opened screens; other practitioners remain available.';
 const WARNING_CRITERION =
   'Staff see every overlapping confirmed booking or a clear no-bookings message; existing bookings remain unchanged.';
 
@@ -75,13 +75,16 @@ test(SLOTS_CRITERION, async ({ browser }) => {
     async () => {
       const originalWhen = await bookSlot(owner, (await pickFreeSlot(owner, date)).id);
       const target = await pickFreeSlot(other, date);
-      await other.getByTestId('slot-link').filter({ hasText: target.time }).click();
+      const targetLink = other.getByTestId('slot-link').filter({ hasText: target.time });
+      const startsAt = await targetLink.getAttribute('data-starts-at');
+      expect(startsAt, 'the selected time has a start instant').not.toBeNull();
+      await targetLink.click();
       await expect(other.getByTestId('confirm-booking')).toBeVisible();
       await bookingRow(owner, 'upcoming-bookings', originalWhen).getByTestId('reschedule-link').click();
       await owner.getByTestId('date-input').fill(date);
       await owner.getByTestId('show-slots').click();
       await expect(owner.getByTestId('reschedule-to').filter({ hasText: target.time })).toBeVisible();
-      return { originalWhen, target };
+      return { originalWhen, target: { ...target, startsAt: startsAt! } };
     },
   );
   const staff = await sessionFor(browser, ADMIN);
@@ -105,6 +108,23 @@ test(SLOTS_CRITERION, async ({ browser }) => {
     await expect(other).toHaveURL(/\/bookings$/);
     await expect(other.getByTestId('block-reason')).toHaveCount(0);
     await expect(other.getByText('Stale screens journey')).toHaveCount(0);
+  });
+  await step(other, 'Choose another physiotherapist and book the same overlapping time', async () => {
+    await showDay(other, date);
+    await other.getByTestId('practitioner-select').selectOption({ label: OTHER_PRACTITIONER });
+    await other.getByTestId('show-slots').click();
+    await expect(other.getByTestId('date-input')).toHaveValue(date);
+    const sameTime = other.getByTestId('slot-link').filter({ hasText: target.time });
+    await expect(sameTime).toBeVisible();
+    await expect(sameTime).toHaveAttribute('data-starts-at', target.startsAt);
+    await sameTime.click();
+    await expect(other.getByTestId('book-practitioner')).toHaveText(OTHER_PRACTITIONER);
+    await expect(other.getByTestId('book-when')).toContainText(target.time);
+    const when = ((await other.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
+    await other.getByTestId('confirm-booking').click();
+    await expect(other).toHaveURL(/\/bookings\?notice=booked$/);
+    await expect(bookingRow(other, 'upcoming-bookings', when)).toContainText(OTHER_PRACTITIONER);
+    await expect(bookingRow(other, 'upcoming-bookings', when).getByTestId('booking-status')).toHaveText('Confirmed');
   });
   await step(owner, 'Try the previously opened move screen and keep the original confirmed booking', async () => {
     await owner.getByTestId('reschedule-to').filter({ hasText: target.time }).click();

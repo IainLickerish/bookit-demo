@@ -30,3 +30,12 @@ existing primary index. Older pages start after the last displayed ID; saving op
 a page at the saved ID. This also keeps the saved result visible when several
 periods share a creation time. Only displayed periods have their overlaps read.
 Their affected bookings are grouped once, without limiting the bookings per period.
+
+Acme's demo seed also adds Robin Physiotherapist and their slots once, including
+when updating an existing bound copy. It leaves the original tenant fingerprint,
+accounts, bookings, settings and other practitioners' slots unchanged. A fixture
+upgrade test rehearses this and checks that reseeding preserves later edits.
+No schema migration is needed for this additive fictional fixture. After reverting
+seed code, keep Robin if any bookings or blocked periods reference them. Remove
+only unused fixture slots and the unused practitioner if an operator needs to undo
+the fixture.

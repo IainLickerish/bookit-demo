@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Executor } from '@/db/client';
 import { practitioners, slots } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
@@ -11,12 +11,22 @@ const INSERT_BATCH_SIZE = 500;
 /**
  * Creates any missing slots for every active practitioner from now up to the
  * booking horizon. Existing slots are left alone, so it is safe to run again.
+ * onlyPractitionerId restricts generation to one active practitioner when supplied.
  * Returns the number of slots created.
  */
-export async function ensureSlotsThroughHorizon(db: Executor, clock: Clock): Promise<number> {
+export async function ensureSlotsThroughHorizon(
+  db: Executor,
+  clock: Clock,
+  onlyPractitionerId?: string,
+): Promise<number> {
   const settings = await loadClinicSettings(db);
   const now = clock.now();
-  const active = await db.select().from(practitioners).where(eq(practitioners.active, true));
+  const active = await db
+    .select()
+    .from(practitioners)
+    .where(
+      and(eq(practitioners.active, true), onlyPractitionerId ? eq(practitioners.id, onlyPractitionerId) : undefined),
+    );
   let created = 0;
   for (const practitioner of active) {
     const times = generateSlotTimes(

@@ -167,6 +167,11 @@ It creates Unicode patient bookings, a booking three hours after the seed instan
 and 09:00–17:00 local slots through the 220-day horizon, spanning the next London
 clock change. Beacon has its distinctive practitioner marker for isolation tests.
 `bun run slots:ensure` extends available slots later without resetting bookings.
+Acme also seeds Robin Physiotherapist as a second fictional practitioner, with the
+same working hours as Alex, so blocked-time checks can prove that other practitioners
+remain available. Reseeding an older Acme copy adds Robin and Robin's slots once,
+without changing its binding, existing accounts, bookings, settings or other slots.
+It preserves later edits to Robin. Beacon's demonstration data is unchanged.
 
 ## Guides and demonstration baseline
 

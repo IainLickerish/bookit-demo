@@ -15,3 +15,6 @@ export async function fillPeriod(page: Page, start: string, end: string, reason:
   await page.getByTestId('block-end').fill(end, { timeout: 10_000 });
   await page.getByTestId('block-reason').fill(reason, { timeout: 10_000 });
 }
+
+/** The second fictional physiotherapist added by the Acme demo seed. */
+export const OTHER_PRACTITIONER = 'Robin Physiotherapist';
