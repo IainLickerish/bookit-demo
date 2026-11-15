@@ -111,6 +111,8 @@ test('Moved bookings receive reminders for their new time when no reminder has a
       'Move the session to another free time before reminders are enabled',
       async () => {
         await bookingRow(client, 'upcoming-bookings', booking.when).getByTestId('reschedule-link').click();
+        await expect(client.getByTestId('current-when')).toContainText(booking.when);
+        await expect(client.getByTestId('slot-list')).toBeVisible();
         const now = evalNow().getTime();
         const choices = await client.getByTestId('reschedule-to').evaluateAll((nodes) =>
           nodes.map((node) => ({
