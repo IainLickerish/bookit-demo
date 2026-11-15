@@ -28,7 +28,7 @@ test('With reminders enabled, each upcoming confirmed booking receives a reminde
       expect(email.text).toContain(`When: ${booking.when} (UK time)`);
       expect(email.text).toContain(`Physiotherapist: ${PRACTITIONER}`);
       const clinic = await client.getByTestId('clinic-name').textContent();
-      expect(email.text.startsWith(`${clinic}\n`)).toBe(true);
+      expect(email.text.split(/\r?\n/, 1)[0]?.trim(), 'the first line names the clinic').toBe(clinic?.trim());
       expect(email.text).toContain('To reschedule or cancel, sign in and open My bookings:');
       expect(email.text).toContain('/bookings');
     });
