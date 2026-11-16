@@ -131,9 +131,11 @@ describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () =>
     const mailer = recordingMailer();
     const deps = { db: database.db, clock, log: logs.log, mail: testMail(mailer) };
     const request = { patientId: clinic.patient1.id, slotId: slotId!, phone: '+44 7700 900001' };
-    const results = await Promise.all(Array.from({ length: 10 }, () => bookSlot(deps, request)));
-    const booking = results[0]!;
-    expect(results).toEqual(Array(10).fill(booking));
+    const results = await Promise.allSettled(Array.from({ length: 10 }, () => bookSlot(deps, request)));
+    const first = results.find((result) => result.status === 'fulfilled');
+    expect(first).toBeDefined();
+    const booking = first!.value;
+    expect(results).toEqual(Array(10).fill({ status: 'fulfilled', value: booking }));
     expect(await confirmedCount(slotId!)).toBe(1);
     expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toEqual(booking);
     expect(mailer.sent).toHaveLength(1);
