@@ -219,7 +219,7 @@ describe('rescheduling a booking (REQ-18.1-01)', () => {
     expect(moved.updatedAt.toISOString()).toBe('2026-10-20T07:05:00.000Z');
     expect((await slotsOn('2026-10-22')).map((s) => s.id)).toContain(original.id);
     expect((await slotsOn('2026-10-27')).map((s) => s.id)).not.toContain(target.id);
-    expect(logs.lines.at(-1)).toMatchObject({
+    expect(logs.lines.find((line) => line.event === 'booking.rescheduled')).toMatchObject({
       event: 'booking.rescheduled',
       from_slot_id: original.id,
       to_slot_id: target.id,
@@ -286,5 +286,6 @@ describe('rescheduling a booking (REQ-18.1-01)', () => {
     ).toBe('booking_already_started 409');
     const unchanged = await listBookingsForPatient(database.db, clinic.patient1.id);
     expect(unchanged.map((b) => [b.slotId, b.rescheduleCount])).toEqual([[mine.slotId, 0]]);
+    expect(mailer.sent).toHaveLength(2);
   });
 });

@@ -126,9 +126,11 @@ describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () =>
 
   it('two bookings rescheduled into the same free slot at once: exactly one moves', async () => {
     const [slotA, slotB, target] = await freeSlotIds(3);
-    const deps = { db: database.db, clock, log: captureLogs(clock).log, mail: testMail() };
+    const mailer = recordingMailer();
+    const deps = { db: database.db, clock, log: captureLogs(clock).log, mail: testMail(mailer) };
     const a = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slotA! });
     const b = await bookSlot(deps, { patientId: clinic.patient2.id, slotId: slotB! });
+    mailer.sent.length = 0;
     const results = await Promise.allSettled([
       rescheduleBooking(deps, { patientId: clinic.patient1.id, bookingId: a.id, newSlotId: target! }),
       rescheduleBooking(deps, { patientId: clinic.patient2.id, bookingId: b.id, newSlotId: target! }),
@@ -138,6 +140,13 @@ describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () =>
     );
     expect(outcomes.sort()).toEqual(['moved', 'slot_unavailable']);
     expect(await confirmedCount(target!)).toBe(1);
+    expect(mailer.sent).toHaveLength(1);
+    const winner = results.find((result) => result.status === 'fulfilled');
+    if (winner?.status !== 'fulfilled') throw new Error('No move succeeded');
+    expect(mailer.sent[0]!.text).toContain(`Booking reference: ${winner.value.id}`);
+    expect(mailer.sent[0]!.to).toBe(
+      winner.value.patientId === clinic.patient1.id ? clinic.patient1.email : clinic.patient2.email,
+    );
     recordEvidence('concurrent-reschedule-same-slot', { target, outcomes });
   });
 

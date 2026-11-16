@@ -3,8 +3,9 @@ import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
-import { formatLocalTime, localDateOf } from '@/lib/time';
+import { formatLocalTime, formatSlot, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
@@ -112,6 +113,61 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
       status: booking.status,
       containsPhoneLine: bodyOf(smtp.messages[0]!.raw).includes('Contact phone:'),
     });
+  });
+
+  it.each([true, false])(
+    'sends one move confirmation with the saved new details and contact inclusion %s',
+    async (includeContact) => {
+      await saveClinicSettings(database.db, clock, {
+        ...clinic.settings,
+        includeContactInConfirmation: includeContact,
+      });
+      const booking = await bookSlot(deps(), {
+        patientId: clinic.patient2.id,
+        slotId: await freeSlotId(),
+        phone: '+44 7700 900002',
+      });
+      smtp.messages.length = 0;
+      const [target] = await listAvailableSlots(database.db, {
+        practitionerId: clinic.practitioners.saturdays,
+        after: new Date('2026-10-24T00:00:00Z'),
+        until: new Date('2026-10-25T00:00:00Z'),
+      });
+      expect(target).toBeDefined();
+      const moved = await rescheduleBooking(deps(), {
+        patientId: clinic.patient2.id,
+        bookingId: booking.id,
+        newSlotId: target!.id,
+      });
+      expect(smtp.messages).toHaveLength(1);
+      const message = smtp.messages[0]!;
+      expect(message.from).toBe(TEST_MAIL_FROM);
+      expect(message.to).toEqual([clinic.patient2.email]);
+      const body = bodyOf(message.raw);
+      expect(body).toContain(`When: ${formatSlot(target!.startsAt, clinic.settings.timeZone)} (Europe/London)`);
+      expect(body).toContain('With: Sam Sports');
+      expect(body).toContain(`Booking reference: ${booking.id}`);
+      expect(body.includes('Contact phone: +44 7700 900002')).toBe(includeContact);
+      expect(body).not.toContain(formatSlot(booking.startsAt, clinic.settings.timeZone));
+      const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+      expect(stored?.slotId).toBe(moved.slotId);
+      expect(stored?.slotId).toBe(target!.id);
+    },
+  );
+
+  it('keeps the moved booking when the SMTP server is down and logs the delivery failure', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
+    smtp.messages.length = 0;
+    const targetId = await freeSlotId();
+    await rescheduleBooking(deps('smtp://127.0.0.1:9'), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: targetId,
+    });
+    const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+    expect(stored).toMatchObject({ slotId: targetId, status: 'confirmed', rescheduleCount: 1 });
+    expect(logs.events().slice(-2)).toEqual(['booking.rescheduled', 'email.confirmation.failed']);
+    expect(smtp.messages).toHaveLength(0);
   });
 
   it('keeps the booking when the SMTP server is down, and logs the failure', async () => {
