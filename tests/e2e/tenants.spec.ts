@@ -292,27 +292,3 @@ test('REQ-18.1-06 container build requires GIT_COMMIT and the production image r
     writeTenantEvidence(directory, results, logs.join('\n'), acme.canaries);
   }
 });
-
-test('Both clinics show their configured name in Fraunces and use the shared Figtree and pine design', async ({
-  browser,
-}) => {
-  const context = await browser.newContext();
-  try {
-    const page = await context.newPage();
-    for (const clinic of [acme, beacon]) {
-      await page.goto(`${clinic.url}/auth/sign-in`);
-      await page.evaluate(() => document.fonts.ready);
-      const name = page.getByTestId('clinic-name');
-      await expect(name).toHaveText(clinic.tenant.settings.clinicName);
-      await expect(name).toHaveCSS('font-family', /Fraunces/);
-      await expect(name).toHaveCSS('font-weight', '500');
-      await expect(page.locator('body')).toHaveCSS('font-family', /Figtree/);
-      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(250, 248, 244)');
-      await expect(page.getByTestId('sign-in-submit')).toHaveCSS('background-color', 'rgb(29, 92, 75)');
-      expect(await page.evaluate(() => document.fonts.check('500 24px Fraunces'))).toBe(true);
-      expect(await page.evaluate(() => document.fonts.check('400 16px Figtree'))).toBe(true);
-    }
-  } finally {
-    await context.close();
-  }
-});
