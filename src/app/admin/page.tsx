@@ -51,7 +51,13 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
         </label>
         <label>
           Date ({settings.timeZone})
-          <input type="date" name="date" defaultValue={filters.date ?? ''} data-testid="admin-date" />
+          <input
+            type="date"
+            name="date"
+            autoComplete="off"
+            defaultValue={filters.date ?? ''}
+            data-testid="admin-date"
+          />
         </label>
         <label>
           Status
@@ -64,7 +70,7 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
         <button className="button" type="submit" data-testid="admin-filter">
           Filter bookings
         </button>
-        <Link href="/admin" prefetch={false} className="button-secondary">
+        <Link href="/admin" prefetch={false} className="button-secondary" data-testid="admin-clear-filters">
           Clear filters
         </Link>
       </form>
