@@ -21,6 +21,8 @@ export default defineConfig({
           name: 'unit',
           include: ['tests/unit/**/*.test.ts'],
           environment: 'node',
+          // Unit fixtures mock containers rather than using the integration database server.
+          env: { BOOKIT_TEST_DATABASE_URL: '' },
         },
       },
       {
