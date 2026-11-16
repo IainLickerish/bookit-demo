@@ -1,16 +1,16 @@
+import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '@/db/client';
 import { bookings } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
 import type { Logger } from '@/lib/logger';
-import { isUniqueViolation } from '../errors';
 import { composeConfirmation } from '../notifications/confirmation';
 import { deliverEmail, type MailSettings } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
 import { findUserById } from '../users';
 import { BookingError } from './errors';
-import { findBookingForPatient, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
+import { findBookingForPatient, type BookingView } from './queries';
 import { assertSlotBookable, normalisePhone } from './rules';
 
 export interface BookingDependencies {
@@ -41,8 +41,9 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     }
     assertSlotBookable(slot.startsAt, now, settings);
     const id = newId(deps.clock);
-    try {
-      await tx.insert(bookings).values({
+    const [inserted] = await tx
+      .insert(bookings)
+      .values({
         id,
         patientId: patient.id,
         slotId: slot.id,
@@ -53,12 +54,23 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
         createdAt: now,
         updatedAt: now,
         cancelledAt: null,
-      });
-    } catch (error) {
-      if (isUniqueViolation(error, ONE_CONFIRMED_BOOKING_PER_SLOT)) {
+      })
+      // The unique index also serialises simultaneous confirmations. Do not
+      // abort the transaction: we need to read the winner after it commits.
+      .onConflictDoNothing({ target: bookings.slotId, where: sql`${bookings.status} = 'confirmed'` })
+      .returning({ id: bookings.id });
+    if (!inserted) {
+      const [existing] = await tx
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(and(eq(bookings.slotId, slot.id), eq(bookings.patientId, patient.id), eq(bookings.status, 'confirmed')))
+        .for('share');
+      const saved = existing ? await findBookingForPatient(tx, patient.id, existing.id) : null;
+      if (!saved) {
         throw new BookingError('slot_unavailable');
       }
-      throw error;
+      // Repeating a confirmation never edits the saved details or sends mail again.
+      return { booking: saved, confirmation: null };
     }
     const created = await findBookingForPatient(tx, patient.id, id);
     if (!created) {
@@ -71,6 +83,7 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
       confirmation: composeConfirmation({ booking: created, patient, settings, from: deps.mail.from }),
     };
   });
+  if (!confirmation) return booking;
   deps.log.info(
     {
       event: 'booking.confirmed',

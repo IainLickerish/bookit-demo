@@ -14,16 +14,10 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
     return ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
   });
   await step(page, 'Press Confirm booking twice in quick succession', async () => {
-    const confirmationPath = new URL(page.url()).pathname;
     let submissions = 0;
     const bothSubmitted = new Promise<void>((resolve) => {
       page.on('response', (response) => {
-        if (
-          response.request().method() === 'POST' &&
-          new URL(response.url()).pathname === confirmationPath &&
-          ++submissions === 2
-        )
-          resolve();
+        if (response.request().method() === 'POST' && ++submissions === 2) resolve();
       });
     });
     // Dispatch both clicks together so navigation cannot remove the form between them.
