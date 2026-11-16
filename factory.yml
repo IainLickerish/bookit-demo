@@ -5,6 +5,7 @@
 image: node:24-bookworm
 install:
   - npm install -g bun@1.4.4
+  - apt-get update && apt-get install -y --no-install-recommends jq && rm -rf /var/lib/apt/lists/*
   - curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz | tar -xz -C /usr/local/bin actionlint
 setup:
   - bun install --frozen-lockfile
