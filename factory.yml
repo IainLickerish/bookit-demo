@@ -1,6 +1,7 @@
 # BookIt's settings for the Software Factory (see the factory's docs/spec.md and decision 0051). The factory reads this
 # file from the main version only, so a change cannot alter how it is built, checked or run.
-# Integration and browser tests need Docker, so they run in CI, not in the sealed space.
+# Browser tests need Docker, so they run in CI, not in the sealed space. The database tests run there too, against the
+# test database below.
 image: node:24-bookworm
 install:
   - npm install -g bun@1.4.4
@@ -12,6 +13,18 @@ checks:
   - bun run lint
   - bun run format:check
   - bun run test:unit
+
+# A test database the factory starts beside its build run and its own checks (the factory's decision 0085), with a new
+# random password each round. The database tests make a fresh database of their own on it (tests/helpers/database.ts);
+# without the setting, as in CI, they start their own through Docker.
+buildService:
+  image: postgres:17-alpine
+  env:
+    POSTGRES_PASSWORD: '{password}'
+  setting: BOOKIT_TEST_DATABASE_URL
+  value: 'postgres://postgres:{password}@{host}:5432/postgres'
+  checks:
+    - bun run test:integration
 
 # Which changes get a closer look: those that change stored data, and those always reviewed in full.
 review:
