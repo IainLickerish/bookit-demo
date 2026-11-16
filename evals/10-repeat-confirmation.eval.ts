@@ -14,10 +14,16 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
     return ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
   });
   await step(page, 'Press Confirm booking twice in quick succession', async () => {
+    const confirmationPath = new URL(page.url()).pathname;
     let submissions = 0;
     const bothSubmitted = new Promise<void>((resolve) => {
       page.on('response', (response) => {
-        if (response.request().method() === 'POST' && ++submissions === 2) resolve();
+        if (
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname === confirmationPath &&
+          ++submissions === 2
+        )
+          resolve();
       });
     });
     // Dispatch both clicks together so navigation cannot remove the form between them.
@@ -51,6 +57,7 @@ test('Repeating a saved confirmation preserves its reference, time, practitioner
   const when = await step(page, 'Open the same free session in two tabs', async () => {
     const slot = await pickFreeSlot(page, londonDate(25));
     await page.getByTestId('slot-link').filter({ hasText: slot.time }).click();
+    await expect(page.getByTestId('book-practitioner')).toHaveText(PRACTITIONER);
     await savedForm.goto(page.url());
     await expect(savedForm.getByTestId('confirm-booking')).toBeVisible();
     return ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();

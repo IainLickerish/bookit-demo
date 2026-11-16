@@ -7,6 +7,7 @@ import { bookings } from '@/db/schema';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { BookingError } from '@/server/bookings/errors';
+import { findBookingForPatient, listBookingsForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { postgresErrorOf } from '@/server/errors';
 import { listAvailableSlots } from '@/server/slots/queries';
@@ -122,6 +123,38 @@ describe('one confirmed booking per slot under concurrency (REQ-18.1-01)', () =>
       refusalCodes: [...new Set(refusals)],
       confirmedBookingsForSlot: 1,
     });
+  });
+
+  it('parallel confirmations by the same patient return one unchanged booking and send one email', async () => {
+    const [slotId] = await freeSlotIds(1);
+    const logs = captureLogs(clock);
+    const mailer = recordingMailer();
+    const deps = { db: database.db, clock, log: logs.log, mail: testMail(mailer) };
+    const request = { patientId: clinic.patient1.id, slotId: slotId!, phone: '+44 7700 900001' };
+    const results = await Promise.all(Array.from({ length: 10 }, () => bookSlot(deps, request)));
+    const booking = results[0]!;
+    expect(results).toEqual(Array(10).fill(booking));
+    expect(await confirmedCount(slotId!)).toBe(1);
+    expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toEqual(booking);
+    expect(mailer.sent).toHaveLength(1);
+    expect(logs.events().filter((event) => event === 'booking.confirmed')).toHaveLength(1);
+
+    clock.advanceMinutes(5);
+    const repeated = await bookSlot(deps, { ...request, phone: '+44 7700 900002' });
+    expect(repeated).toEqual(booking);
+    expect(await findBookingForPatient(database.db, clinic.patient1.id, booking.id)).toEqual(booking);
+    expect(mailer.sent).toHaveLength(1);
+
+    // Knowing the slot or booking reference does not confer access to the saved booking.
+    await expect(bookSlot(deps, { ...request, patientId: clinic.patient2.id })).rejects.toMatchObject({
+      code: 'slot_unavailable',
+    });
+    expect(await findBookingForPatient(database.db, clinic.patient2.id, booking.id)).toBeNull();
+    expect(await listBookingsForPatient(database.db, clinic.patient2.id)).not.toContainEqual(
+      expect.objectContaining({ id: booking.id }),
+    );
+    expect(await confirmedCount(slotId!)).toBe(1);
+    expect(mailer.sent).toHaveLength(1);
   });
 
   it('two bookings rescheduled into the same free slot at once: exactly one moves', async () => {
