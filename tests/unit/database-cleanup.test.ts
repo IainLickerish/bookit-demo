@@ -1,5 +1,12 @@
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  // These tests exercise the mocked container, even when integration tests use a running server.
+  vi.stubEnv('BOOKIT_TEST_DATABASE_URL', undefined);
+});
+
+afterAll(() => vi.unstubAllEnvs());
 
 type TestPool = EventEmitter & { end: ReturnType<typeof vi.fn<() => Promise<void>>> };
 const fixture = vi.hoisted(() => ({
