@@ -130,7 +130,8 @@ test('Sign-in errors use brick notices and password recovery uses sage notices w
     await page.getByTestId('sign-in-email').fill('shared-design-check@patients.acmephysio.test');
     await page.getByTestId('sign-in-password').fill('incorrect-password-for-design-check');
     await page.getByTestId('sign-in-submit').click();
-    const error = page.getByRole('alert');
+    const error = page.getByTestId('sign-in-error');
+    await expect(error).toHaveAttribute('role', 'alert');
     await expect(error).toContainText('The email address or password is not correct.');
     await expect(error).toHaveCSS('color', 'rgb(168, 38, 27)');
     await expect(error).toHaveCSS('background-color', 'rgb(252, 235, 232)');
@@ -149,7 +150,8 @@ test('Sign-in errors use brick notices and password recovery uses sage notices w
     await page.getByTestId('forgot-password-link').click();
     await page.getByTestId('forgot-password-email').fill('shared-design-check@patients.acmephysio.test');
     await page.getByTestId('forgot-password-submit').click();
-    const notice = page.getByRole('status');
+    const notice = page.getByTestId('forgot-password-sent');
+    await expect(notice).toHaveAttribute('role', 'status');
     await expect(notice).toContainText('If an account uses that email address');
     await expect(notice).toHaveCSS('color', 'rgb(29, 92, 75)');
     await expect(notice).toHaveCSS('background-color', 'rgb(233, 241, 236)');
