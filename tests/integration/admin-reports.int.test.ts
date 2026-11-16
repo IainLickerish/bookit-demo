@@ -76,7 +76,7 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
 }
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
-  it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
+  it('exports fictional accented names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
@@ -91,6 +91,19 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     const text = JSON.stringify(logs.lines);
     for (const value of [...ADMIN_PATIENT_NAMES, TEST_PASSWORD, adminToken, patientToken])
       expect(text).not.toContain(value);
+  });
+  it('exports only matching accented bookings for the clinic date, practitioner and status', async () => {
+    const response = await report(`practitionerId=${fixture.practitionerId}&date=2026-10-25&status=confirmed`);
+    expect(response.status).toBe(200);
+    const csv = await response.text();
+    expect(csv.split('\r\n')).toHaveLength(3);
+    expect(csv).toContain(`"${fixture.bookingIds[1]}"`);
+    expect(csv).toContain('"Łukasz Wiśniewski"');
+    for (const id of [fixture.bookingIds[0], fixture.bookingIds[2], fixture.bookingIds[3]])
+      expect(csv).not.toContain(id);
+    const empty = await report(`practitionerId=${clinic.practitioners.weekdays}&date=2026-10-25&status=confirmed`);
+    expect(empty.status).toBe(200);
+    expect((await empty.text()).split('\r\n')).toHaveLength(2);
   });
   it('applies clinic-local date boundaries across the 25-hour clock-change day, with practitioner and status filters', async () => {
     const response = await report(
