@@ -1,5 +1,10 @@
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  // Exercise the mocked container lifecycle even when a local test server is configured.
+  vi.stubEnv('BOOKIT_TEST_DATABASE_URL', undefined);
+});
 
 type TestPool = EventEmitter & { end: ReturnType<typeof vi.fn<() => Promise<void>>> };
 const fixture = vi.hoisted(() => ({
@@ -22,6 +27,10 @@ vi.mock('@/db/client', () => ({ createDatabase: () => fixture.handle }));
 vi.mock('@/db/migrate', () => ({ runMigrations: fixture.migrate }));
 
 import { startTestDatabase } from '../helpers/database';
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 beforeEach(() => {
   vi.resetAllMocks();
