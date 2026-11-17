@@ -1,7 +1,7 @@
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import type { Database } from '@/db/client';
 import { users } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { saveSettingsAction } from '@/app/admin/settings/actions';
 import AdminSettingsPage from '@/app/admin/settings/page';
 import { createSession } from '@/server/auth/session';
@@ -42,8 +42,8 @@ beforeAll(async () => {
   const patient = (await createSession(acme.db, clock, a.patient1.id)).token;
   const expired = (await createSession(acme.db, manualClock('2026-10-19T07:00:00Z'), a.admin.id)).token;
   // A session must use the account's current role, rather than its role at sign-in.
-  const downgraded = (await createSession(acme.db, clock, a.patient2.id)).token;
   await acme.db.update(users).set({ role: 'admin' }).where(eq(users.id, a.patient2.id));
+  const downgraded = (await createSession(acme.db, clock, a.patient2.id)).token;
   await acme.db.update(users).set({ role: 'patient' }).where(eq(users.id, a.patient2.id));
   denied = [
     { token: '', destination: '/auth/sign-in' },

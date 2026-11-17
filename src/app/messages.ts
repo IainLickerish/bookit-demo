@@ -1,9 +1,5 @@
 import { BOOKING_ERRORS, isBookingErrorCode } from '@/server/bookings/errors';
 
-export const SETTINGS_MESSAGES = {
-  remindersLabel: 'Enable reminder emails',
-} as const;
-
 const NOTICES = {
   booked: 'Booking confirmed.',
   cancelled: 'Booking cancelled.',

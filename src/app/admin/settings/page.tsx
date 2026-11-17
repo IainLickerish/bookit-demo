@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { requireAdmin } from '@/server/admin/context';
 import { loadClinicSettings } from '@/server/settings';
-import { SETTINGS_MESSAGES, type SearchParams } from '../../messages';
+import type { SearchParams } from '../../messages';
 import { saveSettingsAction } from './actions';
 
 export default async function AdminSettingsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -82,7 +82,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             className="w-auto"
             data-testid="admin-reminders-enabled"
           />
-          {SETTINGS_MESSAGES.remindersLabel}
+          Enable reminder emails
         </label>
         <button type="submit" className="button" data-testid="admin-save-settings">
           Save settings
