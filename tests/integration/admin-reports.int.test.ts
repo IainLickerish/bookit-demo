@@ -18,6 +18,9 @@ import { captureLogs } from '../helpers/logs';
 let acme: TestDatabase;
 let beacon: TestDatabase;
 let clinic: SeededClinic;
+let beaconAdminToken: string;
+let beaconPatientToken: string;
+let beaconFixture: Awaited<ReturnType<typeof seedAdminBookings>>;
 let adminToken: string;
 let patientToken: string;
 let fixture: Awaited<ReturnType<typeof seedAdminBookings>>;
@@ -30,7 +33,12 @@ beforeAll(async () => {
   acme = await startTestDatabase();
   beacon = await startTestDatabase();
   clinic = await seedClinic(acme.db, clock, { settings: { slotHorizonDays: 7 } });
-  await seedClinic(beacon.db, clock, { settings: { clinicName: 'Beacon Dental', slotHorizonDays: 7 } });
+  const beaconClinic = await seedClinic(beacon.db, clock, {
+    settings: { clinicName: 'Beacon Dental', slotHorizonDays: 7 },
+  });
+  beaconFixture = await seedAdminBookings(beacon.db, clock, 'beacon-admin-fixture');
+  beaconAdminToken = (await createSession(beacon.db, clock, beaconClinic.admin.id)).token;
+  beaconPatientToken = (await createSession(beacon.db, clock, beaconClinic.patient1.id)).token;
   fixture = await seedAdminBookings(acme.db, clock);
   adminToken = (await createSession(acme.db, clock, clinic.admin.id)).token;
   patientToken = (await createSession(acme.db, clock, clinic.patient1.id)).token;
@@ -92,23 +100,37 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     for (const value of [...ADMIN_PATIENT_NAMES, TEST_PASSWORD, adminToken, patientToken])
       expect(text).not.toContain(value);
   });
-  it('downloads only the filtered bookings with names intact as UTF-8', async () => {
-    const query = `practitionerId=${fixture.practitionerId}&date=2026-10-25&status=confirmed`;
-    const response = await report(query);
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
-    expect(response.headers.get('content-disposition')).toContain('attachment;');
-    const bytes = Buffer.from(await response.arrayBuffer());
-    expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-    const csv = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    expect(csv.split('\r\n')).toHaveLength(3);
-    expect(csv).toContain(`"${ADMIN_PATIENT_NAMES[1]}"`);
-    expect(csv).toContain(fixture.bookingIds[1]);
-    for (const index of [0, 2, 3]) expect(csv).not.toContain(fixture.bookingIds[index]);
-    const refused = await report(query, patientToken);
-    expect(refused.status).toBe(403);
-    expect(await refused.text()).toBe('Admin access required');
-  });
+  it.each(['acme', 'beacon'] as const)(
+    '%s downloads only the filtered bookings with names intact as UTF-8',
+    async (tenant) => {
+      const database = tenant === 'acme' ? acme : beacon;
+      const bookings = tenant === 'acme' ? fixture : beaconFixture;
+      const staffToken = tenant === 'acme' ? adminToken : beaconAdminToken;
+      const clientToken = tenant === 'acme' ? patientToken : beaconPatientToken;
+      const query = `practitionerId=${bookings.practitionerId}&date=2026-10-25&status=confirmed`;
+      const download = (token: string) =>
+        adminReportResponse(
+          { db: database.db, clock, log: captureLogs(clock, tenant).log },
+          token,
+          new URLSearchParams(query),
+          'csv',
+        );
+      const response = await download(staffToken);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+      expect(response.headers.get('content-disposition')).toContain('attachment;');
+      const bytes = Buffer.from(await response.arrayBuffer());
+      expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+      const csv = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      expect(csv.split('\r\n')).toHaveLength(3);
+      expect(csv).toContain(`"${ADMIN_PATIENT_NAMES[1]}"`);
+      expect(csv).toContain(bookings.bookingIds[1]);
+      for (const index of [0, 2, 3]) expect(csv).not.toContain(bookings.bookingIds[index]);
+      const refused = await download(clientToken);
+      expect(refused.status).toBe(403);
+      expect(await refused.text()).toBe('Admin access required');
+    },
+  );
   it('applies clinic-local date boundaries across the 25-hour clock-change day, with practitioner and status filters', async () => {
     const response = await report(
       `type=bookings&practitionerId=${fixture.practitionerId}&date=2026-10-25`,
