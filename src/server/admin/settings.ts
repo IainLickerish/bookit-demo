@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import type { Executor } from '@/db/client';
 import { clinicSettings } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
@@ -12,6 +13,8 @@ export const adminSettingsInput = clinicSettingsInput
     includeContactInConfirmation: true,
     remindersEnabled: true,
   })
+  // Older callers leave the reminder choice alone; the staff form always supplies it.
+  .extend({ remindersEnabled: z.boolean().optional() })
   .strict();
 
 /** Update only the admin-editable fields; preserve the booking rules. */

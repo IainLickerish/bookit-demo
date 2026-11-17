@@ -20,11 +20,13 @@ export function startReminderWorker(): void {
     const clock = getClock();
     const log = getLogger().child({ request_id: newId(clock), operation: 'reminders' });
     try {
+      const mail = mailSettings();
+      if (mail.mailer.kind === 'disabled') return;
       await sendDueReminders({
         db: getDatabase(),
         clock,
         log,
-        mail: mailSettings(),
+        mail,
         publicUrl: publicBaseUrl(),
         tenant: process.env.BOOKIT_TENANT ?? '',
       });

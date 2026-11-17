@@ -5,7 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDatabase } from '@/db/client';
 import { bookings, slots, clinicSettings } from '@/db/schema';
 import { MIGRATIONS_FOLDER, runMigrations } from '@/db/migrate';
@@ -134,6 +134,45 @@ describe('day-before reminders', () => {
     expect(textBody(smtp.messages[0]!.raw)).toContain('Thu, 22 Oct 2026, 10:00');
     expect(textBody(smtp.messages[0]!.raw)).toContain('Your physiotherapist: Sam Sports');
     expect(textBody(smtp.messages[0]!.raw)).not.toContain('Pat Physio');
+  });
+
+  it.each(['move', 'cancel'] as const)('rechecks a %s committed after the reminder was claimed', async (change) => {
+    const booking = await book();
+    const newSlotId = await slot('2026-10-22T09:00:00Z', clinic.practitioners.saturdays);
+    clock.set('2026-10-20T08:00:00Z');
+    smtp.messages.length = 0;
+    const blocker = await database.handle.pool.connect();
+    let sending: Promise<void> | undefined;
+    try {
+      await blocker.query('begin');
+      // Pause delivery after its durable claim, without blocking booking changes.
+      await blocker.query('select id from clinic_settings where id = 1 for update');
+      sending = sendDueReminders(deps());
+      await vi.waitFor(
+        async () => {
+          const [row] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+          expect(row!.reminderAttemptedAt).not.toBeNull();
+        },
+        { timeout: 5000, interval: 20 },
+      );
+      if (change === 'move') {
+        await rescheduleBooking(deps(), { patientId: booking.patientId, bookingId: booking.id, newSlotId });
+      } else {
+        await cancelBooking(deps(), { patientId: booking.patientId, bookingId: booking.id });
+      }
+    } finally {
+      await blocker.query('rollback');
+      blocker.release();
+      await sending;
+    }
+    expect(smtp.messages).toHaveLength(0);
+    if (change === 'move') {
+      clock.set('2026-10-21T09:00:00Z');
+      await sendDueReminders(deps());
+      expect(smtp.messages).toHaveLength(1);
+      expect(textBody(smtp.messages[0]!.raw)).toContain('Thu, 22 Oct 2026, 10:00');
+      expect(textBody(smtp.messages[0]!.raw)).toContain('Sam Sports');
+    }
   });
 
   it('does not send a second reminder when a previously reminded booking moves', async () => {
