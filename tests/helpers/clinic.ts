@@ -17,6 +17,7 @@ export const TEST_CLINIC_SETTINGS: ClinicSettings = {
   lateCancellationHours: 24,
   // The optional-contact regression with collection enabled is owned by the
   // external DEF-04 fixture; ordinary booking tests exercise collection off.
+  remindersEnabled: true,
   includeContactInConfirmation: false,
   slotHorizonDays: 220,
   sessionMinutes: 45,

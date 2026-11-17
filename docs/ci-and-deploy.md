@@ -88,3 +88,21 @@ The script:
 3. prints the SHA to deploy.
 
 Wait for `ci` to publish that SHA's image. Then run `deploy` for each product to `staging`, then to `production`.
+
+## Reminder emails
+
+The Node application checks for due reminders at startup and every minute. No separate scheduler or public trigger
+is needed. Each check processes up to 100 confirmed, future bookings within 24 hours, so a restarted server catches
+up while appointments are still upcoming. Both clinics start with reminders switched on; staff can change this in
+**Clinic settings**. The existing `BOOKIT_PUBLIC_URL`, `BOOKIT_SMTP_URL` and `BOOKIT_MAIL_FROM` settings also apply to
+reminders. Without SMTP, nothing is claimed or sent.
+
+A sending claim is saved before contacting SMTP. This prevents duplicate reminders across replicas and restarts,
+including when SMTP accepts an email but its reply is lost. An uncertain or failed attempt is not retried; a crash
+after saving the claim can therefore leave a reminder unsent. Check `email.reminder.sent`, `email.reminder.failed`
+and `reminders.failed` in the existing logs. Moving a booking before delivery uses its current time and practitioner;
+a booking that has already had a reminder attempt is not reminded again after a move.
+
+Migration `0002_parched_micromax` adds the clinic switch and the booking's reminder attempt time without changing
+existing booking details. To roll back, restore the previous application and keep these additional columns so the
+sending history survives a later upgrade. The previous application works with the additional columns.

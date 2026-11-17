@@ -17,6 +17,7 @@ const settings: ClinicSettings = {
   clinicName: 'Test Physio Clinic',
   timeZone: 'Europe/London',
   lateCancellationHours: 24,
+  remindersEnabled: true,
   includeContactInConfirmation: true,
   slotHorizonDays: 220,
   sessionMinutes: 45,
