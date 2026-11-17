@@ -10,6 +10,9 @@ import { createDatabase } from '@/db/client';
 import { bookings, slots, clinicSettings } from '@/db/schema';
 import { MIGRATIONS_FOLDER, runMigrations } from '@/db/migrate';
 import { newId } from '@/lib/ids';
+import { seedTenant, assertSeedIdentity } from '@/server/seed/seed';
+import { loadTenant } from '@/server/seed/tenant';
+import previousSeeds from '../fixtures/seed-before-reminders.json';
 import { updateAdminSettings } from '@/server/admin/settings';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
@@ -252,52 +255,76 @@ describe('day-before reminders', () => {
   });
 });
 
-it('migrates an existing booking without changing its details, and defaults reminders on', async () => {
-  const server = await databaseOn(database.url);
-  const folder = await mkdtemp(path.join(tmpdir(), 'bookit-reminder-migration-'));
-  const pool = new Pool({ connectionString: server.url });
-  try {
-    for (const file of await readdir(MIGRATIONS_FOLDER))
-      await cp(path.join(MIGRATIONS_FOLDER, file), path.join(folder, file), { recursive: true });
-    const journalPath = path.join(folder, 'meta/_journal.json');
-    const journal = JSON.parse(await readFile(journalPath, 'utf8')) as { entries: { tag: string }[] };
-    journal.entries = journal.entries.filter((entry) => !entry.tag.startsWith('0002_'));
-    const { writeFile } = await import('node:fs/promises');
-    await writeFile(journalPath, JSON.stringify(journal));
-    await migrate(drizzle(pool), { migrationsFolder: folder });
-    await pool.query(
-      `insert into "user" (id,email,name,role,password_hash,created_at,updated_at) values ($1,'migration@patient.test','Migration Patient','patient','unused',$2,$2)`,
-      [clinic.patient1.id, clock.now()],
-    );
-    await pool.query(
-      `insert into practitioner (id,name,bio,working_days,workday_start,workday_end,active,created_at,updated_at) values ($1,'Migration Practitioner','',array[1],'09:00','17:00',true,$2,$2)`,
-      [clinic.practitioners.weekdays, clock.now()],
-    );
-    const slotId = newId(clock);
-    const bookingId = newId(clock);
-    await pool.query(`insert into slot (id,practitioner_id,starts_at,ends_at,created_at) values ($1,$2,$3,$4,$3)`, [
-      slotId,
-      clinic.practitioners.weekdays,
-      new Date('2026-10-21T08:00:00Z'),
-      new Date('2026-10-21T08:45:00Z'),
-    ]);
-    await pool.query(
-      `insert into booking (id,patient_id,slot_id,status,late_cancellation,reschedule_count,created_at,updated_at) values ($1,$2,$3,'confirmed',false,0,$4,$4)`,
-      [bookingId, clinic.patient1.id, slotId, clock.now()],
-    );
-    await pool.query(`insert into clinic_settings values (1,'Migration Clinic','Europe/London',24,false,7,45,3,$1)`, [
-      clock.now(),
-    ]);
-    const before = (await pool.query('select * from booking')).rows[0];
-    await runMigrations(server.url);
-    const after = (await pool.query('select * from booking')).rows[0];
-    expect(after).toEqual({ ...before, reminder_attempted_at: null });
-    expect((await pool.query('select reminders_enabled from clinic_settings')).rows[0]).toEqual({
-      reminders_enabled: true,
-    });
-  } finally {
-    await pool.end();
-    await server.stop();
-    await rm(folder, { recursive: true, force: true });
-  }
-});
+// Captured from sf-base's real seedTenant on disposable databases. The fixture
+// retains booked slots and replaces password hashes with inert placeholders.
+it.each(['acme', 'beacon'] as const)(
+  'migrates and reseeds the previous %s clinic without resetting saved data',
+  async (name) => {
+    const server = await databaseOn(database.url);
+    const folder = await mkdtemp(path.join(tmpdir(), 'bookit-reminder-migration-'));
+    const pool = new Pool({ connectionString: server.url });
+    const upgraded = createDatabase(server.url);
+    const tenant = loadTenant(name);
+    const passwords = Object.fromEntries(tenant.accounts.map((account) => [account.email, 'migration-only-password']));
+    const snapshot: Record<string, Record<string, unknown>[]> = previousSeeds[name];
+    try {
+      for (const file of await readdir(MIGRATIONS_FOLDER))
+        await cp(path.join(MIGRATIONS_FOLDER, file), path.join(folder, file), { recursive: true });
+      const journalPath = path.join(folder, 'meta/_journal.json');
+      const journal = JSON.parse(await readFile(journalPath, 'utf8')) as { entries: { idx: number }[] };
+      journal.entries = journal.entries.filter((entry) => entry.idx < 2);
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(journalPath, JSON.stringify(journal));
+      await migrate(drizzle(pool), { migrationsFolder: folder });
+      await pool.query(`create table bookit_seed_state (
+      singleton boolean primary key check (singleton), tenant text not null,
+      environment text not null, fingerprint text not null, seeded_at timestamptz not null
+    )`);
+      for (const table of ['user', 'practitioner', 'slot', 'booking', 'clinic_settings', 'bookit_seed_state']) {
+        await pool.query(`insert into "${table}" select * from json_populate_recordset(null::"${table}", $1::json)`, [
+          JSON.stringify(snapshot[table]),
+        ]);
+      }
+      await runMigrations(server.url);
+      expect(await seedTenant(upgraded.db, clock, { tenant, environment: 'staging', passwords })).toMatchObject({
+        outcome: 'unchanged',
+        counts: { users: 4, practitioners: 1, slots: 3, bookings: 3 },
+      });
+      await assertSeedIdentity(upgraded.db, name, 'staging');
+      // Idempotent reseeding preserves credentials, bookings, settings and seed identity.
+      for (const table of ['user', 'practitioner', 'slot', 'booking', 'clinic_settings', 'bookit_seed_state']) {
+        const rows = JSON.parse(JSON.stringify((await pool.query(`select * from "${table}" order by 1`)).rows));
+        const expected = snapshot[table]!.map((row) =>
+          table === 'booking'
+            ? { ...row, reminder_attempted_at: null }
+            : table === 'clinic_settings'
+              ? { ...row, reminders_enabled: true }
+              : row,
+        );
+        expect(rows, table).toEqual(expected);
+      }
+      for (const input of [
+        { tenant, environment: 'production', passwords },
+        { tenant: loadTenant(name === 'acme' ? 'beacon' : 'acme'), environment: 'staging', passwords },
+        {
+          tenant: { ...tenant, settings: { ...tenant.settings, sessionMinutes: tenant.settings.sessionMinutes + 5 } },
+          environment: 'staging',
+          passwords,
+        },
+      ]) {
+        // Supply matching passwords even for the other clinic so the identity check is exercised.
+        const supplied = Object.fromEntries(
+          input.tenant.accounts.map((account) => [account.email, 'migration-only-password']),
+        );
+        await expect(seedTenant(upgraded.db, clock, { ...input, passwords: supplied })).rejects.toThrow(
+          'identity or configuration differs',
+        );
+      }
+    } finally {
+      await upgraded.pool.end();
+      await pool.end();
+      await server.stop();
+      await rm(folder, { recursive: true, force: true });
+    }
+  },
+);

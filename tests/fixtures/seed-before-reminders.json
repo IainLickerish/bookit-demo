@@ -1,0 +1,298 @@
+{
+  "acme": {
+    "user": [
+      {
+        "id": "2b004385-5080-5f8a-82e5-0f706859fa8b",
+        "email": "patient2@patients.acmephysio.test",
+        "name": "Łukasz Wiśniewski",
+        "role": "patient",
+        "phone": null,
+        "password_hash": "unused-fixture-hash",
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "5e7ee896-ec6e-55ba-a87f-f6431c789986",
+        "email": "patient3@patients.acmephysio.test",
+        "name": "Siobhán Ó Briain",
+        "role": "patient",
+        "phone": null,
+        "password_hash": "unused-fixture-hash",
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "a4b43647-07cf-55a3-b93b-463b3bd1e074",
+        "email": "admin@acmephysio.test",
+        "name": "Acme Demo Admin",
+        "role": "admin",
+        "phone": null,
+        "password_hash": "unused-fixture-hash",
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "cdec1cb0-e41d-5e69-a7ea-424975041ddf",
+        "email": "patient1@patients.acmephysio.test",
+        "name": "Zoë Brontë",
+        "role": "patient",
+        "phone": "+44 7700 900001",
+        "password_hash": "unused-fixture-hash",
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      }
+    ],
+    "practitioner": [
+      {
+        "id": "c81e366c-324a-598c-a52f-a525eec52dbf",
+        "name": "Alex Physiotherapist",
+        "bio": "Acme physiotherapy and rehabilitation",
+        "working_days": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "workday_start": "09:00",
+        "workday_end": "17:00",
+        "active": true,
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      }
+    ],
+    "slot": [
+      {
+        "id": "01a1581c-1d80-702a-9904-b8a44c1be98a",
+        "practitioner_id": "c81e366c-324a-598c-a52f-a525eec52dbf",
+        "starts_at": "2026-10-20T11:00:00.000Z",
+        "ends_at": "2026-10-20T11:45:00.000Z",
+        "created_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "01a1581c-1d80-72c0-ab8b-6f736a73d9d8",
+        "practitioner_id": "c81e366c-324a-598c-a52f-a525eec52dbf",
+        "starts_at": "2026-10-20T10:15:00.000Z",
+        "ends_at": "2026-10-20T11:00:00.000Z",
+        "created_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "34bbb059-dcfb-5024-84ba-f372398fda67",
+        "practitioner_id": "c81e366c-324a-598c-a52f-a525eec52dbf",
+        "starts_at": "2026-10-20T10:00:00.000Z",
+        "ends_at": "2026-10-20T10:45:00.000Z",
+        "created_at": "2026-10-20T07:00:00.000Z"
+      }
+    ],
+    "booking": [
+      {
+        "id": "1777949e-29ad-5438-868b-c643effbf07c",
+        "patient_id": "cdec1cb0-e41d-5e69-a7ea-424975041ddf",
+        "slot_id": "34bbb059-dcfb-5024-84ba-f372398fda67",
+        "status": "confirmed",
+        "late_cancellation": false,
+        "phone": "+44 7700 900001",
+        "reschedule_count": 0,
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z",
+        "cancelled_at": null
+      },
+      {
+        "id": "343137fd-64b6-50b1-8e34-aa3d176fb1f2",
+        "patient_id": "2b004385-5080-5f8a-82e5-0f706859fa8b",
+        "slot_id": "01a1581c-1d80-72c0-ab8b-6f736a73d9d8",
+        "status": "confirmed",
+        "late_cancellation": false,
+        "phone": null,
+        "reschedule_count": 0,
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z",
+        "cancelled_at": null
+      },
+      {
+        "id": "c0fa4f84-8f6d-5e7c-9e59-7afbacfe9b43",
+        "patient_id": "5e7ee896-ec6e-55ba-a87f-f6431c789986",
+        "slot_id": "01a1581c-1d80-702a-9904-b8a44c1be98a",
+        "status": "confirmed",
+        "late_cancellation": false,
+        "phone": null,
+        "reschedule_count": 0,
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z",
+        "cancelled_at": null
+      }
+    ],
+    "clinic_settings": [
+      {
+        "id": 1,
+        "clinic_name": "Acme Physio",
+        "time_zone": "Europe/London",
+        "late_cancellation_hours": 24,
+        "include_contact_in_confirmation": true,
+        "slot_horizon_days": 220,
+        "session_minutes": 45,
+        "max_reschedules_per_booking": 3,
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      }
+    ],
+    "bookit_seed_state": [
+      {
+        "singleton": true,
+        "tenant": "acme",
+        "environment": "staging",
+        "fingerprint": "3b29a773c0ee0e47dcb5f49275a116726842fea9df1ea5fbd06f5444d743bfa1",
+        "seeded_at": "2026-10-20T07:00:00.000Z"
+      }
+    ]
+  },
+  "beacon": {
+    "user": [
+      {
+        "id": "93eba84d-976d-5c73-9576-8d48009bd422",
+        "email": "admin@beacondental.test",
+        "name": "Beacon Demo Admin",
+        "role": "admin",
+        "phone": null,
+        "password_hash": "unused-fixture-hash",
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "bdef98b0-3e51-5e37-8996-e0834d16ff05",
+        "email": "patient1@patients.beacondental.test",
+        "name": "Niamh O’Connell",
+        "role": "patient",
+        "phone": "+44 7700 900002",
+        "password_hash": "unused-fixture-hash",
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "deec71b0-721f-52a8-84d4-bf41a52fb116",
+        "email": "patient2@patients.beacondental.test",
+        "name": "Emil Andersson",
+        "role": "patient",
+        "phone": null,
+        "password_hash": "unused-fixture-hash",
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "ecc51658-37e2-5633-a22d-c36c22d1e4fa",
+        "email": "patient3@patients.beacondental.test",
+        "name": "Róisín Murphy",
+        "role": "patient",
+        "phone": null,
+        "password_hash": "unused-fixture-hash",
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      }
+    ],
+    "practitioner": [
+      {
+        "id": "072ec4bc-5ecf-59ab-bd99-0d914db28de2",
+        "name": "Blair Dentist",
+        "bio": "Beacon preventive dentistry. BEACON-SEED-MARKER",
+        "working_days": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "workday_start": "09:00",
+        "workday_end": "17:00",
+        "active": true,
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      }
+    ],
+    "slot": [
+      {
+        "id": "01a1581c-1d80-71f1-aa71-70265396d137",
+        "practitioner_id": "072ec4bc-5ecf-59ab-bd99-0d914db28de2",
+        "starts_at": "2026-10-20T10:00:00.000Z",
+        "ends_at": "2026-10-20T10:30:00.000Z",
+        "created_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "01a1581c-1d80-72f4-8fd9-f48e66ae6740",
+        "practitioner_id": "072ec4bc-5ecf-59ab-bd99-0d914db28de2",
+        "starts_at": "2026-10-20T11:00:00.000Z",
+        "ends_at": "2026-10-20T11:30:00.000Z",
+        "created_at": "2026-10-20T07:00:00.000Z"
+      },
+      {
+        "id": "01a1581c-1d80-76de-a246-abc674dfb575",
+        "practitioner_id": "072ec4bc-5ecf-59ab-bd99-0d914db28de2",
+        "starts_at": "2026-10-20T10:30:00.000Z",
+        "ends_at": "2026-10-20T11:00:00.000Z",
+        "created_at": "2026-10-20T07:00:00.000Z"
+      }
+    ],
+    "booking": [
+      {
+        "id": "a823b69b-b1af-5c28-905f-02fa3bf31c7c",
+        "patient_id": "bdef98b0-3e51-5e37-8996-e0834d16ff05",
+        "slot_id": "01a1581c-1d80-71f1-aa71-70265396d137",
+        "status": "confirmed",
+        "late_cancellation": false,
+        "phone": "+44 7700 900002",
+        "reschedule_count": 0,
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z",
+        "cancelled_at": null
+      },
+      {
+        "id": "e6448b32-11ae-5ec4-abf8-72be7f382921",
+        "patient_id": "ecc51658-37e2-5633-a22d-c36c22d1e4fa",
+        "slot_id": "01a1581c-1d80-72f4-8fd9-f48e66ae6740",
+        "status": "confirmed",
+        "late_cancellation": false,
+        "phone": null,
+        "reschedule_count": 0,
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z",
+        "cancelled_at": null
+      },
+      {
+        "id": "f7b589ce-8b86-5093-bfec-3cee7daf4151",
+        "patient_id": "deec71b0-721f-52a8-84d4-bf41a52fb116",
+        "slot_id": "01a1581c-1d80-76de-a246-abc674dfb575",
+        "status": "confirmed",
+        "late_cancellation": false,
+        "phone": null,
+        "reschedule_count": 0,
+        "created_at": "2026-10-20T07:00:00.000Z",
+        "updated_at": "2026-10-20T07:00:00.000Z",
+        "cancelled_at": null
+      }
+    ],
+    "clinic_settings": [
+      {
+        "id": 1,
+        "clinic_name": "Beacon Dental",
+        "time_zone": "Europe/London",
+        "late_cancellation_hours": 48,
+        "include_contact_in_confirmation": false,
+        "slot_horizon_days": 220,
+        "session_minutes": 30,
+        "max_reschedules_per_booking": 2,
+        "updated_at": "2026-10-20T07:00:00.000Z"
+      }
+    ],
+    "bookit_seed_state": [
+      {
+        "singleton": true,
+        "tenant": "beacon",
+        "environment": "staging",
+        "fingerprint": "63fbda6918a8f981aa301573dc78f73fd67870f3df465319056421f3b61010aa",
+        "seeded_at": "2026-10-20T07:00:00.000Z"
+      }
+    ]
+  }
+}

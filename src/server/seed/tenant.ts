@@ -27,7 +27,9 @@ export const tenantSchema = z
     allowedSenderDomains: z.array(text).length(1),
     mailFrom: fictionalEmail,
     branding: z.strictObject({ practitionerLabel: text, welcome: text }),
-    settings: clinicSettingsInput.strict(),
+    // Reminders are a saved staff choice, not part of the original seed configuration.
+    // Keep the seed fingerprint compatible with clinics created before reminders.
+    settings: clinicSettingsInput.omit({ remindersEnabled: true }).strict(),
     supportHours: text,
     tone: text,
     contacts: z
