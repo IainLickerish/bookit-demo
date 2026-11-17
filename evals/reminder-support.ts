@@ -22,7 +22,7 @@ export async function dispatchAt(staff: Page, bookingId: string, now: string): P
     headers: { origin },
     data: { bookingId, now },
   });
-  expect(response.ok(), 'the authorised reminder clock fixture answers').toBe(true);
+  expect(response.status(), 'the authorised reminder clock fixture answers').toBe(200);
   return ((await response.json()) as { processed: number }).processed;
 }
 

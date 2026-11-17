@@ -68,3 +68,10 @@ it('dispatches only the selected booking with a scoped clock', async () => {
   expect(id).toBe(bookingId);
   expect((deps as { clock: { now(): Date } }).clock.now().toISOString()).toBe(new Date(now).toISOString());
 });
+
+it('accepts the matching public Host through a proxy and rejects opaque origins', async () => {
+  const proxied = request(undefined, 'https://public-clinic.example.test');
+  proxied.headers.set('host', 'public-clinic.example.test');
+  expect((await POST(proxied)).status).toBe(200);
+  expect((await POST(request(undefined, 'null'))).status).toBe(403);
+});

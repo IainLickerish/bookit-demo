@@ -42,8 +42,8 @@ export function composeReminder(input: ReminderInput): OutgoingEmail {
 <h1 style="font:500 32px Fraunces,Georgia,serif">${escapeHtml(clinic.clinicName)}</h1>
 <p>${escapeHtml(lines[2]!)}</p><p>${escapeHtml(lines[4]!)}</p>
 <p>${escapeHtml(lines[5]!)}<br>${escapeHtml(lines[6]!)}</p>
-<p>Sign in to My bookings to <a style="color:#1D5C4B" href="${escapeHtml(link)}">reschedule your ${words.booking}</a>
-or <a style="color:#1D5C4B" href="${escapeHtml(link)}">cancel your ${words.booking}</a>.</p>
+<p>Sign in to My bookings to <a style="color:#1D5C4B;display:inline-block;min-height:44px;padding:8px 0;box-sizing:border-box" href="${escapeHtml(link)}">reschedule your ${words.booking}</a>
+or <a style="color:#1D5C4B;display:inline-block;min-height:44px;padding:8px 0;box-sizing:border-box" href="${escapeHtml(link)}">cancel your ${words.booking}</a>.</p>
 </div>`,
   };
 }

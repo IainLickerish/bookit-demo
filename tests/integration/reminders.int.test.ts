@@ -4,6 +4,7 @@ import { bookingReminders, bookings, slots } from '@/db/schema';
 import { newId } from '@/lib/ids';
 import { addHours, addMinutes } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { createSession, SESSION_COOKIE } from '@/server/auth/session';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { disabledMailer } from '@/server/notifications/mailer';
 import { sendDueReminders, type ReminderDependencies } from '@/server/notifications/reminders';
@@ -221,7 +222,38 @@ it('starts automatic reminder delivery with the web server and uses the configur
     expect(smtp.messages[0]!.from).toBe('noreply@acmephysio.test');
     expect(smtp.messages[0]!.raw).toContain('Your session reminder:');
     expect(await database.db.select().from(bookingReminders)).toHaveLength(1);
+    const session = await createSession(database.db, manualClock(addHours(booking.startsAt, -24)), clinic.admin.id);
+    // Node fetch replaces a custom Host, so use HTTP directly to reproduce the ingress proxy.
+    const response = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const outgoing = httpRequest(
+        `${server!.url}/api/debug/reminders`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie: `${SESSION_COOKIE}=${session.token}`,
+            host: 'public-clinic.example.test',
+            origin: 'http://public-clinic.example.test',
+          },
+        },
+        (incoming) => {
+          let body = '';
+          incoming.setEncoding('utf8');
+          incoming.on('data', (chunk: string) => {
+            body += chunk;
+          });
+          incoming.on('end', () => resolve({ status: incoming.statusCode!, body }));
+        },
+      );
+      outgoing.on('error', reject);
+      outgoing.setTimeout(10_000, () => outgoing.destroy(new Error('Test proxy request timed out')));
+      outgoing.end(JSON.stringify({ bookingId: booking.id, now: addHours(booking.startsAt, -24).toISOString() }));
+    });
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({ processed: 0 });
+    expect(smtp.messages).toHaveLength(1);
   } finally {
     await server?.stop();
   }
 }, 300_000);
+import { request as httpRequest } from 'node:http';

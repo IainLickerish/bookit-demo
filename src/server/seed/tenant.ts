@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import acmeConfig from '../../../tenants/acme.json';
-import beaconConfig from '../../../tenants/beacon.json';
+import acmeConfig from '../../../tenants/acme.json' with { type: 'json' };
+import beaconConfig from '../../../tenants/beacon.json' with { type: 'json' };
 import { clinicSettingsInput } from '../settings';
 
 export const tenantName = z.enum(['acme', 'beacon']);

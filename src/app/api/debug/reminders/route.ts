@@ -17,7 +17,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: 'unauthorised' }, { status: 401 });
   if (user.role !== 'admin') return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-  if (request.headers.get('origin') !== request.nextUrl.origin) {
+  const origin = request.headers.get('origin');
+  let sameOrigin = false;
+  try {
+    const supplied = new URL(origin ?? '');
+    sameOrigin =
+      supplied.origin === origin &&
+      supplied.protocol === request.nextUrl.protocol &&
+      supplied.host === (request.headers.get('host') ?? request.nextUrl.host);
+  } catch {
+    // Missing and opaque origins cannot authorise a state-changing fixture call.
+  }
+  if (!sameOrigin) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
   const parsed = input.safeParse(await request.json().catch(() => null));

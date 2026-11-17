@@ -87,7 +87,7 @@ test('A client receives one reminder with clinic-local details and My bookings l
   }
 });
 
-test('Cancelled and too-soon bookings receive no reminder', async ({ page, browser }) => {
+test('Cancelled bookings and bookings made less than 24 hours ahead receive no reminder', async ({ page, browser }) => {
   const staff = await (await browser.newContext()).newPage();
   const cancelledDate = londonDate(12);
   let cancelledId = '';
