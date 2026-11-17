@@ -16,8 +16,10 @@ export async function saveSettingsAction(form: FormData): Promise<void> {
     timeZone: form.get('timeZone'),
     lateCancellationHours: typeof hours === 'string' && hours.trim() !== '' ? Number(hours) : NaN,
     includeContactInConfirmation: form.get('includeContactInConfirmation') === 'on',
+    remindersEnabled: form.get('remindersEnabled') === 'on',
   });
-  if (!parsed.success) redirect('/admin/settings?error=invalid');
+  const reminderChoice = form.get('remindersEnabled') === 'on' ? 'on' : 'off';
+  if (!parsed.success) redirect(`/admin/settings?error=invalid&reminders=${reminderChoice}`);
   const log = await requestLogger();
   let failed = false;
   try {
@@ -27,7 +29,7 @@ export async function saveSettingsAction(form: FormData): Promise<void> {
     log.error({ event: 'admin.settings_failed' }, 'Clinic settings could not be saved');
     failed = true;
   }
-  if (failed) redirect('/admin/settings?error=unavailable');
+  if (failed) redirect(`/admin/settings?error=unavailable&reminders=${reminderChoice}`);
   revalidatePath('/', 'layout');
   redirect('/admin/settings?saved=1');
 }

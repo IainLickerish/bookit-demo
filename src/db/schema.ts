@@ -155,6 +155,7 @@ export const clinicSettings = pgTable(
     timeZone: text('time_zone').notNull(),
     lateCancellationHours: integer('late_cancellation_hours').notNull(),
     includeContactInConfirmation: boolean('include_contact_in_confirmation').notNull(),
+    remindersEnabled: boolean('reminders_enabled').notNull().default(true),
     slotHorizonDays: integer('slot_horizon_days').notNull(),
     sessionMinutes: integer('session_minutes').notNull(),
     maxReschedulesPerBooking: integer('max_reschedules_per_booking').notNull(),

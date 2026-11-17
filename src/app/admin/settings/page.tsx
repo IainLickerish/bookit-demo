@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { requireAdmin } from '@/server/admin/context';
 import { loadClinicSettings } from '@/server/settings';
-import type { SearchParams } from '../../messages';
+import { SETTINGS_MESSAGES, type SearchParams } from '../../messages';
 import { saveSettingsAction } from './actions';
 
 export default async function AdminSettingsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -69,6 +69,20 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             data-testid="admin-include-contact"
           />
           Include contact details in confirmation emails
+        </label>
+        <label className="flex min-h-11 items-center gap-2">
+          <input
+            type="checkbox"
+            name="remindersEnabled"
+            defaultChecked={
+              params.error && (params.reminders === 'on' || params.reminders === 'off')
+                ? params.reminders === 'on'
+                : settings.remindersEnabled
+            }
+            className="w-auto"
+            data-testid="admin-reminders-enabled"
+          />
+          {SETTINGS_MESSAGES.remindersLabel}
         </label>
         <button type="submit" className="button" data-testid="admin-save-settings">
           Save settings

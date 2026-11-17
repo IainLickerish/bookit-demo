@@ -12,6 +12,7 @@
     "timeZone": "Europe/London",
     "lateCancellationHours": 48,
     "includeContactInConfirmation": false,
+    "remindersEnabled": true,
     "slotHorizonDays": 220,
     "sessionMinutes": 30,
     "maxReschedulesPerBooking": 2

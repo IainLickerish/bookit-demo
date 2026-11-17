@@ -193,6 +193,59 @@ test('REQ-18.2-01 admin pages and downloaded exports contain only their own seed
   }
 });
 
+test('Clinic staff save reminder choices independently for Acme and Beacon', async ({ browser }) => {
+  const a = await signIn(browser, acme, 'admin');
+  const b = await signIn(browser, beacon, 'admin');
+  const pageA = a.pages()[0]!;
+  const pageB = b.pages()[0]!;
+  try {
+    for (const [page, clinic] of [
+      [pageA, acme],
+      [pageB, beacon],
+    ] as const) {
+      await page.goto(`${clinic.url}/admin/settings`);
+      await expect(page.getByRole('checkbox', { name: 'Enable reminder emails' })).toBeChecked();
+    }
+    await pageA.getByTestId('admin-reminders-enabled').uncheck();
+    await pageA.getByTestId('admin-save-settings').click();
+    await expect(pageA.getByTestId('admin-settings-saved')).toBeVisible();
+    await pageA.reload();
+    await expect(pageA.getByTestId('admin-reminders-enabled')).not.toBeChecked();
+    await pageB.reload();
+    await expect(pageB.getByTestId('admin-reminders-enabled')).toBeChecked();
+    await pageB.getByTestId('admin-reminders-enabled').uncheck();
+    await pageB.getByTestId('admin-save-settings').click();
+    await expect(pageB.getByTestId('admin-settings-saved')).toBeVisible();
+    await pageB.reload();
+    await expect(pageB.getByTestId('admin-reminders-enabled')).not.toBeChecked();
+    await pageA.getByTestId('admin-reminders-enabled').check();
+    await pageA.getByTestId('admin-save-settings').click();
+    await expect(pageA.getByTestId('admin-settings-saved')).toBeVisible();
+    await pageA.reload();
+    await expect(pageA.getByTestId('admin-reminders-enabled')).toBeChecked();
+    await pageB.reload();
+    await expect(pageB.getByTestId('admin-reminders-enabled')).not.toBeChecked();
+    const foreign = await browser.newContext();
+    try {
+      await foreign.addCookies(await a.cookies());
+      const page = await foreign.newPage();
+      await page.goto(`${beacon.url}/admin/settings`);
+      await expect(page).toHaveURL(`${beacon.url}/auth/sign-in`);
+      await expect(page.getByTestId('admin-reminders-enabled')).toHaveCount(0);
+    } finally {
+      await foreign.close();
+    }
+  } finally {
+    for (const page of [pageA, pageB]) {
+      await page.getByTestId('admin-reminders-enabled').check();
+      await page.getByTestId('admin-save-settings').click();
+      await expect(page.getByTestId('admin-settings-saved')).toBeVisible();
+    }
+    await a.close();
+    await b.close();
+  }
+});
+
 test('REQ-18.2-01 patient sees the three-hour appointment, rerun seed preserves data and database role denies foreign databases', async ({
   browser,
 }) => {

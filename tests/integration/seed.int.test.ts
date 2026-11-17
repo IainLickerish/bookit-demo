@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { bookings, clinicSettings, practitioners, slots, users } from '@/db/schema';
@@ -53,6 +53,7 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
     expect(noPhone.phone).toBeNull();
     expect(await verifyPassword(passwordsA[noPhone.email]!, noPhone.passwordHash)).toBe(true);
     expect((await b.db.select().from(clinicSettings))[0]).toMatchObject(beacon.settings);
+    expect((await a.db.select().from(clinicSettings))[0]?.remindersEnabled).toBe(true);
     const seeded = await a.db
       .select({ start: slots.startsAt })
       .from(bookings)
@@ -84,7 +85,15 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
       .update(bookings)
       .set({ status: 'cancelled', cancelledAt: clock.now() })
       .where(eq(bookings.id, booking!.id));
-    await a.db.update(clinicSettings).set({ clinicName: 'Acme Admin Changed' });
+    await a.db.update(clinicSettings).set({ clinicName: 'Acme Admin Changed', remindersEnabled: false });
+    // Match the fingerprint written by the app before reminder preferences existed.
+    const legacySettings = Object.fromEntries(
+      Object.entries(acme.settings).filter(([key]) => key !== 'remindersEnabled'),
+    );
+    const legacyFingerprint = createHash('sha256')
+      .update(JSON.stringify({ version: 1, tenant: { ...acme, settings: legacySettings } }))
+      .digest('hex');
+    await a.db.execute(sql`update bookit_seed_state set fingerprint = ${legacyFingerprint}`);
     const hashesBefore = (await a.db.select().from(users)).map((row) => row.passwordHash).sort();
     const results = await Promise.all(
       [1, 2].map(() =>
@@ -99,6 +108,7 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
     expect(results[0]).toMatchObject({ outcome: 'unchanged', counts: { users: 4, bookings: 3 } });
     expect((await a.db.select().from(users)).map((row) => row.passwordHash).sort()).toEqual(hashesBefore);
     expect((await a.db.select().from(clinicSettings))[0]?.clinicName).toBe('Acme Admin Changed');
+    expect((await a.db.select().from(clinicSettings))[0]?.remindersEnabled).toBe(false);
     expect((await a.db.select().from(bookings).where(eq(bookings.id, booking!.id)))[0]?.status).toBe('cancelled');
   });
   it('refuses foreign-tenant/environment/config seeding and container identity, retaining all data', async () => {

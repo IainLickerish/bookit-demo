@@ -151,18 +151,23 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
       timeZone: 'Europe/Paris',
       lateCancellationHours: 48,
       includeContactInConfirmation: false,
+      remindersEnabled: false,
     };
     try {
       await updateAdminSettings(acme.db, clock, updated);
       expect(await loadClinicSettings(acme.db)).toEqual({ ...before, ...updated });
+      expect((await loadClinicSettings(beacon.db)).remindersEnabled).toBe(true);
       await expect(updateAdminSettings(acme.db, clock, { ...updated, lateCancellationHours: -1 })).rejects.toThrow();
       expect(await loadClinicSettings(acme.db)).toEqual({ ...before, ...updated });
+      await updateAdminSettings(acme.db, clock, { ...updated, remindersEnabled: true });
+      expect((await loadClinicSettings(acme.db)).remindersEnabled).toBe(true);
     } finally {
       await updateAdminSettings(acme.db, clock, {
         clinicName: before.clinicName,
         timeZone: before.timeZone,
         lateCancellationHours: before.lateCancellationHours,
         includeContactInConfirmation: before.includeContactInConfirmation,
+        remindersEnabled: before.remindersEnabled,
       });
     }
   });

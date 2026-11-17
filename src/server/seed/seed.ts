@@ -77,7 +77,16 @@ export async function seedTenant(
   const now = clock.now();
   const fixedClock: Clock = { now: () => new Date(now) };
   const fingerprint = createHash('sha256')
-    .update(JSON.stringify({ version: SEED_VERSION, tenant }))
+    // This new preference is mutable, and must not change the version 1 seed identity.
+    .update(
+      JSON.stringify({
+        version: SEED_VERSION,
+        tenant: {
+          ...tenant,
+          settings: Object.fromEntries(Object.entries(tenant.settings).filter(([key]) => key !== 'remindersEnabled')),
+        },
+      }),
+    )
     .digest('hex');
   const id = (label: string) => uuidv5(`bookit-demo:${tenant.tenant}:${environment}:${label}`, uuidv5.URL);
   return db.transaction(async (tx) => {

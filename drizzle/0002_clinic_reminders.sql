@@ -1,0 +1,1 @@
+ALTER TABLE "clinic_settings" ADD COLUMN "reminders_enabled" boolean DEFAULT true NOT NULL;
