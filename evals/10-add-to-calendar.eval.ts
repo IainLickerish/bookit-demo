@@ -15,6 +15,8 @@ import {
 } from './support';
 import { calendarField, calendarInstant, downloadCalendar, emailedCalendar } from './calendar-support';
 
+test.use({ viewport: { width: 375, height: 812 } });
+
 // Each journey creates its own booking on a separate day, without relying on another check's data.
 test('A client can download their confirmed booking from My bookings and receives the same calendar file by email', async ({
   page,

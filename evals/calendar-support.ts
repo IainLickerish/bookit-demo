@@ -18,6 +18,15 @@ export function calendarInstant(file: string, field: string): Date {
 }
 
 export async function downloadCalendar(page: Page, link: Locator): Promise<string> {
+  await expect(link).toBeVisible();
+  expect(
+    (await link.boundingBox())?.height,
+    'the calendar option has a comfortable touch target',
+  ).toBeGreaterThanOrEqual(44);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    'the page fits the phone screen',
+  ).toBe(true);
   const downloaded = page.waitForEvent('download');
   await link.click();
   const file = await downloaded;
