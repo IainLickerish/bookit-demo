@@ -2,11 +2,13 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings, practitioners } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
+import { listAdminBookings } from '@/server/admin/bookings';
 import { bookSlot, type BookingDependencies } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { BookingError } from '@/server/bookings/errors';
 import { findBookingForPatient, listBookingsForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
+import { saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots, type SlotView } from '@/server/slots/queries';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
@@ -150,6 +152,39 @@ describe('booking a slot (REQ-18.1-01)', () => {
 });
 
 describe('cancelling a booking (REQ-18.1-01)', () => {
+  it.each([24, 48])('saves a late cancellation inside the %i-hour window and allows rebooking', async (hours) => {
+    await saveClinicSettings(database.db, clock, { ...clinic.settings, lateCancellationHours: hours });
+    const slot = await slotAt('2026-10-23', '14:15');
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
+    clock.set(new Date(slot.startsAt.getTime() - (hours * 60 - 1) * 60_000).toISOString());
+
+    const result = await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
+    expect(result).toMatchObject({ ok: true, late: true, booking: { status: 'cancelled', lateCancellation: true } });
+    const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+    expect(stored).toMatchObject({
+      status: 'cancelled',
+      lateCancellation: true,
+      cancelledAt: clock.now(),
+      updatedAt: clock.now(),
+    });
+    expect(await listBookingsForPatient(database.db, clinic.patient1.id)).toEqual([
+      expect.objectContaining({ id: booking.id, status: 'cancelled', lateCancellation: true }),
+    ]);
+    expect(await listAdminBookings(database.db, { date: '2026-10-23' }, clinic.settings.timeZone)).toEqual([
+      expect.objectContaining({ id: booking.id, status: 'cancelled', lateCancellation: true }),
+    ]);
+    expect((await slotsOn('2026-10-23')).map((s) => s.id)).toContain(slot.id);
+    const replacement = await bookSlot(deps, { patientId: clinic.patient2.id, slotId: slot.id });
+    expect(replacement).toMatchObject({ slotId: slot.id, patientId: clinic.patient2.id, status: 'confirmed' });
+    expect((await findBookingForPatient(database.db, clinic.patient1.id, booking.id))?.status).toBe('cancelled');
+    expect(logs.lines).toContainEqual(
+      expect.objectContaining({ event: 'booking.cancelled', booking_id: booking.id, late: true }),
+    );
+    expect(await refusalOf(cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id }))).toBe(
+      'booking_not_active 409',
+    );
+  });
+
   it('cancels outside the late window without the late flag', async () => {
     const booking = await bookSlot(deps, {
       patientId: clinic.patient1.id,
