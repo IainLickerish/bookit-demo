@@ -27,6 +27,15 @@ buildService:
   checks:
     - bun run test:integration
 
+# BookIt's own guidance, which every agent reads: its conventions, the product brief and the guides (the factory's
+# decision 0099). The owner's privacy note (docs/owner/) is left out on purpose.
+guidance:
+  - AGENTS.md
+  - docs/product.md
+  - docs/guides/look-and-feel.md
+  - docs/guides/user-experience.md
+  - docs/guides/writing.md
+
 # Which changes get a closer look: those that change stored data, and those always reviewed in full.
 review:
   dataChanges:
