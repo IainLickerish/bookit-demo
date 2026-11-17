@@ -5,6 +5,8 @@ import {
   PATIENT_3,
   bookSlot,
   givePhone,
+  expectBookingConfirmation,
+  isBookingConfirmationUrl,
   londonDate,
   pickFreeSlot,
   sessionFor,
@@ -52,7 +54,8 @@ test('When two clients try to book the same time at once, only one gets it', asy
         )
         .catch(() => undefined);
     await Promise.all([settled(a), settled(b)]);
-    const booked = [a.url(), b.url()].filter((u) => u.endsWith('/bookings?notice=booked'));
+    const booked = [a, b].filter((page) => isBookingConfirmationUrl(new URL(page.url()), 'booked'));
     expect(booked, 'exactly one client got the time').toHaveLength(1);
+    await expectBookingConfirmation(booked[0]!, 'booked');
   });
 });

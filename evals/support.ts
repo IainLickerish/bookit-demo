@@ -94,13 +94,33 @@ export async function givePhone(page: Page): Promise<void> {
   if ((await phone.count()) && !(await phone.inputValue())) await phone.fill('+44 7700 900123');
 }
 
+/** A confirmation identifies the saved booking as well as the action that succeeded. */
+export function isBookingConfirmationUrl(url: URL, notice: 'booked' | 'rescheduled'): boolean {
+  const bookingId = url.searchParams.get('booking') ?? '';
+  return (
+    url.pathname === '/bookings' &&
+    url.searchParams.size === 2 &&
+    url.hash === '' &&
+    url.searchParams.get('notice') === notice &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId)
+  );
+}
+
+export async function expectBookingConfirmation(page: Page, notice: 'booked' | 'rescheduled'): Promise<void> {
+  await expect(page).toHaveURL((url) => isBookingConfirmationUrl(url, notice));
+  const bookingId = new URL(page.url()).searchParams.get('booking')!;
+  const row = page.getByTestId('upcoming-bookings').locator(`[data-booking-id="${bookingId}"]`);
+  await expect(row).toHaveCount(1);
+  await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
+}
+
 /** Books the slot and returns how its time is shown, for example "Mon, 23 Nov 2026, 09:00". */
 export async function bookSlot(page: Page, slotId: string): Promise<string> {
   await page.goto(`/book/${slotId}`);
   const when = ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
   await givePhone(page);
   await page.getByTestId('confirm-booking').click();
-  await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+  await expectBookingConfirmation(page, 'booked');
   return when;
 }
 

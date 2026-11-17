@@ -3,6 +3,7 @@ import {
   ADMIN,
   PATIENT_1,
   bookSlot,
+  expectBookingConfirmation,
   bookingRow,
   dateInPeriod,
   givePhone,
@@ -76,7 +77,7 @@ test('Clients see the correct UK date and time when reviewing a booking, in My b
       async () => {
         await givePhone(page);
         await page.getByTestId('confirm-booking').click();
-        await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+        await expectBookingConfirmation(page, 'booked');
         await page.reload();
         const row = bookingRow(page, 'upcoming-bookings', appointment.when);
         await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
@@ -94,7 +95,7 @@ test('Clients see the correct UK date and time when reviewing a booking, in My b
       const target = choices.last();
       const movedWhen = ukWhen((await target.getAttribute('data-starts-at')) ?? '');
       await target.click();
-      await expect(page).toHaveURL(/\/bookings\?notice=rescheduled$/);
+      await expectBookingConfirmation(page, 'rescheduled');
       await expect(bookingRow(page, 'upcoming-bookings', movedWhen).getByTestId('booking-status')).toHaveText(
         'Confirmed',
       );
