@@ -20,7 +20,7 @@ async function confirmationsFor(reference: string, seen: string[] = []): Promise
   return emails.filter((email) => email.Text.includes(`Booking reference: ${reference}`));
 }
 
-test('Moving a booking sends the client one confirmation email with the new day, date, time and practitioner', async ({
+test('Moving a booking sends the client one email saying it was moved with the new day, date, time and practitioner', async ({
   page,
 }) => {
   await step(page, 'Sign in as a client', async () => {
@@ -67,6 +67,8 @@ test('Moving a booking sends the client one confirmation email with the new day,
     expect(emails).toHaveLength(1);
     const email = emails[0]!;
     expect(email.To.map((recipient) => recipient.Address)).toEqual([PATIENT_2]);
+    expect(email.Subject).toContain('Booking moved:');
+    expect(email.Text).toContain('Your booking at Acme Physio has been moved.');
     expect(email.Subject).toContain(movedWhen);
     expect(email.Text).toContain(`When: ${movedWhen} (Europe/London)`);
     expect(email.Text).toContain(`With: ${PRACTITIONER}`);
