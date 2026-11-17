@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BookingView } from '@/server/bookings/queries';
+import { bookingCalendar } from '@/server/bookings/calendar';
 import { composeConfirmation, formatPhone } from '@/server/notifications/confirmation';
 import { deliverEmail } from '@/server/notifications/deliver';
 import {
@@ -45,6 +46,24 @@ function booking(phone: string | null): BookingView {
 }
 
 describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
+  it('attaches the same personal calendar file for booking and move confirmations', () => {
+    for (const rescheduleCount of [0, 1]) {
+      const saved = { ...booking('+44 7700 900001'), rescheduleCount };
+      const email = composeConfirmation({ booking: saved, patient, settings, from: TEST_MAIL_FROM });
+      expect(email.attachments).toEqual([
+        {
+          filename: 'booking.ics',
+          contentType: 'text/calendar; charset=utf-8',
+          content: bookingCalendar(saved, settings),
+        },
+      ]);
+      expect(email.text).toContain('Duration: 45 minutes');
+      expect(email.text.startsWith(`${settings.clinicName}\n`)).toBe(true);
+      expect(email.subject).toContain(rescheduleCount ? 'Booking moved:' : 'Booking confirmed:');
+      expect(email.attachments![0]!.content).not.toContain('7700');
+      expect(email.attachments![0]!.content).not.toContain(patient.email);
+    }
+  });
   it('confirms the slot in the clinic time zone with the practitioner and booking reference', () => {
     const email = composeConfirmation({ booking: booking('+44 7700 900001'), patient, settings, from: TEST_MAIL_FROM });
     expect(email.from).toBe(TEST_MAIL_FROM);

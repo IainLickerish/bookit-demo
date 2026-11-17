@@ -14,3 +14,8 @@ confirm your appointment. You can leave the phone number blank.
 You can choose slots up to 220 days ahead, shown in Europe/London time. If another
 patient takes your selected slot first, pick a different one. Once confirmed,
 your dental appointment will appear in **My bookings** at `/bookings`.
+
+Choose **Add to calendar** beside your confirmed appointment to download `booking.ics`.
+Import the file into Google, Outlook or Apple Calendar to see Beacon Dental, your
+clinician, the time and appointment length. You can download it again from
+**My bookings** before the appointment starts.

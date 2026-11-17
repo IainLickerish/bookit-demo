@@ -14,3 +14,8 @@ details before confirming. You can provide a phone number, but it is optional.
 Slots are offered up to 220 days ahead. All times use Europe/London. A slot can
 be booked by only one patient; if somebody books it first, choose another time.
 Your confirmed session appears under **My bookings** at `/bookings`.
+
+Choose **Add to calendar** beside your confirmed session to download `booking.ics`.
+Import this file into Google, Outlook or Apple Calendar. It includes Acme Physio,
+your physiotherapist, the session time and its length. You can download it again
+from **My bookings** while the session is upcoming.

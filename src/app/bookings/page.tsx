@@ -43,7 +43,16 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/api/bookings/${booking.id}/calendar`}
+            download="booking.ics"
+            className="button-secondary inline-flex min-h-11 items-center"
+            data-testid="add-to-calendar"
+            aria-label={`Add to calendar: ${formatSlot(booking.startsAt, settings.timeZone)} with ${booking.practitionerName}`}
+          >
+            Add to calendar
+          </a>
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}

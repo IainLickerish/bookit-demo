@@ -5,6 +5,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { bookingCalendar } from '@/server/bookings/calendar';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
@@ -74,6 +76,35 @@ beforeEach(async () => {
 });
 
 describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stand-in, no real email)', () => {
+  it('sends booking and move files matching the committed appointment through SMTP', async () => {
+    const original = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
+    const moved = await rescheduleBooking(deps(), {
+      patientId: clinic.patient1.id,
+      bookingId: original.id,
+      newSlotId: await freeSlotId(1),
+    });
+    expect(smtp.messages).toHaveLength(2);
+    for (const [index, booking] of [original, moved].entries()) {
+      const raw = smtp.messages[index]!.raw;
+      expect(smtp.messages[index]!.to).toEqual([clinic.patient1.email]);
+      const boundary = raw.match(/boundary="([^"]+)"/)![1]!;
+      const attachment = raw.split(`--${boundary}`).find((part) => /Content-Disposition: attachment/.test(part))!;
+      expect(attachment).toMatch(/Content-Type: text\/calendar; charset=utf-8/);
+      expect(attachment).toContain('filename=booking.ics');
+      expect(attachment).toContain('Content-Transfer-Encoding: base64');
+      const file = Buffer.from(attachment.split('\r\n\r\n')[1]!.trim(), 'base64').toString('utf8');
+      expect(file).toBe(bookingCalendar(booking, clinic.settings));
+    }
+    const failed = await rescheduleBooking(deps('smtp://127.0.0.1:9'), {
+      patientId: clinic.patient1.id,
+      bookingId: moved.id,
+      newSlotId: original.slotId,
+    });
+    const [saved] = await database.db.select().from(bookings).where(eq(bookings.id, failed.id));
+    expect(saved?.slotId).toBe(original.slotId);
+    expect(logs.events()).toContain('email.confirmation.failed');
+    expect(smtp.messages).toHaveLength(2);
+  });
   it('sends one confirmation with the contact phone when the clinic includes contact details', async () => {
     await saveClinicSettings(database.db, clock, { ...clinic.settings, includeContactInConfirmation: true });
     const booking = await bookSlot(deps(), {
