@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { z } from 'zod';
+import acmeConfig from '../../../tenants/acme.json';
+import beaconConfig from '../../../tenants/beacon.json';
 import { clinicSettingsInput } from '../settings';
 
 export const tenantName = z.enum(['acme', 'beacon']);
@@ -71,8 +71,7 @@ export type Tenant = z.infer<typeof tenantSchema>;
 /** The caller selects one of two checked-in files, never an arbitrary path. */
 export function loadTenant(name: unknown): Tenant {
   const selected = tenantName.parse(name);
-  const file = path.resolve(import.meta.dirname, '../../..', 'tenants', `${selected}.json`);
-  const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+  const parsed: unknown = selected === 'acme' ? acmeConfig : beaconConfig;
   const result = tenantSchema.parse(parsed);
   if (result.tenant !== selected) throw new Error('Tenant file identity mismatch');
   return result;

@@ -5,7 +5,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createDatabase } from '@/db/client';
 import { MIGRATIONS_FOLDER, runMigrations } from '@/db/migrate';
-import { bookings, clinicSettings, practitioners, slots, users } from '@/db/schema';
+import { bookingReminders, bookings, clinicSettings, practitioners, slots, users } from '@/db/schema';
 import { loadTenant } from '@/server/seed/tenant';
 import { loadClinicSettings } from '@/server/settings';
 import { seedAdminBookings } from '../helpers/admin-fixture';
@@ -69,6 +69,7 @@ it.each(['acme', 'beacon'] as const)(
         practitioners: await handle.db.select().from(practitioners),
       };
       await runMigrations(database.url);
+      expect(await handle.db.select().from(bookingReminders)).toEqual([]);
       expect(await loadClinicSettings(handle.db)).toEqual(settings);
       const upgraded = (await handle.pool.query('select * from clinic_settings')).rows as Record<string, unknown>[];
       expect(upgraded).toEqual(before.settings.map((row) => ({ ...row, reminders_enabled: true })));

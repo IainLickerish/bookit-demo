@@ -21,4 +21,4 @@ Open **Clinic settings** from **Clinic bookings**. **Enable reminder emails** st
 selected. Clear it to switch reminders off, or select it to switch them on, then
 choose **Save settings**. The page confirms the save. Reopen settings to see the
 saved choice. Only Acme staff can change this preference, and it applies only to
-Acme Physio. This step saves the preference; reminder emails are not sent yet.
+Acme Physio. When enabled, reminders are sent about 24 hours before eligible bookings.

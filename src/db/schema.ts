@@ -170,6 +170,14 @@ export const clinicSettings = pgTable(
   ],
 );
 
+/** A dispatch claim prevents two workers from sending the same booking's reminder. */
+export const bookingReminders = pgTable('booking_reminder', {
+  bookingId: uuid('booking_id')
+    .primaryKey()
+    .references(() => bookings.id, { onDelete: 'cascade' }),
+  attemptedAt: instant('attempted_at').notNull(),
+});
+
 export type UserRow = typeof users.$inferSelect;
 export type PractitionerRow = typeof practitioners.$inferSelect;
 export type SlotRow = typeof slots.$inferSelect;

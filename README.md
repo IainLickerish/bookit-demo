@@ -204,3 +204,30 @@ failing-then-passing tests live in SupportAgents under `demo/bookit-expected/`.
 BookIt's ordinary tests exercise unaffected cancellation/export/display cases and
 must pass both on this baseline and after each expected fix. The tenant seed keeps
 its Unicode names and DST reference slots so those defects remain reproducible.
+
+## Appointment reminders
+
+Each clinic's saved **Enable reminder emails** setting controls reminders. The
+Node web server checks once on startup and every minute while running, using the
+application clock. It sends within the five minutes beginning 24 elapsed hours
+before an unchanged confirmed booking, provided it was made at least 24 hours
+ahead. Cancelled bookings, later bookings, disabled clinics and times outside
+that window are excluded. A missed window is not sent later. SMTP must be
+configured; the existing `.test` address restriction applies.
+
+A new `booking_reminder` table stores a booking reference and dispatch time. Its
+unique booking key is committed before SMTP to prevent duplicate dispatches.
+This is a dispatch claim, not a delivery receipt. No booking or account is changed
+by dispatch. The additive migration also works with existing bookings. For
+recovery, stop the new app and restore the previous app, leaving the table and
+claims intact. Do not remove claims and restart dispatch, as that permits another
+email for the same booking. Move handling and delivery-outcome work remain for
+the next planned step.
+
+The fixed-clock browser checks use `POST /api/debug/reminders` as a test fixture,
+with a staff session, a matching Origin header, a booking reference and a scoped
+`now`. It runs the real dispatcher for that booking without changing the shared
+clock or other bookings. The fixture returns 404 without a test-clock build and
+clock file, and in the production environment. Visitors and clients are refused.
+It accepts only a time within 366 days of the shared clock, with no tenant or
+recipient selector. This is test support, not a production control.

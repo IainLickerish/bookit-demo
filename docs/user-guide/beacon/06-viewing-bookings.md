@@ -21,4 +21,4 @@ From **Clinic bookings**, open **Clinic settings**. **Enable reminder emails** s
 selected. Clear it to switch reminders off, or select it to switch them on, then
 choose **Save settings**. You'll see a message confirming the save. Open settings
 again to check your saved choice. Only Beacon staff can change it, and it applies
-only to Beacon Dental. This step saves the preference; reminder emails are not sent yet.
+only to Beacon Dental. When enabled, reminders are sent about 24 hours before eligible bookings.

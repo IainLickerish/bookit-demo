@@ -29,6 +29,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
+      id={`booking-${booking.id}`}
       className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
       data-testid="booking-row"
       data-booking-id={booking.id}

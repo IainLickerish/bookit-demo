@@ -40,7 +40,9 @@
     ".next-m0-25a/types/**/*.ts",
     ".next-m0-25a/dev/types/**/*.ts",
     ".next-m0-25b/types/**/*.ts",
-    ".next-m0-25b/dev/types/**/*.ts"
+    ".next-m0-25b/dev/types/**/*.ts",
+    ".next-reminders/types/**/*.ts",
+    ".next-reminders/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules", ".next*", "test-results", "playwright-report"]
 }
