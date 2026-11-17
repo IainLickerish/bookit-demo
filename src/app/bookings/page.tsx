@@ -6,6 +6,7 @@ import { listBookingsForPatient, type BookingView } from '@/server/bookings/quer
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
+import { PageHeading } from '../page-heading';
 import { cancelAction } from './actions';
 
 function statusText(booking: BookingView): string {
@@ -25,25 +26,42 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
+  const tileDate = new Intl.DateTimeFormat('en-GB', {
+    timeZone: settings.timeZone,
+    day: 'numeric',
+    month: 'short',
+  });
 
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+      className="card booking-list-card"
       data-testid="booking-row"
       data-booking-id={booking.id}
       data-status={booking.status}
     >
-      <div>
-        <p className="font-medium" data-testid="booking-when">
+      <div className="booking-date-tile" data-testid="booking-date-tile" aria-hidden="true">
+        {tileDate.formatToParts(booking.startsAt).map((part) =>
+          part.type === 'day' || part.type === 'month' ? (
+            <span key={part.type} className={`booking-date-${part.type}`} data-testid={`booking-date-${part.type}`}>
+              {part.value}
+            </span>
+          ) : null,
+        )}
+      </div>
+      <div className="booking-summary">
+        <p className="card-title booking-time" data-testid="booking-when">
           {formatSlot(booking.startsAt, settings.timeZone)}
         </p>
-        <p className="text-sm text-slate-600">
-          With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
+        <p className="booking-summary-details">
+          <span data-testid="booking-practitioner">With {booking.practitionerName} · </span>
+          <span className={`status-pill status-${booking.status}`} data-testid="booking-status">
+            {statusText(booking)}
+          </span>
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="booking-list-actions">
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -64,8 +82,8 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   );
 
   return (
-    <section>
-      <h1>My bookings</h1>
+    <section className="page-shell" data-testid="my-bookings-page">
+      <PageHeading title="My bookings" />
       {notice ? (
         <p role="status" className="notice" data-testid="notice">
           {notice}
@@ -78,7 +96,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       ) : null}
       <h2>Upcoming</h2>
       {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">
+        <p className="card booking-empty" data-testid="no-upcoming">
           You have no upcoming appointments.{' '}
           <Link href="/slots" prefetch={false} className="underline">
             Book one
@@ -86,14 +104,14 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           .
         </p>
       ) : (
-        <ul className="space-y-2" data-testid="upcoming-bookings">
+        <ul className="booking-list" data-testid="upcoming-bookings">
           {upcoming.map((b) => row(b, true))}
         </ul>
       )}
       {others.length > 0 ? (
         <>
           <h2>Past and cancelled</h2>
-          <ul className="space-y-2" data-testid="other-bookings">
+          <ul className="booking-list" data-testid="other-bookings">
             {others.map((b) => row(b, false))}
           </ul>
         </>

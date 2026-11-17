@@ -90,6 +90,15 @@ for (const slug of ['acme', 'beacon'] as const) {
       await page.getByTestId('confirm-booking').click();
       await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
       const row = page.getByTestId('upcoming-bookings').getByTestId('booking-row').filter({ hasText: when });
+      await expect(row).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      await expect(row).toHaveCSS('border-radius', '20px');
+      await expect(row.getByTestId('booking-date-day')).toHaveText('4');
+      await expect(row.getByTestId('booking-date-month')).toHaveText('Dec');
+      await expect(row.getByTestId('booking-date-tile')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
+      await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
+      await expect(row.getByTestId('booking-status')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.screenshot({ path: info.outputPath('my-bookings-phone.png') });
       await row.getByTestId('reschedule-link').click();
       await expect(page.getByTestId('page-title')).toHaveText('Reschedule your appointment');
       await expect(page.getByTestId('current-when')).toContainText(when);

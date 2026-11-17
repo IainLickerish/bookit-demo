@@ -97,3 +97,10 @@ booking button sits in a white bottom bar, still inside the same form. The layou
 device's safe area, and scroll spacing keeps fields and the return link reachable. On larger screens the same button
 stays in the card. An unavailable time has no confirmation button or empty action bar. There is no added selection
 step, confirmation step, day choice or wording; moving still submits directly from the chosen time.
+
+My bookings uses the same reading column and short title header. Each booking is a separate white `.card`, with a
+sage day-and-month tile in the clinic's time zone, the full existing date and time in even-width figures, the
+practitioner's name and a status pill. Confirmed is pine on sage; Cancelled, including the existing late label, is
+muted on stone. The date tile is decorative, so screen readers hear the complete date once. Keep cards out of cards.
+Lists have 16px gaps, long content wraps and the existing Reschedule and Cancel controls wrap below the details.
+Upcoming and Past and cancelled retain their existing membership, order, wording and available actions.
