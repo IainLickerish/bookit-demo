@@ -10,6 +10,7 @@ import { loadDayView } from '@/server/slots/day-view';
 import { DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
 import { rescheduleAction } from '../../actions';
+import { PageHeading } from '../../../page-heading';
 
 export default async function ReschedulePage({
   params,
@@ -39,61 +40,65 @@ export default async function ReschedulePage({
   const path = `/bookings/${booking.id}/reschedule`;
 
   return (
-    <section>
-      <h1>Reschedule your appointment</h1>
+    <section className="page-shell" data-testid="booking-page">
+      <PageHeading title="Reschedule your appointment">
+        <p>
+          Currently booked:{' '}
+          <span className="font-medium booking-time" data-testid="current-when">
+            {formatSlot(booking.startsAt, view.settings.timeZone)}
+          </span>{' '}
+          with {booking.practitionerName}.
+        </p>
+      </PageHeading>
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
         </p>
       ) : null}
-      <p className="mb-2">
-        Currently booked:{' '}
-        <span className="font-medium" data-testid="current-when">
-          {formatSlot(booking.startsAt, view.settings.timeZone)}
-        </span>{' '}
-        with {booking.practitionerName}.
-      </p>
+
       {!changeable ? (
-        <p className="alert" data-testid="not-reschedulable">
+        <p role="alert" className="alert" data-testid="not-reschedulable">
           This booking can no longer be rescheduled online.
         </p>
       ) : remaining === 0 ? (
-        <p className="alert" data-testid="reschedule-limit">
+        <p role="alert" className="alert" data-testid="reschedule-limit">
           This booking has been rescheduled as many times as the clinic allows. Please contact the clinic.
         </p>
       ) : (
         <>
-          <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
+          <p className="booking-hint" data-testid="reschedules-remaining">
             You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
           </p>
           <DayPicker view={view} path={path} />
-          {choices.length === 0 ? (
-            <p data-testid="no-slots">No free times on this day. Try another day.</p>
-          ) : (
-            <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
-              {choices.map((slot) => (
-                <li key={slot.id}>
-                  <form action={rescheduleAction}>
-                    <input type="hidden" name="bookingId" value={booking.id} />
-                    <input type="hidden" name="newSlotId" value={slot.id} />
-                    <button
-                      type="submit"
-                      className="button-secondary w-full"
-                      data-testid="reschedule-to"
-                      data-slot-id={slot.id}
-                      data-starts-at={slot.startsAt.toISOString()}
-                    >
-                      {formatSlot(slot.startsAt, view.settings.timeZone)}
-                    </button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="card" data-testid="times-card">
+            {choices.length === 0 ? (
+              <p data-testid="no-slots">No free times on this day. Try another day.</p>
+            ) : (
+              <ul className="time-grid" data-testid="slot-list">
+                {choices.map((slot) => (
+                  <li key={slot.id}>
+                    <form action={rescheduleAction}>
+                      <input type="hidden" name="bookingId" value={booking.id} />
+                      <input type="hidden" name="newSlotId" value={slot.id} />
+                      <button
+                        type="submit"
+                        className="button-secondary time-pill"
+                        data-testid="reschedule-to"
+                        data-slot-id={slot.id}
+                        data-starts-at={slot.startsAt.toISOString()}
+                      >
+                        {formatSlot(slot.startsAt, view.settings.timeZone)}
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </>
       )}
-      <p className="mt-6 text-sm">
-        <Link href="/bookings" prefetch={false} className="underline">
+      <p className="page-actions">
+        <Link href="/bookings" prefetch={false} className="underline" data-testid="back-to-my-bookings">
           Back to my bookings
         </Link>
       </p>

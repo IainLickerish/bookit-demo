@@ -5,14 +5,17 @@ import { launchServer, type RunningServer } from '../helpers/built-server';
 import { TEST_PASSWORD } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { startTestDatabase } from '../helpers/database';
+import { startSmtpReceiver } from '../helpers/mail';
 import { E2E_START, writeClock } from './support';
 
 for (const slug of ['acme', 'beacon'] as const) {
-  test(`${slug} shows its configured clinic name with local Fraunces, Figtree and the shared premium palette`, async ({
+  test(`${slug} uses its configured name and the premium design on sign-in and booking pages`, async ({
     page,
   }, info) => {
+    test.setTimeout(60_000);
     const tenant = loadTenant(slug);
     const database = await startTestDatabase();
+    const smtp = await startSmtpReceiver();
     let server: RunningServer | undefined;
     try {
       await seedTenant(database.db, manualClock(E2E_START), {
@@ -30,6 +33,7 @@ for (const slug of ['acme', 'beacon'] as const) {
         BOOKIT_PRODUCT: tenant.product,
         BOOKIT_ENV: 'local',
         BOOKIT_MAIL_FROM: tenant.mailFrom,
+        BOOKIT_SMTP_URL: smtp.url,
       });
       expect(server.served).toBe(true);
       await page.goto(`${server.url}/auth/sign-in`);
@@ -62,8 +66,41 @@ for (const slug of ['acme', 'beacon'] as const) {
       await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toHaveCSS('font-size', '28px');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await page.screenshot({ path: info.outputPath('sign-in-phone.png') });
+      const patient = tenant.accounts.find((account) => account.email.startsWith('patient2@'))!;
+      await page.getByTestId('sign-in-email').fill(patient.email);
+      await page.getByTestId('sign-in-password').fill(TEST_PASSWORD);
+      await page.getByTestId('sign-in-submit').click();
+      await expect(page).toHaveURL(/\/bookings$/);
+      await page.getByTestId('nav-book').click();
+      await page.getByTestId('date-input').fill('2026-12-04');
+      await page.getByTestId('show-slots').click();
+      await expect(page.getByTestId('day-picker')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      await expect(page.getByTestId('times-card')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      const choice = page.getByRole('link', { name: /09:00$/ });
+      await expect(choice).toHaveCSS('font-variant-numeric', 'tabular-nums');
+      expect((await choice.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+      await choice.click();
+      await expect(page.getByTestId('booking-card')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      expect((await page.getByTestId('booking-card').boundingBox())!.width).toBeLessThanOrEqual(440);
+      await expect(page.getByTestId('book-when')).toContainText(`(${tenant.settings.sessionMinutes} minutes)`);
+      await expect(page.getByTestId('booking-action-bar')).toHaveCSS('position', 'fixed');
+      await expect(page.getByTestId('book-phone')).toHaveValue('');
+      const when = ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
+      await page.screenshot({ path: info.outputPath('confirmation-phone.png') });
+      await page.getByTestId('confirm-booking').click();
+      await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+      const row = page.getByTestId('upcoming-bookings').getByTestId('booking-row').filter({ hasText: when });
+      await row.getByTestId('reschedule-link').click();
+      await expect(page.getByTestId('page-title')).toHaveText('Reschedule your appointment');
+      await expect(page.getByTestId('current-when')).toContainText(when);
+      await expect(page.getByTestId('day-picker')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      const nextTime = tenant.tenant === 'acme' ? /09:45$/ : /09:30$/;
+      await expect(page.getByRole('button', { name: nextTime })).toHaveCSS('font-variant-numeric', 'tabular-nums');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.screenshot({ path: info.outputPath('move-phone.png') });
     } finally {
       await server?.stop();
+      await smtp.stop();
       await database.stop();
     }
   });

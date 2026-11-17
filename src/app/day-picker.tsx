@@ -9,8 +9,8 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
   const previous = addDaysToLocalDate(view.date, -1);
   const next = addDaysToLocalDate(view.date, 1);
   return (
-    <div className="mb-6 space-y-4">
-      <form method="get" action={path} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+    <div className="card day-picker" data-testid="day-picker">
+      <form method="get" action={path} className="day-picker-form">
         <label>
           Practitioner
           <select name="practitioner" defaultValue={practitionerId} data-testid="practitioner-select">
@@ -36,23 +36,23 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           Show times
         </button>
       </form>
-      <div className="flex items-center justify-between text-sm">
+      <div className="day-navigation">
         {view.date > view.today ? (
-          <Link href={dayLink(previous)} prefetch={false} data-testid="previous-day">
+          <Link href={dayLink(previous)} prefetch={false} className="day-previous" data-testid="previous-day">
             ← Previous day
           </Link>
         ) : (
-          <span />
+          <span className="day-previous" />
         )}
-        <span className="font-medium" data-testid="shown-date">
+        <span className="shown-day" data-testid="shown-date">
           {formatLocalDate(view.date)}
         </span>
         {view.date < view.lastDate ? (
-          <Link href={dayLink(next)} prefetch={false} data-testid="next-day">
+          <Link href={dayLink(next)} prefetch={false} className="day-next" data-testid="next-day">
             Next day →
           </Link>
         ) : (
-          <span />
+          <span className="day-next" />
         )}
       </div>
     </div>

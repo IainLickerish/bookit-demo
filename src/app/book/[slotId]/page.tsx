@@ -7,6 +7,7 @@ import { loadClinicSettings } from '@/server/settings';
 import { findBookableSlot, isSlotFree } from '@/server/slots/queries';
 import { bookAction } from '../../bookings/actions';
 import { errorText, single, type SearchParams } from '../../messages';
+import { PageHeading } from '../../page-heading';
 
 export default async function BookSlotPage({
   params,
@@ -25,54 +26,56 @@ export default async function BookSlotPage({
   }
   const free = await isSlotFree(db, slot.id);
   return (
-    <section className="max-w-md">
-      <h1>Confirm your booking</h1>
-      {error ? (
-        <p role="alert" className="alert" data-testid="booking-error">
-          {error}
+    <section className={`page-shell${free ? ' booking-confirmation-shell' : ''}`} data-testid="booking-page">
+      <div className="card confirmation-card" data-testid="booking-card">
+        <PageHeading title="Confirm your booking" />
+        {error ? (
+          <p role="alert" className="alert" data-testid="booking-error">
+            {error}
+          </p>
+        ) : null}
+        <dl className="booking-details">
+          <div>
+            <dt>With: </dt>
+            <dd data-testid="book-practitioner">{slot.practitionerName}</dd>
+          </div>
+          <div>
+            <dt>When: </dt>
+            <dd className="booking-time" data-testid="book-when">
+              {formatSlot(slot.startsAt, settings.timeZone)} ({settings.sessionMinutes} minutes)
+            </dd>
+          </div>
+        </dl>
+        {free ? (
+          <form action={bookAction} className="space-y-4">
+            <input type="hidden" name="slotId" value={slot.id} />
+            <label>
+              Phone number (optional)
+              <input
+                type="tel"
+                name="phone"
+                autoComplete="tel"
+                defaultValue={patient.phone ?? ''}
+                data-testid="book-phone"
+              />
+            </label>
+            <div className="booking-action-bar" data-testid="booking-action-bar">
+              <button type="submit" className="button" data-testid="confirm-booking">
+                Confirm booking
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p role="alert" className="alert" data-testid="slot-taken">
+            This time is no longer available.
+          </p>
+        )}
+        <p className="page-actions">
+          <Link href="/slots" prefetch={false} className="underline" data-testid="choose-different-time">
+            Choose a different time
+          </Link>
         </p>
-      ) : null}
-      <dl className="mb-6 space-y-1">
-        <div>
-          <dt className="inline font-medium">With: </dt>
-          <dd className="inline" data-testid="book-practitioner">
-            {slot.practitionerName}
-          </dd>
-        </div>
-        <div>
-          <dt className="inline font-medium">When: </dt>
-          <dd className="inline" data-testid="book-when">
-            {formatSlot(slot.startsAt, settings.timeZone)} ({settings.sessionMinutes} minutes)
-          </dd>
-        </div>
-      </dl>
-      {free ? (
-        <form action={bookAction} className="space-y-4">
-          <input type="hidden" name="slotId" value={slot.id} />
-          <label>
-            Phone number (optional)
-            <input
-              type="tel"
-              name="phone"
-              autoComplete="tel"
-              defaultValue={patient.phone ?? ''}
-              data-testid="book-phone"
-            />
-          </label>
-          <button type="submit" className="button" data-testid="confirm-booking">
-            Confirm booking
-          </button>
-        </form>
-      ) : (
-        <p className="alert" data-testid="slot-taken">
-          This time is no longer available.
-        </p>
-      )}
-      <p className="mt-6 text-sm">
-        <Link href="/slots" prefetch={false} className="underline">
-          Choose a different time
-        </Link>
-      </p>
+      </div>
     </section>
   );
 }

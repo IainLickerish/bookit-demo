@@ -86,3 +86,14 @@ introduction. Their `.page-shell` adds to the root content gutters to give 20px 
 larger screens. Account forms use a single `.card.account-card`, centred and no wider than 440px; home and fallback
 cards stay within the reading column. `.page-actions` gives their existing text links a comfortable tap target.
 These changes do not add descriptions or destinations, or alter the recovery journey.
+
+Time selection and moving now reuse the reading column and `PageHeading`. The existing practitioner and date form
+sits in a white card, with the shown day in stone and a pine outline. Existing day links wrap below it on phones.
+Time choices sit in a separate white card as 48px pills with even-width figures. Keep the full `formatSlot` label,
+including the clinic date and time. Choosing a time still follows its existing link or submits the existing move form.
+
+Booking confirmation uses one `.card.confirmation-card` up to 440px wide. On phones below 640px, its existing Confirm
+booking button sits in a white bottom bar, still inside the same form. The layout reserves space for the bar and the
+device's safe area, and scroll spacing keeps fields and the return link reachable. On larger screens the same button
+stays in the card. An unavailable time has no confirmation button or empty action bar. There is no added selection
+step, confirmation step, day choice or wording; moving still submits directly from the chosen time.
