@@ -3,16 +3,17 @@ import { getDatabase } from '@/db/client';
 import { requireAdmin } from '@/server/admin/context';
 import { loadClinicSettings } from '@/server/settings';
 import type { SearchParams } from '../../messages';
+import { PageHeading } from '../../page-heading';
 import { saveSettingsAction } from './actions';
 
 export default async function AdminSettingsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
   const [settings, params] = await Promise.all([loadClinicSettings(getDatabase()), searchParams]);
   return (
-    <section>
-      <h1>Clinic settings</h1>
-      <p>
-        <Link href="/admin" prefetch={false} className="underline">
+    <section className="page-shell staff-page" data-testid="staff-page">
+      <PageHeading title="Clinic settings" />
+      <p className="page-actions">
+        <Link href="/admin" prefetch={false} className="underline" data-testid="admin-back-to-bookings">
           Back to bookings
         </Link>
       </p>
@@ -28,7 +29,11 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             : 'Settings could not be saved. Please try again.'}
         </p>
       ) : null}
-      <form action={saveSettingsAction} className="mt-6 space-y-4">
+      <form
+        action={saveSettingsAction}
+        className="card staff-settings-form space-y-4"
+        data-testid="admin-settings-form"
+      >
         <label>
           Clinic name
           <input
@@ -43,7 +48,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           Time zone
           <input name="timeZone" defaultValue={settings.timeZone} required data-testid="admin-time-zone" />
         </label>
-        <p className="text-sm">
+        <p className="staff-settings-hint">
           Use an IANA time zone, for example Europe/London. Existing appointment times stay fixed; display and date
           filters use this zone.
         </p>
@@ -60,12 +65,11 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             data-testid="admin-late-hours"
           />
         </label>
-        <label className="flex items-center gap-2">
+        <label className="staff-checkbox">
           <input
             type="checkbox"
             name="includeContactInConfirmation"
             defaultChecked={settings.includeContactInConfirmation}
-            className="w-auto"
             data-testid="admin-include-contact"
           />
           Include contact details in confirmation emails

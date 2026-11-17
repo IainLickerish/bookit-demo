@@ -77,8 +77,8 @@ and booking confirmation each use one centred card up to 440px. On phones, an ex
 can sit in a bottom bar with enough content space above it. Keep table scrolling, and any phone day strip scrolling,
 inside its own area rather than widening the page.
 
-The full reskin is being built in stages. These are the standards for the remaining page work, not new journeys or
-new wording. This look-only change preserves every current title, description, clinic term and action. Emails stay
+The full reskin follows these shared standards. This look-only change preserves every current title, description,
+clinic term and action. Emails stay
 plain text. Separate confirmation steps, additional messages and other behaviour changes need their own decision.
 
 The account, administration home and fallback pages now use `PageHeading` for the existing title and any existing
@@ -104,3 +104,12 @@ practitioner's name and a status pill. Confirmed is pine on sage; Cancelled, inc
 muted on stone. The date tile is decorative, so screen readers hear the complete date once. Keep cards out of cards.
 Lists have 16px gaps, long content wraps and the existing Reschedule and Cancel controls wrap below the details.
 Upcoming and Past and cancelled retain their existing membership, order, wording and available actions.
+
+Clinic bookings and Clinic settings use `.staff-page`, which widens the shared content area to at most 1120px while
+keeping the client column at 720px. Their existing titles use `PageHeading`; there are no added descriptions.
+Filters and settings use separate white cards. Settings fields stay within 720px for comfortable reading.
+The bookings table has 16px by 24px cell spacing, stone headings and the shared status pills. Its white card is a
+labelled, keyboard-focusable scrolling region, so wide columns scroll inside that region on narrow screens and at
+200% zoom. Tab shows the pine focus ring; the arrow keys scroll the table. No card contains another card.
+Filter, Clear filters, export, settings and return controls retain their wording and destinations. Saving retains its
+existing success and error announcements. No staff permissions, saved settings or export contents change.

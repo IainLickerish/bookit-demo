@@ -182,6 +182,16 @@
 }
 
 @layer components {
+  .site-main {
+    max-width: 768px;
+    margin-inline: auto;
+    padding: 24px 16px;
+  }
+
+  .site-main:has(.staff-page) {
+    max-width: 1184px;
+  }
+
   .site-header {
     border-bottom: 1px solid var(--color-line);
     background: var(--color-white);
@@ -461,6 +471,7 @@
   }
 
   .status-pill {
+    display: inline-block;
     max-width: 100%;
     margin-inline-start: auto;
     border-radius: 999px;
@@ -495,6 +506,101 @@
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+  }
+
+  .staff-page {
+    max-width: 1120px;
+  }
+
+  .staff-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    margin-block: 24px;
+  }
+
+  .staff-filter-actions,
+  .staff-results-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+  }
+
+  .staff-filter-actions {
+    grid-column: 1 / -1;
+  }
+
+  .staff-results-toolbar {
+    justify-content: space-between;
+    margin-block: 24px;
+  }
+
+  .staff-results-toolbar .button-secondary {
+    max-width: 100%;
+  }
+
+  .staff-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0;
+  }
+
+  .staff-table {
+    width: 100%;
+    min-width: 840px;
+    text-align: left;
+    font-size: 16px;
+  }
+
+  .staff-table thead {
+    background: var(--color-stone);
+  }
+
+  .staff-table th,
+  .staff-table td {
+    padding: 16px 24px;
+    vertical-align: top;
+  }
+
+  .staff-table th {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .staff-table tbody tr {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .staff-appointment {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .staff-empty {
+    margin-top: 24px;
+    color: var(--color-muted);
+  }
+
+  .staff-settings-form {
+    max-width: 720px;
+    margin-top: 24px;
+  }
+
+  .staff-settings-hint {
+    color: var(--color-muted);
+    font-size: 13px;
+  }
+
+  .staff-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+  }
+
+  .staff-checkbox input {
+    flex-shrink: 0;
   }
 
   .booking-hint {
@@ -593,6 +699,10 @@
   }
 
   @media (min-width: 640px) {
+    .staff-filters {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .day-picker-form {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
       align-items: end;

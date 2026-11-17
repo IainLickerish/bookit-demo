@@ -49,7 +49,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             ) : null}
           </div>
         </header>
-        <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
+        <main className="site-main">{children}</main>
       </body>
     </html>
   );
