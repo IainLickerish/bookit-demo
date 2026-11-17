@@ -24,9 +24,7 @@ test('A client can download their confirmed booking from My bookings and receive
   });
   const details = await step(page, 'Choose a session and confirm it without a phone number', async () => {
     const slot = await pickFreeSlot(page, londonDate(31));
-    const startsAt = await page
-      .locator(`[data-testid="slot-link"][data-slot-id="${slot.id}"]`)
-      .getAttribute('data-starts-at');
+    const startsAt = await page.getByTestId('slot-link').filter({ hasText: slot.time }).getAttribute('data-starts-at');
     const seen = new Set((await mailTo(PATIENT_2)).map((message) => message.ID));
     await page.goto(`/book/${slot.id}`);
     const when = (await page.getByTestId('book-when').innerText()).replace(/\s*\(.*\)\s*$/, '').trim();
@@ -121,19 +119,19 @@ test('Visitors, other clients and staff cannot download a client’s booking cal
     await page.goto('/auth/sign-in');
     const response = await page.request.get(path);
     expect(response.status()).toBe(404);
-    expect(await response.text()).not.toMatch(/VEVENT|DTSTART|Alex|Physio/);
+    expect((await response.text()).trim()).toBe('We could not find that booking.');
   });
   const stranger = await sessionFor(browser, PATIENT_1);
   await step(stranger, 'Try the calendar address as another client', async () => {
     const response = await stranger.request.get(path);
     expect(response.status()).toBe(404);
-    expect(await response.text()).not.toMatch(/VEVENT|DTSTART|Alex|Physio/);
+    expect((await response.text()).trim()).toBe('We could not find that booking.');
   });
   const staff = await sessionFor(browser, ADMIN);
   await step(staff, 'Try the client calendar address as clinic staff', async () => {
     const response = await staff.request.get(path);
     expect(response.status()).toBe(404);
-    expect(await response.text()).not.toMatch(/VEVENT|DTSTART|Alex|Physio/);
+    expect((await response.text()).trim()).toBe('We could not find that booking.');
   });
   await owner.context().close();
   await stranger.context().close();
