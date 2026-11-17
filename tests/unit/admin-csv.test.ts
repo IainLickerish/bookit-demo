@@ -27,6 +27,27 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
     expect(csv.endsWith('\r\n')).toBe(true);
     expect(bookingsCsv([]).split('\r\n')).toHaveLength(2);
   });
+  it.each(['Zoë Brontë', 'Łukasz Wiśniewski', 'Siobhán Ó Briain', '李明', 'Zoe\u0308 Bronte\u0308'])(
+    'keeps the name %j intact in UTF-8',
+    (patientName) => {
+      const csv = bookingsCsv([
+        {
+          id: 'booking-unicode',
+          patientName,
+          practitionerId: 'p1',
+          practitionerName: 'Pat',
+          startsAt: new Date('2026-10-25T09:00:00Z'),
+          endsAt: new Date('2026-10-25T09:45:00Z'),
+          status: 'confirmed',
+          lateCancellation: false,
+          phone: null,
+        },
+      ]);
+      const bytes = Buffer.from(csv, 'utf8');
+      expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+      expect(new TextDecoder('utf-8', { fatal: true }).decode(bytes)).toContain(`"${patientName}"`);
+    },
+  );
   it.each(['=1+1', '+SUM(1,2)', '-1+2', '@SUM(1,2)', '  =HYPERLINK("x")', '\t=1+1', '\r=1+1'])(
     'exports formula-leading text as inert quoted text: %j',
     (value) => {

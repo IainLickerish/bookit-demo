@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { ADMIN, PATIENT_1, bookSlot, londonDate, pickFreeSlot, sessionFor, step } from './support';
 
@@ -17,6 +18,19 @@ test("Clinic staff can find a client's booking and change the clinic's settings"
     await staff.getByTestId('admin-date').fill(date);
     await staff.getByTestId('admin-filter').click();
     await expect(staff.getByTestId('admin-booking-row').filter({ hasText: CLIENT })).toContainText('Confirmed');
+  });
+
+  await step(staff, 'Download the filtered bookings with the client name intact', async () => {
+    const downloadReady = staff.waitForEvent('download');
+    await staff.getByTestId('admin-export').click();
+    const download = await downloadReady;
+    expect(download.suggestedFilename()).toBe('bookings.csv');
+    expect(await download.failure()).toBeNull();
+    const bytes = await readFile((await download.path())!);
+    expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    const csv = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    expect(csv).toContain(`"${CLIENT}"`);
+    expect(csv.split('\r\n')).toHaveLength((await staff.getByTestId('admin-booking-row').count()) + 2);
   });
 
   const name = await step(staff, "Change the clinic's name and see it saved", async () => {
