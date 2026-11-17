@@ -73,7 +73,7 @@ export async function rescheduleBooking(
     return {
       booking: moved,
       previousSlotId: locked.slotId,
-      confirmation: composeConfirmation({ booking: moved, patient, settings, from: deps.mail.from }),
+      confirmation: composeConfirmation({ booking: moved, patient, settings, from: deps.mail.from, kind: 'moved' }),
     };
   });
   deps.log.info(

@@ -8,6 +8,8 @@ audience: patient
 # Your Beacon Dental confirmation
 
 Look for booking and rescheduling confirmations from `noreply@beacondental.test`.
+After a move, look for "Booking moved" in the subject. The message says your
+booking has been moved, followed by the new details.
 They include your clinician and appointment date and time. Beacon does not include
 patient contact details in confirmation messages.
 

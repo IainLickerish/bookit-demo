@@ -8,6 +8,8 @@ audience: patient
 # Your Acme Physio confirmation
 
 Booking and rescheduling confirmations are sent from `noreply@acmephysio.test`.
+After a move, the subject starts with "Booking moved" and the message confirms
+that your booking has been moved, followed by the new details.
 They describe the physiotherapist, appointment date and local time. Acme includes
 contact details when available; providing a phone number is optional.
 

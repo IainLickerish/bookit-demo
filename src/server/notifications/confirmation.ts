@@ -9,6 +9,7 @@ export interface ConfirmationInput {
   patient: { email: string; name: string };
   settings: ClinicSettings;
   from: string;
+  kind?: 'booked' | 'moved';
 }
 
 /** A stored phone number as it appears in an email. */
@@ -29,10 +30,13 @@ export function formatPhone(phone: string): string {
 export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   const { booking, patient, settings } = input;
   const when = formatSlot(booking.startsAt, settings.timeZone);
+  const moved = input.kind === 'moved';
   const lines = [
     `Dear ${patient.name},`,
     '',
-    `Your appointment at ${settings.clinicName} is confirmed.`,
+    moved
+      ? `Your booking at ${settings.clinicName} has been moved.`
+      : `Your appointment at ${settings.clinicName} is confirmed.`,
     '',
     `When: ${when} (${settings.timeZone})`,
     `With: ${booking.practitionerName}`,
@@ -45,7 +49,7 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   return {
     from: input.from,
     to: patient.email,
-    subject: `Booking confirmed: ${when}`,
+    subject: `Booking ${moved ? 'moved' : 'confirmed'}: ${when}`,
     text: `${lines.join('\n')}\n`,
   };
 }

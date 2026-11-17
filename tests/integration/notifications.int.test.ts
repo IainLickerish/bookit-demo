@@ -144,6 +144,8 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
       expect(message.from).toBe(TEST_MAIL_FROM);
       expect(message.to).toEqual([clinic.patient2.email]);
       const body = bodyOf(message.raw);
+      expect(message.raw).toContain('Subject: Booking moved:');
+      expect(body).toContain(`Your booking at ${clinic.settings.clinicName} has been moved.`);
       expect(body).toContain(`When: ${formatSlot(target!.startsAt, clinic.settings.timeZone)} (Europe/London)`);
       expect(body).toContain('With: Sam Sports');
       expect(body).toContain(`Booking reference: ${booking.id}`);

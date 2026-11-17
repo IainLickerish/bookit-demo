@@ -67,6 +67,22 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
     expect(email.text).toContain('Contact phone: +44 7700 900001\n');
   });
 
+  it('says a booking has been moved before showing its new details', () => {
+    const email = composeConfirmation({
+      booking: booking(null),
+      patient,
+      settings,
+      from: TEST_MAIL_FROM,
+      kind: 'moved',
+    });
+    expect(email.subject).toBe('Booking moved: Thu, 22 Oct 2026, 10:30');
+    expect(email.text).toContain(
+      'Your booking at Test Physio Clinic has been moved.\n\nWhen: Thu, 22 Oct 2026, 10:30 (Europe/London)',
+    );
+    expect(email.text).toContain('With: Pat Physio');
+    expect(email.text).not.toContain('is confirmed');
+  });
+
   it('leaves the phone line out with no phone when contact collection is disabled', () => {
     const email = composeConfirmation({
       booking: booking(null),
