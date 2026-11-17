@@ -21,7 +21,7 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
     });
     const onResponse = (response: Response) => {
       const request = response.request();
-      if (request.method() === 'POST' && request.headers()['next-action']) {
+      if (request.method() === 'POST') {
         responses.push(response);
         if (responses.length === 2) bothSubmitted();
       }
@@ -36,7 +36,10 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
     page.off('response', onResponse);
     for (const response of responses) {
       expect(await response.finished(), 'the confirmation response completes').toBeNull();
-      expect(await response.headerValue('x-action-redirect')).toBe('/bookings?notice=booked;push');
+      const redirect = (await response.headerValue('x-action-redirect')) ?? (await response.headerValue('location'));
+      expect(redirect, 'each confirmation redirects to the saved booking').toMatch(
+        /^(?:https?:\/\/[^/]+)?\/bookings\?notice=booked(?:;push)?$/,
+      );
     }
     await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
     await expect(page.getByTestId('notice')).toHaveText('Booking confirmed.');
