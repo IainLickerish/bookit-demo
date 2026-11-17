@@ -6,6 +6,8 @@ async function checkCard(page: Page, testId: string, maxWidth: number) {
   await expect(card).toHaveCount(1);
   await expect(card).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(card).toHaveCSS('border-color', 'rgb(230, 225, 216)');
+  await expect(card).toHaveCSS('border-width', '1px');
+  await expect(card).toHaveCSS('border-style', 'solid');
   await expect(card).toHaveCSS('border-radius', '20px');
   await expect(card).toHaveCSS('padding', '24px');
   await expect(card).not.toHaveCSS('box-shadow', 'none');

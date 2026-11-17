@@ -40,6 +40,8 @@ test('The error page keeps its existing title, description, retry control and ke
     const error = page.getByTestId('error-page');
     await expect(error).toHaveAttribute('role', 'alert');
     await expect(error.getByTestId('page-title')).toHaveText('Something went wrong');
+    await expect(error.getByTestId('page-title')).toHaveCSS('font-family', /Fraunces/);
+    await expect(error.getByTestId('page-title')).toHaveCSS('font-weight', '500');
     await expect(error.getByTestId('page-heading')).toContainText(
       'Please try again. If it keeps happening, contact the clinic.',
     );
