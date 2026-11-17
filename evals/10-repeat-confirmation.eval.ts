@@ -15,24 +15,28 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
   });
   await step(page, 'Press Confirm booking twice in quick succession', async () => {
     const responses: Response[] = [];
-    let bothSubmitted!: () => void;
-    const submitted = new Promise<void>((resolve) => {
-      bothSubmitted = resolve;
-    });
     const onResponse = (response: Response) => {
       const request = response.request();
       if (request.method() === 'POST') {
         responses.push(response);
-        if (responses.length === 2) bothSubmitted();
       }
     };
     page.on('response', onResponse);
+    // Wait for React to attach the form before dispatching both clicks together.
+    // Otherwise the browser can coalesce two native navigations into one POST.
+    await expect
+      .poll(() =>
+        page
+          .getByTestId('confirm-booking')
+          .evaluate((button) => Object.keys(button).some((key) => key.startsWith('__reactProps$'))),
+      )
+      .toBe(true);
     // Dispatch both clicks together so navigation cannot remove the form between them.
     await page.getByTestId('confirm-booking').evaluate((button: HTMLButtonElement) => {
       button.click();
       button.click();
     });
-    await submitted;
+    await expect.poll(() => responses.length, { message: 'both confirmation responses arrive' }).toBe(2);
     page.off('response', onResponse);
     for (const response of responses) {
       expect(await response.finished(), 'the confirmation response completes').toBeNull();
