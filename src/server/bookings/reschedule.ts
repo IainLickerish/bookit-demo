@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { bookings, slots } from '@/db/schema';
+import { bookings } from '@/db/schema';
 import { isUniqueViolation } from '../errors';
 import { composeConfirmation } from '../notifications/confirmation';
 import { deliverEmail } from '../notifications/deliver';
@@ -29,19 +29,19 @@ export async function rescheduleBooking(
   const now = deps.clock.now();
   const { booking, previousSlotId, confirmation } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
-    const [locked] = await tx
-      .select({
-        status: bookings.status,
-        slotId: bookings.slotId,
-        rescheduleCount: bookings.rescheduleCount,
-        startsAt: slots.startsAt,
-      })
+    const [owned] = await tx
+      .select({ id: bookings.id })
       .from(bookings)
-      .innerJoin(slots, eq(slots.id, bookings.slotId))
       .where(and(eq(bookings.id, request.bookingId), eq(bookings.patientId, request.patientId)))
-      .for('update', { of: bookings });
-    if (!locked) {
+      .for('update');
+    if (!owned) {
       throw new BookingError('booking_not_found');
+    }
+    // Read the slot after acquiring the booking lock. A concurrent move can change
+    // the slot while a locking query that joins slots is waiting.
+    const locked = await findBookingForPatient(tx, request.patientId, request.bookingId);
+    if (!locked) {
+      throw new Error('The locked booking could not be read back.');
     }
     // The first submission may already have committed while this one waited for the lock.
     // Return that saved result without using another move or sending another confirmation.
@@ -53,11 +53,7 @@ export async function rescheduleBooking(
       isUuid(request.originalSlotId ?? '') &&
       request.originalSlotId !== request.newSlotId
     ) {
-      const saved = await findBookingForPatient(tx, request.patientId, request.bookingId);
-      if (!saved) {
-        throw new Error('The saved move could not be read back.');
-      }
-      return { booking: saved, previousSlotId: locked.slotId, confirmation: null };
+      return { booking: locked, previousSlotId: locked.slotId, confirmation: null };
     }
     assertReschedulable(locked, request.newSlotId, now, settings);
     const target = await findBookableSlot(tx, request.newSlotId);
