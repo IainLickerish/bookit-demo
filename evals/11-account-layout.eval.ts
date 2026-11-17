@@ -42,7 +42,7 @@ test('Sign-in uses a centred white card at most 440px wide on desktop and phone'
     }
   });
 
-  await step(page, 'See an incorrect-password warning inside the same card and tab to the email field', async () => {
+  await step(page, 'See an incorrect-password warning inside the same card', async () => {
     await page.getByTestId('sign-in-email').fill('account-card-check@patients.acmephysio.test');
     await page.getByTestId('sign-in-password').fill('incorrect-password-for-account-card');
     await page.getByTestId('sign-in-submit').click();
@@ -50,6 +50,10 @@ test('Sign-in uses a centred white card at most 440px wide on desktop and phone'
       'The email address or password is not correct.',
     );
     await checkCard(page, 'account-card', 440);
+  });
+
+  await step(page, 'Open sign-in again and tab from the clinic link to the email field', async () => {
+    await page.goto('/auth/sign-in');
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('clinic-name')).toBeFocused();
     await page.keyboard.press('Tab');
