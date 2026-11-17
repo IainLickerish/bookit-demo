@@ -135,6 +135,8 @@ export const bookings = pgTable(
     cancelledAt: instant('cancelled_at'),
     /** Durable claim made before SMTP: an uncertain attempt is never sent again. */
     reminderAttemptedAt: instant('reminder_attempted_at'),
+    /** Due while the clinic switch was off; a successful move clears this skip. */
+    reminderSkippedAt: instant('reminder_skipped_at'),
   },
   (t) => [
     // At most one confirmed booking per slot, so concurrent bookings of the

@@ -17,7 +17,7 @@ import { updateAdminSettings } from '@/server/admin/settings';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
-import { createSmtpMailer, type Mailer } from '@/server/notifications/mailer';
+import { createSmtpMailer, disabledMailer, type Mailer } from '@/server/notifications/mailer';
 import { sendDueReminders } from '@/server/notifications/reminders';
 import { loadClinicSettings } from '@/server/settings';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
@@ -203,25 +203,87 @@ describe('day-before reminders', () => {
     expect(textBody(smtp.messages[0]!.raw)).toContain('12:00');
   });
 
-  it('saves off and on only in the selected clinic and leaves due reminders available while off', async () => {
-    await book();
-    const other = await loadClinicSettings(beacon.db);
-    await updateAdminSettings(database.db, clock, {
-      clinicName: clinic.settings.clinicName,
-      timeZone: clinic.settings.timeZone,
-      lateCancellationHours: clinic.settings.lateCancellationHours,
-      includeContactInConfirmation: clinic.settings.includeContactInConfirmation,
-      remindersEnabled: false,
-    });
-    clock.set('2026-10-20T08:00:00Z');
+  it.each(['smtp', 'disabled'] as const)(
+    'saves off only in the selected clinic and keeps due reminders skipped after re-enabling (%s)',
+    async (transport) => {
+      const booking = await book();
+      const other = await loadClinicSettings(beacon.db);
+      await updateAdminSettings(database.db, clock, {
+        clinicName: clinic.settings.clinicName,
+        timeZone: clinic.settings.timeZone,
+        lateCancellationHours: clinic.settings.lateCancellationHours,
+        includeContactInConfirmation: clinic.settings.includeContactInConfirmation,
+        remindersEnabled: false,
+      });
+      clock.set('2026-10-20T08:00:00Z');
+      smtp.messages.length = 0;
+      await sendDueReminders(deps(transport === 'disabled' ? disabledMailer : createSmtpMailer(smtp.url)));
+      expect(smtp.messages).toHaveLength(0);
+      expect((await loadClinicSettings(database.db)).remindersEnabled).toBe(false);
+      expect(await loadClinicSettings(beacon.db)).toEqual(other);
+      await database.db.update(clinicSettings).set({ remindersEnabled: true });
+      const restarted = createDatabase(database.url);
+      try {
+        await sendDueReminders({ ...deps(), db: restarted.db });
+      } finally {
+        await restarted.pool.end();
+      }
+      await sendDueReminders(deps());
+      expect(smtp.messages).toHaveLength(0);
+      await rescheduleBooking(deps(), {
+        patientId: booking.patientId,
+        bookingId: booking.id,
+        newSlotId: await slot('2026-10-22T09:00:00Z', clinic.practitioners.saturdays),
+      });
+      clock.set('2026-10-21T09:00:00Z');
+      await sendDueReminders(deps());
+      await sendDueReminders(deps());
+      expect(smtp.messages).toHaveLength(1);
+      expect(textBody(smtp.messages[0]!.raw)).toContain('Thu, 22 Oct 2026, 10:00');
+      expect(textBody(smtp.messages[0]!.raw)).toContain('Sam Sports');
+      expect(await loadClinicSettings(beacon.db)).toEqual(other);
+    },
+  );
+
+  it('does not skip a booking that becomes due only after reminders are switched back on', async () => {
+    await book('2026-10-22T08:00:00Z');
+    await database.db.update(clinicSettings).set({ remindersEnabled: false });
+    await sendDueReminders(deps());
+    await database.db.update(clinicSettings).set({ remindersEnabled: true });
+    clock.set('2026-10-21T08:00:00Z');
     smtp.messages.length = 0;
     await sendDueReminders(deps());
+    expect(smtp.messages).toHaveLength(1);
+  });
+
+  it('keeps a due reminder skipped when staff switch off after claiming but before delivery', async () => {
+    const booking = await book();
+    clock.set('2026-10-20T08:00:00Z');
+    smtp.messages.length = 0;
+    const blocker = await database.handle.pool.connect();
+    let sending: Promise<void> | undefined;
+    try {
+      await blocker.query('begin');
+      await blocker.query('select id from clinic_settings where id = 1 for update');
+      sending = sendDueReminders(deps());
+      await vi.waitFor(
+        async () => {
+          const [row] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+          expect(row!.reminderAttemptedAt).not.toBeNull();
+        },
+        { timeout: 5000, interval: 20 },
+      );
+      await blocker.query('update clinic_settings set reminders_enabled = false where id = 1');
+      await blocker.query('commit');
+    } finally {
+      await blocker.query('rollback');
+      blocker.release();
+      await sending;
+    }
     expect(smtp.messages).toHaveLength(0);
-    expect((await loadClinicSettings(database.db)).remindersEnabled).toBe(false);
-    expect(await loadClinicSettings(beacon.db)).toEqual(other);
     await database.db.update(clinicSettings).set({ remindersEnabled: true });
     await sendDueReminders(deps());
-    expect(smtp.messages).toHaveLength(1);
+    expect(smtp.messages).toHaveLength(0);
   });
 
   it('never retries an ambiguous mail failure, preserving the booking', async () => {
@@ -296,7 +358,7 @@ it.each(['acme', 'beacon'] as const)(
         const rows = JSON.parse(JSON.stringify((await pool.query(`select * from "${table}" order by 1`)).rows));
         const expected = snapshot[table]!.map((row) =>
           table === 'booking'
-            ? { ...row, reminder_attempted_at: null }
+            ? { ...row, reminder_attempted_at: null, reminder_skipped_at: null }
             : table === 'clinic_settings'
               ? { ...row, reminders_enabled: true }
               : row,

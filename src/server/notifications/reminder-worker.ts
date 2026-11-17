@@ -21,7 +21,9 @@ export function startReminderWorker(): void {
     const log = getLogger().child({ request_id: newId(clock), operation: 'reminders' });
     try {
       const mail = mailSettings();
-      if (mail.mailer.kind === 'disabled') return;
+      // Even without SMTP, record reminders due while the clinic switch is off.
+      // Configuration-only server checks can run without a database.
+      if (!process.env.DATABASE_URL && mail.mailer.kind === 'disabled') return;
       await sendDueReminders({
         db: getDatabase(),
         clock,

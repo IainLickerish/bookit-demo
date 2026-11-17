@@ -34,7 +34,6 @@ test('staff control reminders and the emailed link opens only the signed-in clie
     `insert into booking (id,patient_id,slot_id,status,late_cancellation,reschedule_count,created_at,updated_at) values ($1,$2,$3,'confirmed',false,0,$4,$4)`,
     [bookingId, patient!.id, slot!.id, '2026-10-20T07:00:00Z'],
   );
-  writeClock(state.clockFile, '2026-10-20T08:00:00Z');
 
   const clientContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
   const client = await clientContext.newPage();
@@ -50,6 +49,8 @@ test('staff control reminders and the emailed link opens only the signed-in clie
     await expect(page.getByTestId('admin-settings-saved')).toBeVisible();
     await page.reload();
     await expect(toggle).toBeChecked();
+    // Become due only after switching on; reminders due while off are skipped.
+    writeClock(state.clockFile, '2026-10-20T08:00:00Z');
 
     const reminders = () =>
       readFileSync(state.mailLog, 'utf8')

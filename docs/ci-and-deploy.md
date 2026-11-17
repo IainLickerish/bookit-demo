@@ -95,7 +95,10 @@ The Node application checks for due reminders at startup and every minute. No se
 is needed. Each check processes up to 100 confirmed, future bookings within 24 hours, so a restarted server catches
 up while appointments are still upcoming. Both clinics start with reminders switched on; staff can change this in
 **Clinic settings**. The existing `BOOKIT_PUBLIC_URL`, `BOOKIT_SMTP_URL` and `BOOKIT_MAIL_FROM` settings also apply to
-reminders. Without SMTP, nothing is claimed or sent.
+reminders. Without SMTP, nothing is claimed or sent. A reminder that becomes due while the clinic switch is off
+is recorded as skipped, including without SMTP. Switching reminders back on does not send skipped reminders for
+the same booking time. A successful move clears the skipped record so the new time can receive a reminder, unless
+sending has already been attempted.
 
 A sending claim is saved before contacting SMTP. This prevents duplicate reminders across replicas and restarts,
 including when SMTP accepts an email but its reply is lost. An uncertain or failed attempt is not retried; a crash
@@ -104,5 +107,7 @@ and `reminders.failed` in the existing logs. Moving a booking before delivery us
 a booking that has already had a reminder attempt is not reminded again after a move.
 
 Migration `0002_parched_micromax` adds the clinic switch and the booking's reminder attempt time without changing
-existing booking details. To roll back, restore the previous application and keep these additional columns so the
+existing booking details. Migration `0003_complex_boomerang` adds the skipped reminder time without changing
+existing records. The tenant seed configuration keeps its previous fingerprint, so existing clinics can reseed
+without resetting bookings or settings. To roll back, restore the previous application and keep these additional columns so the
 sending history survives a later upgrade. The previous application works with the additional columns.

@@ -49,6 +49,7 @@ export async function rescheduleBooking(
         .update(bookings)
         .set({
           slotId: target.id,
+          reminderSkippedAt: null,
           rescheduleCount: locked.rescheduleCount + 1,
           updatedAt: now,
         })

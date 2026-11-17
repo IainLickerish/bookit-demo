@@ -18,4 +18,6 @@ staff should use this page. Patients see their own appointments through **My boo
 Open **Clinic settings** and tick or untick **Send reminder emails**, then choose
 **Save settings**. Reminders start switched on. The choice applies only to this
 clinic. Switching them off stops future reminders; it cannot recall an email
-already sent. Switching them on includes upcoming bookings within 24 hours.
+already sent. Reminders that become due while switched off are skipped. Switching
+them on later does not send those reminders for the same booking time. Moving a
+booking makes its new time eligible, unless its reminder has already been attempted.

@@ -1,0 +1,1 @@
+ALTER TABLE "booking" ADD COLUMN "reminder_skipped_at" timestamp with time zone;

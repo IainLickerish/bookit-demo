@@ -13,10 +13,7 @@ export type ReminderDependencies = BookingDependencies & { publicUrl: URL; tenan
 
 /** Every replica may run this. Booking row locks and committed claims prevent duplicate attempts. */
 export async function sendDueReminders(deps: ReminderDependencies): Promise<void> {
-  // Nothing is claimed when mail is disabled, so configuring SMTP later still works.
-  if (deps.mail.mailer.kind === 'disabled') return;
   try {
-    if (!(await loadClinicSettings(deps.db)).remindersEnabled) return;
     const now = deps.clock.now();
     const due = await deps.db
       .select({ id: bookings.id })
@@ -26,6 +23,7 @@ export async function sendDueReminders(deps: ReminderDependencies): Promise<void
         and(
           eq(bookings.status, 'confirmed'),
           isNull(bookings.reminderAttemptedAt),
+          isNull(bookings.reminderSkippedAt),
           gt(slots.startsAt, now),
           lte(slots.startsAt, new Date(now.getTime() + DAY_MS)),
         ),
@@ -35,11 +33,18 @@ export async function sendDueReminders(deps: ReminderDependencies): Promise<void
     for (const candidate of due) {
       const claimed = await deps.db.transaction(async (tx) => {
         const [row] = await tx.select().from(bookings).where(eq(bookings.id, candidate.id)).for('update');
-        if (!row || row.reminderAttemptedAt || row.status !== 'confirmed') return false;
+        if (!row || row.reminderAttemptedAt || row.reminderSkippedAt || row.status !== 'confirmed') return false;
         // Read the joined slot after acquiring the lock, in case a move just committed.
         const booking = await findBookingForPatient(tx, row.patientId, row.id);
         const time = deps.clock.now();
         if (!booking || !isDue(booking.startsAt, time)) return false;
+        const settings = await loadClinicSettings(tx);
+        if (!settings.remindersEnabled) {
+          await tx.update(bookings).set({ reminderSkippedAt: time }).where(eq(bookings.id, row.id));
+          return false;
+        }
+        // Missing SMTP does not consume a reminder when the clinic switch is on.
+        if (deps.mail.mailer.kind === 'disabled') return false;
         await tx.update(bookings).set({ reminderAttemptedAt: time }).where(eq(bookings.id, row.id));
         return true;
       });
@@ -54,10 +59,17 @@ export async function sendDueReminders(deps: ReminderDependencies): Promise<void
         const [row] = await tx.select().from(bookings).where(eq(bookings.id, candidate.id)).for('update');
         if (!row || row.status !== 'confirmed') return;
         const booking = await findBookingForPatient(tx, row.patientId, row.id);
-        if (!settings.remindersEnabled || !booking || !isDue(booking.startsAt, deps.clock.now())) {
-          // A move to a later time or a settings change before delivery has not
-          // used the reminder. It can be claimed again when it becomes due.
+        if (!booking || !isDue(booking.startsAt, deps.clock.now())) {
+          // A move to a later time has not used the reminder.
+          // It can be claimed again when its new time becomes due.
           await tx.update(bookings).set({ reminderAttemptedAt: null }).where(eq(bookings.id, row.id));
+          return;
+        }
+        if (!settings.remindersEnabled) {
+          await tx
+            .update(bookings)
+            .set({ reminderAttemptedAt: null, reminderSkippedAt: deps.clock.now() })
+            .where(eq(bookings.id, row.id));
           return;
         }
         const patient = await findUserById(tx, row.patientId);

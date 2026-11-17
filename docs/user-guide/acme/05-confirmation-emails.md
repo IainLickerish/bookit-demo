@@ -21,3 +21,6 @@ before your session. It shows the date, UK time and physiotherapist, with a link
 to **My bookings** to reschedule or cancel after signing in. Cancelled bookings
 get no reminder. If you move before the reminder is sent, it uses your new time
 and physiotherapist. A booking that has already had its reminder does not get another.
+
+If reminders are switched off when yours is due, it is skipped. Switching them
+on later does not send a reminder for the same booking time.
