@@ -72,6 +72,7 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
       patientId: patient.id,
       bookingId,
       newSlotId: formText(formData, 'newSlotId'),
+      originalSlotId: formText(formData, 'originalSlotId'),
     });
     destination = '/bookings?notice=rescheduled';
   } catch (error) {

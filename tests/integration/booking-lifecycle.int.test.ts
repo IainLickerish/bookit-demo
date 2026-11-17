@@ -205,6 +205,41 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
 });
 
 describe('rescheduling a booking (REQ-18.1-01)', () => {
+  it.each([0, 2])(
+    'returns the saved move for repeated submissions after %i earlier moves without another email or move allowance',
+    async (earlierMoves) => {
+      const original = await slotAt('2026-10-22', '09:00');
+      const target = await slotAt('2026-10-27', '14:15');
+      const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: original.id });
+      await database.db.update(bookings).set({ rescheduleCount: earlierMoves }).where(eq(bookings.id, booking.id));
+      const request = {
+        patientId: clinic.patient1.id,
+        bookingId: booking.id,
+        newSlotId: target.id,
+        originalSlotId: original.id,
+      };
+      mailer.sent.length = 0;
+      const results = await Promise.all([rescheduleBooking(deps, request), rescheduleBooking(deps, request)]);
+      for (const result of results) {
+        expect(result).toMatchObject({ id: booking.id, slotId: target.id, rescheduleCount: earlierMoves + 1 });
+      }
+      clock.advanceMinutes(1);
+      const repeated = await rescheduleBooking(deps, request);
+      expect(repeated.updatedAt).toEqual(results[0]!.updatedAt);
+      expect(repeated.rescheduleCount).toBe(earlierMoves + 1);
+      expect(mailer.sent).toHaveLength(1);
+      expect(logs.events().filter((event) => event === 'booking.rescheduled')).toHaveLength(1);
+      expect((await slotsOn('2026-10-22')).map((slot) => slot.id)).toContain(original.id);
+
+      await expect(rescheduleBooking(deps, { ...request, patientId: clinic.patient2.id })).rejects.toMatchObject({
+        code: 'booking_not_found',
+      });
+      await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
+      await expect(rescheduleBooking(deps, request)).rejects.toMatchObject({ code: 'booking_not_active' });
+      expect(mailer.sent).toHaveLength(1);
+    },
+  );
+
   it('moves the booking to another free slot and frees the old one', async () => {
     const original = await slotAt('2026-10-22', '09:00');
     const target = await slotAt('2026-10-27', '14:15');

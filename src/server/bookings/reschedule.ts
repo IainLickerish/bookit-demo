@@ -15,6 +15,8 @@ export interface RescheduleBookingRequest {
   patientId: string;
   bookingId: string;
   newSlotId: string;
+  /** The time shown when the move form was opened, used to recognise a repeated submission. */
+  originalSlotId?: string;
 }
 
 export async function rescheduleBooking(
@@ -40,6 +42,22 @@ export async function rescheduleBooking(
       .for('update', { of: bookings });
     if (!locked) {
       throw new BookingError('booking_not_found');
+    }
+    // The first submission may already have committed while this one waited for the lock.
+    // Return that saved result without using another move or sending another confirmation.
+    if (
+      locked.status === 'confirmed' &&
+      locked.startsAt > now &&
+      locked.rescheduleCount > 0 &&
+      locked.slotId === request.newSlotId &&
+      isUuid(request.originalSlotId ?? '') &&
+      request.originalSlotId !== request.newSlotId
+    ) {
+      const saved = await findBookingForPatient(tx, request.patientId, request.bookingId);
+      if (!saved) {
+        throw new Error('The saved move could not be read back.');
+      }
+      return { booking: saved, previousSlotId: locked.slotId, confirmation: null };
     }
     assertReschedulable(locked, request.newSlotId, now, settings);
     const target = await findBookableSlot(tx, request.newSlotId);
@@ -76,6 +94,7 @@ export async function rescheduleBooking(
       confirmation: composeConfirmation({ booking: moved, patient, settings, from: deps.mail.from, kind: 'moved' }),
     };
   });
+  if (!confirmation) return booking;
   deps.log.info(
     {
       event: 'booking.rescheduled',

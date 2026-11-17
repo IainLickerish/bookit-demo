@@ -76,6 +76,7 @@ export default async function ReschedulePage({
                   <form action={rescheduleAction}>
                     <input type="hidden" name="bookingId" value={booking.id} />
                     <input type="hidden" name="newSlotId" value={slot.id} />
+                    <input type="hidden" name="originalSlotId" value={booking.slotId} />
                     <button
                       type="submit"
                       className="button-secondary w-full"
