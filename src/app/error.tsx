@@ -1,13 +1,18 @@
 'use client';
 
+import { PageHeading } from './page-heading';
+
 export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <section role="alert" data-testid="error-page">
-      <h1>Something went wrong</h1>
-      <p className="mb-4">Please try again. If it keeps happening, contact the clinic.</p>
-      <button type="button" className="button" onClick={() => reset()}>
-        Try again
-      </button>
+    <section className="page-shell" role="alert" data-testid="error-page">
+      <div className="card" data-testid="fallback-card">
+        <PageHeading title="Something went wrong">
+          <p>Please try again. If it keeps happening, contact the clinic.</p>
+        </PageHeading>
+        <button type="button" className="button" data-testid="retry-page" onClick={() => reset()}>
+          Try again
+        </button>
+      </div>
     </section>
   );
 }

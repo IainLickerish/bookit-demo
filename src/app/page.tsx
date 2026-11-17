@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/server/request-context';
+import { PageHeading } from './page-heading';
 
 export default async function HomePage() {
   const user = await currentUser();
@@ -10,9 +11,12 @@ export default async function HomePage() {
     redirect('/bookings');
   }
   return (
-    <section>
-      <h1>Clinic administration</h1>
-      <p data-testid="admin-home">You are signed in as the clinic admin.</p>
+    <section className="page-shell">
+      <div className="card" data-testid="home-card">
+        <PageHeading title="Clinic administration">
+          <p data-testid="admin-home">You are signed in as the clinic admin.</p>
+        </PageHeading>
+      </div>
     </section>
   );
 }

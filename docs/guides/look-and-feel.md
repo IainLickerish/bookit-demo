@@ -80,3 +80,9 @@ inside its own area rather than widening the page.
 The full reskin is being built in stages. These are the standards for the remaining page work, not new journeys or
 new wording. This look-only change preserves every current title, description, clinic term and action. Emails stay
 plain text. Separate confirmation steps, additional messages and other behaviour changes need their own decision.
+
+The account, administration home and fallback pages now use `PageHeading` for the existing title and any existing
+introduction. Their `.page-shell` adds to the root content gutters to give 20px phone margins and at least 32px on
+larger screens. Account forms use a single `.card.account-card`, centred and no wider than 440px; home and fallback
+cards stay within the reading column. `.page-actions` gives their existing text links a comfortable tap target.
+These changes do not add descriptions or destinations, or alter the recovery journey.

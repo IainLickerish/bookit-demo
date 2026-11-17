@@ -41,6 +41,10 @@ for (const slug of ['acme', 'beacon'] as const) {
       await expect(page.locator('body')).toHaveCSS('font-family', /Figtree/);
       await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(250, 248, 244)');
       await expect(page.getByTestId('sign-in-submit')).toHaveCSS('background-color', 'rgb(29, 92, 75)');
+      const card = page.getByTestId('account-card');
+      await expect(card).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      expect((await card.boundingBox())!.width).toBeLessThanOrEqual(440);
+      await expect(card.getByTestId('page-title')).toHaveText('Sign in');
       expect(await page.evaluate(() => document.fonts.check('500 24px Fraunces'))).toBe(true);
       expect(await page.evaluate(() => document.fonts.check('400 16px Figtree'))).toBe(true);
       for (const family of ['fraunces', 'figtree']) {

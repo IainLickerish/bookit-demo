@@ -298,6 +298,50 @@
     line-height: 1.4;
   }
 
+  /* These shells add to the root main's existing 16px side padding. */
+  .page-shell {
+    width: calc(100% - 8px);
+    max-width: 720px;
+    min-width: 0;
+    margin: 8px auto 0;
+    overflow-wrap: anywhere;
+  }
+
+  .account-card {
+    width: 100%;
+    max-width: 440px;
+    margin-inline: auto;
+  }
+
+  .account-card .button {
+    width: 100%;
+  }
+
+  .page-heading {
+    margin-bottom: 24px;
+  }
+
+  .page-heading h1 {
+    margin-bottom: 0;
+  }
+
+  .page-heading p {
+    margin-top: 12px;
+    color: var(--color-muted);
+  }
+
+  .page-actions {
+    margin-top: 24px;
+  }
+
+  .page-actions a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
   .notice,
   .alert {
     position: relative;
@@ -338,6 +382,10 @@
   }
 
   @media (min-width: 640px) {
+    .page-shell {
+      width: calc(100% - 32px);
+    }
+
     .site-header-inner {
       padding-inline: 32px;
     }
