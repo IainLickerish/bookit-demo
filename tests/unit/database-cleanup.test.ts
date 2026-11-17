@@ -11,6 +11,11 @@ afterAll(() => {
 });
 
 type TestPool = EventEmitter & { end: ReturnType<typeof vi.fn<() => Promise<void>>> };
+// This file tests the path that starts its own container, so a running test database (as the Software Factory gives
+// its checks) must not be used here. The helper reads the setting when it loads, so it is cleared before any import.
+vi.hoisted(() => {
+  delete process.env.BOOKIT_TEST_DATABASE_URL;
+});
 const fixture = vi.hoisted(() => ({
   handle: undefined as undefined | { db: object; pool: TestPool },
   stop: vi.fn<() => Promise<void>>(),
