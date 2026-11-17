@@ -336,11 +336,14 @@
   }
 
   .day-picker {
+    container-type: inline-size;
     margin-bottom: 32px;
   }
 
   .day-picker-form {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    align-items: end;
     gap: 16px;
     margin-bottom: 24px;
   }
@@ -391,7 +394,7 @@
 
   .time-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
     gap: 12px;
   }
 
@@ -514,7 +517,7 @@
 
   .staff-filters {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
     gap: 16px;
     margin-block: 24px;
   }
@@ -698,16 +701,7 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none' stroke='%2316241F' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m10 2 8 15H2L10 2Z'/%3E%3Cpath d='M10 7v4m0 3h.01'/%3E%3C/svg%3E");
   }
 
-  @media (min-width: 640px) {
-    .staff-filters {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .day-picker-form {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-      align-items: end;
-    }
-
+  @container (min-width: 520px) {
     .day-navigation {
       grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     }
@@ -724,11 +718,9 @@
     .day-next {
       grid-column: 3;
     }
+  }
 
-    .time-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
+  @media (min-width: 640px) {
     .page-shell {
       width: calc(100% - 32px);
     }

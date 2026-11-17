@@ -39,6 +39,7 @@ async function reviewLayout(page: Page, info: TestInfo, state: string, clinicNam
   await expect(page.getByTestId('clinic-name')).toHaveCSS('font-weight', '500');
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(250, 248, 244)');
   await expect(page.locator('body')).toHaveCSS('font-family', /Figtree/);
+  await expect(page.getByTestId('site-header')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(page.locator('main h1')).toHaveCount(1);
   for (const heading of await page.locator('main h1, main h2').all()) {
     await expect(heading).toHaveCSS('font-family', /Fraunces/);
@@ -62,17 +63,39 @@ async function reviewLayout(page: Page, info: TestInfo, state: string, clinicNam
       viewport.width === 640 ? '2' : '1',
     );
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), state).toBe(true);
-    for (const control of await page
+    const staff = page.getByTestId('staff-page');
+    if (await staff.count()) {
+      expect(await staff.evaluate((element) => element.clientWidth)).toBeLessThanOrEqual(1120);
+      const box = (await staff.boundingBox())!;
+      expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
+    }
+    const controls = await page
       .locator('main input:not([type="hidden"]), main select, main button, main a')
-      .all()) {
-      const box = (await control.boundingBox())!;
-      expect(box.x, state).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width, state).toBeLessThanOrEqual(viewport.width);
-      await expect(control).toHaveCSS('font-family', /Figtree/);
-      if (await control.evaluate((element) => element instanceof HTMLInputElement && element.type === 'checkbox')) {
-        expect((await control.locator('..').boundingBox())!.height).toBeGreaterThanOrEqual(44);
-      } else {
-        expect(box.height, state).toBeGreaterThanOrEqual(44);
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const checkbox = element instanceof HTMLInputElement && element.type === 'checkbox';
+          return {
+            x: box.x,
+            right: box.right,
+            height: checkbox ? element.parentElement!.getBoundingClientRect().height : box.height,
+            font: style.fontFamily,
+            field: element.matches('input:not([type="checkbox"]), select'),
+            fieldWidth: element.clientWidth,
+            border: style.borderTopColor,
+            background: style.backgroundColor,
+          };
+        }),
+      );
+    for (const control of controls) {
+      expect(control.x, state).toBeGreaterThanOrEqual(0);
+      expect(control.right, state).toBeLessThanOrEqual(viewport.width);
+      expect(control.font).toContain('Figtree');
+      expect(control.height, state).toBeGreaterThanOrEqual(44);
+      if (control.field) {
+        expect(control.fieldWidth, `${state}: readable field width`).toBeGreaterThanOrEqual(180);
+        expect(contrast(control.border, control.background), `${state}: field border`).toBeGreaterThanOrEqual(3);
       }
     }
     const target = page
@@ -259,11 +282,6 @@ for (const slug of ['acme', 'beacon'] as const) {
       await page.goto(`${server.url}${movePath}`);
       await expect(page.getByTestId('not-reschedulable')).toBeVisible();
       await review('unavailable-move');
-      writeClock(clockFile, '2026-10-20T18:00:00.000Z');
-      await page.goto(`${server.url}/slots?date=2026-10-20`);
-      await expect(page.getByTestId('no-slots')).toBeVisible();
-      await review('empty-times');
-      writeClock(clockFile, E2E_START);
       await page.getByTestId('sign-out').click();
       const empty = await createUser(database.db, manualClock(E2E_START), {
         email: 'layout-review@patients.example.test',
@@ -358,6 +376,16 @@ for (const slug of ['acme', 'beacon'] as const) {
       } finally {
         await database.db.execute(sql`alter table design_review_hidden_tokens rename to password_reset_token`);
       }
+      // Advance only after every morning review: the shared clock deliberately refuses to move backwards.
+      await page.goto(`${server.url}/auth/sign-in`);
+      await page.getByTestId('sign-in-email').fill(patient.email);
+      await page.getByTestId('sign-in-password').fill(TEST_PASSWORD);
+      await page.getByTestId('sign-in-submit').click();
+      await expect(page).toHaveURL(/\/bookings$/);
+      writeClock(clockFile, '2026-10-20T18:00:00.000Z');
+      await page.goto(`${server.url}/slots?date=2026-10-20`);
+      await expect(page.getByTestId('no-slots')).toBeVisible();
+      await review('empty-times');
       expect([...fontOrigins]).toEqual([new URL(server.url).origin]);
       expect(smtp.messages.length).toBeGreaterThan(0);
       for (const message of smtp.messages) {
