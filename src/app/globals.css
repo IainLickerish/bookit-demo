@@ -363,6 +363,12 @@
     grid-row: 2;
   }
 
+  .day-name {
+    display: block;
+    color: var(--color-muted);
+    font-size: 13px;
+  }
+
   .day-previous {
     grid-column: 1;
     justify-self: start;

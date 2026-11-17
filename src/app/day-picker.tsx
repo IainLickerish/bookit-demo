@@ -8,6 +8,8 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
   const dayLink = (date: string) => `${path}?${new URLSearchParams({ practitioner: practitionerId, date }).toString()}`;
   const previous = addDaysToLocalDate(view.date, -1);
   const next = addDaysToLocalDate(view.date, 1);
+  const shownDate = formatLocalDate(view.date);
+  const dayNameEnd = shownDate.indexOf(',') + 1;
   return (
     <div className="card day-picker" data-testid="day-picker">
       <form method="get" action={path} className="day-picker-form">
@@ -45,7 +47,8 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           <span className="day-previous" />
         )}
         <span className="shown-day" data-testid="shown-date">
-          {formatLocalDate(view.date)}
+          <span className="day-name">{shownDate.slice(0, dayNameEnd)}</span>
+          {shownDate.slice(dayNameEnd)}
         </span>
         {view.date < view.lastDate ? (
           <Link href={dayLink(next)} prefetch={false} className="day-next" data-testid="next-day">
