@@ -39,7 +39,10 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
     await expect.poll(() => responses.length, { message: 'both confirmation responses arrive' }).toBe(2);
     page.off('response', onResponse);
     for (const response of responses) {
-      expect(await response.finished(), 'the confirmation response completes').toBeNull();
+      expect(
+        await test.step('The confirmation response finishes', () => response.finished(), { timeout: 10_000 }),
+        'the confirmation response completes',
+      ).toBeNull();
       const redirect = (await response.headerValue('x-action-redirect')) ?? (await response.headerValue('location'));
       expect(redirect, 'each confirmation redirects to the saved booking').toMatch(
         /^(?:https?:\/\/[^/]+)?\/bookings\?notice=booked(?:;push)?$/,
