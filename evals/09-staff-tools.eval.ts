@@ -1,9 +1,12 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { ADMIN, PATIENT_1, bookSlot, londonDate, pickFreeSlot, sessionFor, step } from './support';
 
 const CLIENT = 'Zoë Brontë';
 
-test("Clinic staff can find a client's booking and change the clinic's settings", async ({ browser }) => {
+test("Clinic staff can find a client's booking, download the filtered file, and change the clinic's settings", async ({
+  browser,
+}) => {
   const date = londonDate(15);
   const client = await sessionFor(browser, PATIENT_1);
   await step(client, 'Book a free session as a client', async () => {
@@ -17,6 +20,21 @@ test("Clinic staff can find a client's booking and change the clinic's settings"
     await staff.getByTestId('admin-date').fill(date);
     await staff.getByTestId('admin-filter').click();
     await expect(staff.getByTestId('admin-booking-row').filter({ hasText: CLIENT })).toContainText('Confirmed');
+  });
+
+  await step(staff, "Download the filtered file and read the client's name in it", async () => {
+    const downloaded = staff.waitForEvent('download', { timeout: 10_000 });
+    await staff.getByTestId('admin-export').click();
+    const download = await downloaded;
+    expect(download.suggestedFilename()).toBe('bookings.csv');
+    expect(await download.failure()).toBeNull();
+    const path = await download.path();
+    expect(path).not.toBeNull();
+    const csv = await readFile(path!, 'utf8');
+    expect(csv).toContain(`"${CLIENT}"`);
+    const records = csv.split('\r\n').slice(1, -1);
+    expect(records).toHaveLength(await staff.getByTestId('admin-booking-row').count());
+    for (const record of records) expect(record).toContain(`"${date}T`);
   });
 
   const name = await step(staff, "Change the clinic's name and see it saved", async () => {
