@@ -9,6 +9,7 @@ import {
   type ComposeTenant,
 } from '../helpers/compose';
 import { TEST_COMMIT } from '../helpers/built-server';
+import { calendarJourney } from '../helpers/calendar-journey';
 import { tenantEvidenceDirectory, writeTenantEvidence } from '../helpers/tenant-evidence';
 
 test.describe.configure({ mode: 'serial' });
@@ -254,6 +255,26 @@ test('REQ-18.2-01 patient sees the three-hour appointment, rerun seed preserves 
     expect((await acme.command(['logs', '--no-color', 'bookit'])).output).toContain('2026-10-20T08:00:00.000Z');
   } finally {
     await context.close();
+  }
+});
+
+test('clients can add booked and moved appointments to calendars in both clinics', async ({ browser }) => {
+  test.setTimeout(120_000);
+  for (const clinic of [acme, beacon]) {
+    const context = await signIn(browser, clinic, 'patient1');
+    try {
+      const page = context.pages()[0]!;
+      await page.setViewportSize({ width: 390, height: 844 });
+      await calendarJourney(
+        page,
+        clinic.url,
+        clinic.tenant.settings.clinicName,
+        clinic.tenant.practitioners[0]!.name,
+        clinic.tenant.settings.sessionMinutes,
+      );
+    } finally {
+      await context.close();
+    }
   }
 });
 

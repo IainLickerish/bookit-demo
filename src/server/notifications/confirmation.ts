@@ -1,4 +1,5 @@
 import { formatSlot } from '@/lib/time';
+import { bookingCalendar } from '../bookings/calendar';
 import { reportError } from '../error-reporting';
 import type { BookingView } from '../bookings/queries';
 import type { ClinicSettings } from '../settings';
@@ -47,5 +48,12 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
     to: patient.email,
     subject: `Booking confirmed: ${when}`,
     text: `${lines.join('\n')}\n`,
+    attachments: [
+      {
+        filename: 'booking.ics',
+        content: bookingCalendar(booking, settings),
+        contentType: 'text/calendar; charset=utf-8; method=PUBLISH',
+      },
+    ],
   };
 }

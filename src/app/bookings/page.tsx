@@ -7,6 +7,7 @@ import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
+import { AddToCalendar } from './add-to-calendar';
 
 function statusText(booking: BookingView): string {
   if (booking.status === 'confirmed') {
@@ -24,6 +25,9 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
+  const confirmed = ['booked', 'rescheduled'].includes(single(params.notice) ?? '')
+    ? upcoming.find((booking) => booking.id === single(params.booking))
+    : undefined;
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
 
   const row = (booking: BookingView, changeable: boolean) => (
@@ -43,7 +47,8 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <AddToCalendar booking={booking} settings={settings} />
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -70,6 +75,18 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         <p role="status" className="notice" data-testid="notice">
           {notice}
         </p>
+      ) : null}
+      {confirmed ? (
+        <div className="mb-4 space-y-2" data-testid="booking-confirmation">
+          <p>
+            {settings.clinicName} with {confirmed.practitionerName}
+          </p>
+          <p>
+            {formatSlot(confirmed.startsAt, settings.timeZone)} ({settings.timeZone}),{' '}
+            {(confirmed.endsAt.getTime() - confirmed.startsAt.getTime()) / 60_000} minutes
+          </p>
+          <AddToCalendar booking={confirmed} settings={settings} />
+        </div>
       ) : null}
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
