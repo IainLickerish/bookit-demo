@@ -77,8 +77,10 @@ test('Moving a booking updates its calendar download and sends a matching calend
   });
   const moved = await step(page, 'Move the session to another free time', async () => {
     const seen = new Set((await mailTo(PATIENT_2)).map((message) => message.ID));
+    const free = await pickFreeSlot(page, londonDate(32));
+    await page.getByTestId('nav-my-bookings').click();
     await bookingRow(page, 'upcoming-bookings', original.when).getByTestId('reschedule-link').click();
-    const target = page.getByTestId('reschedule-to').filter({ hasText: '12:00' });
+    const target = page.getByTestId('reschedule-to').filter({ hasText: free.time });
     await expect(target).toBeVisible();
     const startsAt = await target.getAttribute('data-starts-at');
     const when = (await target.innerText()).trim();
