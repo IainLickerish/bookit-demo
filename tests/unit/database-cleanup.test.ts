@@ -1,12 +1,17 @@
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type TestPool = EventEmitter & { end: ReturnType<typeof vi.fn<() => Promise<void>>> };
-const fixture = vi.hoisted(() => ({
-  handle: undefined as undefined | { db: object; pool: TestPool },
-  stop: vi.fn<() => Promise<void>>(),
-  migrate: vi.fn<() => Promise<void>>(),
-}));
+const fixture = vi.hoisted(() => {
+  // This fixture mocks a container. Select it before the helper reads its configuration,
+  // even when integration tests have a running PostgreSQL server in the environment.
+  vi.stubEnv('BOOKIT_TEST_DATABASE_URL', undefined);
+  return {
+    handle: undefined as undefined | { db: object; pool: TestPool },
+    stop: vi.fn<() => Promise<void>>(),
+    migrate: vi.fn<() => Promise<void>>(),
+  };
+});
 
 vi.mock('@testcontainers/postgresql', () => ({
   PostgreSqlContainer: class {
@@ -22,6 +27,10 @@ vi.mock('@/db/client', () => ({ createDatabase: () => fixture.handle }));
 vi.mock('@/db/migrate', () => ({ runMigrations: fixture.migrate }));
 
 import { startTestDatabase } from '../helpers/database';
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 beforeEach(() => {
   vi.resetAllMocks();
