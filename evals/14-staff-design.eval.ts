@@ -50,7 +50,8 @@ test('Staff filters keep the bookings table inside a labelled keyboard-scrollabl
     await expect(region).toHaveAttribute('tabindex', '0');
     await expect(region).toHaveCSS('overflow-x', 'auto');
     const controls = await page.locator('a, button, input:not([type="hidden"]), select, [tabindex="0"]').count();
-    for (let tabs = 0; tabs <= controls; tabs++) {
+    // Native date fields can have separate day, month and year tab stops.
+    for (let tabs = 0; tabs <= controls * 4; tabs++) {
       await page.keyboard.press('Tab');
       if (await region.evaluate((element) => element === document.activeElement)) break;
     }
