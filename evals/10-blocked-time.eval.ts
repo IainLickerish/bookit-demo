@@ -10,6 +10,7 @@ import {
   londonDate,
   pickFreeSlot,
   sessionFor,
+  signIn,
   showDay,
   step,
 } from './support';
@@ -110,13 +111,15 @@ test('A saved block removes overlapping choices and refuses booking and moving f
   browser,
 }) => {
   const date = londonDate(43);
-  const client = await sessionFor(browser, PATIENT_1);
-  const original = await step(client, 'Book a session to move later', async () => {
+  const client = await (await browser.newContext()).newPage();
+  const original = await step(client, 'Sign in and book a session to move later', async () => {
+    await signIn(client, PATIENT_1);
     const slot = await pickFreeSlot(client, date);
     return { slot, when: await bookSlot(client, slot.id) };
   });
-  const staleBooker = await sessionFor(browser, PATIENT_2);
-  const target = await step(staleBooker, 'Open a free time ready to confirm a booking', async () => {
+  const staleBooker = await (await browser.newContext()).newPage();
+  const target = await step(staleBooker, 'Sign in and open a free time ready to confirm a booking', async () => {
+    await signIn(staleBooker, PATIENT_2);
     const slot = await pickFreeSlot(staleBooker, date);
     await staleBooker.goto(`/book/${slot.id}`);
     await givePhone(staleBooker);
@@ -129,8 +132,9 @@ test('A saved block removes overlapping choices and refuses booking and moving f
     await client.getByTestId('show-slots').click();
     await expect(client.locator(`[data-testid="reschedule-to"][data-slot-id="${target.id}"]`)).toBeVisible();
   });
-  const staff = await sessionFor(browser, ADMIN);
-  await step(staff, 'Save a block overlapping part of the chosen target time', async () => {
+  const staff = await (await browser.newContext()).newPage();
+  await step(staff, 'Sign in as staff and block part of the chosen target time', async () => {
+    await signIn(staff, ADMIN);
     const [hour, minute] = target.time.split(':').map(Number) as [number, number];
     const endMinutes = hour * 60 + minute + 5;
     const end = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
