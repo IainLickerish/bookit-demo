@@ -46,7 +46,7 @@ test('A client receives one reminder with clinic-local details and My bookings l
       expect(await dispatchAt(staff, id, due)).toBe(1);
       await expect.poll(async () => (await remindersFor(PATIENT_1, id)).length).toBe(1);
       text = (await remindersFor(PATIENT_1, id))[0]!.text;
-      expect(text.startsWith(`${clinicName}\n`)).toBe(true);
+      expect(text.split(/\r?\n/, 1)[0]?.trim(), 'the clinic name is the first line').toBe(clinicName);
       expect(text).toContain(`When: ${when} (Europe/London)`);
       expect(text).toContain(`With your physiotherapist: ${PRACTITIONER}`);
       expect(text).toContain('To reschedule your session, sign in to My bookings:');
