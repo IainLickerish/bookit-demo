@@ -292,3 +292,56 @@ test('REQ-18.1-06 container build requires GIT_COMMIT and the production image r
     writeTenantEvidence(directory, results, logs.join('\n'), acme.canaries);
   }
 });
+
+test('blocked periods and reasons are private to each clinic staff account', async ({ browser }) => {
+  const staffA = await signIn(browser, acme, 'admin');
+  const staffB = await signIn(browser, beacon, 'admin');
+  const visitor = await browser.newContext();
+  try {
+    for (const [context, clinic, ownReason, foreignReason] of [
+      [staffA, acme, 'Acme private training block', 'Beacon private training block'],
+      [staffB, beacon, 'Beacon private training block', 'Acme private training block'],
+    ] as const) {
+      const page = context.pages()[0]!;
+      await page.goto(`${clinic.url}/admin/blocks`);
+      await page.getByTestId('block-practitioner').selectOption({ label: clinic.tenant.practitioners[0]!.name });
+      await page.getByTestId('block-start').fill('2026-11-24T09:00');
+      await page.getByTestId('block-end').fill('2026-11-24T10:00');
+      await page.getByTestId('block-reason').fill(ownReason);
+      await page.getByTestId('block-save').click();
+      await expect(page.getByTestId('block-saved')).toBeVisible();
+      await page.reload();
+      await expect(page.getByTestId('block-list')).toContainText(ownReason);
+      await expect(page.getByTestId('block-list')).not.toContainText(foreignReason);
+      // Even a query naming the other clinic cannot select its database.
+      await page.goto(`${clinic.url}/admin/blocks?tenant=${clinic === acme ? 'beacon' : 'acme'}`);
+      await expect(page.getByTestId('block-list')).toContainText(ownReason);
+      await expect(page.getByTestId('block-list')).not.toContainText(foreignReason);
+      const patient = await signIn(browser, clinic, 'patient1');
+      try {
+        const clientPage = patient.pages()[0]!;
+        await clientPage.goto(`${clinic.url}/admin/blocks`);
+        await expect(clientPage).toHaveURL(`${clinic.url}/bookings`);
+        await expect(clientPage.locator('body')).not.toContainText(ownReason);
+      } finally {
+        await patient.close();
+      }
+      const publicPage = await visitor.newPage();
+      await publicPage.goto(`${clinic.url}/admin/blocks`);
+      await expect(publicPage).toHaveURL(`${clinic.url}/auth/sign-in`);
+      await expect(publicPage.locator('body')).not.toContainText(ownReason);
+      await publicPage.close();
+    }
+    const foreign = await browser.newContext();
+    try {
+      await foreign.addCookies(await staffA.cookies());
+      const page = await foreign.newPage();
+      await page.goto(`${beacon.url}/admin/blocks`);
+      await expect(page).toHaveURL(`${beacon.url}/auth/sign-in`);
+    } finally {
+      await foreign.close();
+    }
+  } finally {
+    await Promise.all([staffA.close(), staffB.close(), visitor.close()]);
+  }
+});

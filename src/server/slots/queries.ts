@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, lte, notExists, sql } from 'drizzle-orm';
 import type { Executor } from '@/db/client';
-import { bookings, practitioners, slots } from '@/db/schema';
+import { bookings, practitionerBlocks, practitioners, slots } from '@/db/schema';
 import { isUuid } from '../bookings/queries';
 
 export interface SlotView {
@@ -50,6 +50,14 @@ const noConfirmedBooking = notExists(
   sql`(select 1 from ${bookings} where ${bookings.slotId} = ${slots.id} and ${bookings.status} = 'confirmed')`,
 );
 
+// Half-open intervals: a slot that only touches a block boundary remains free.
+const noBlockedPeriod = notExists(
+  sql`(select 1 from ${practitionerBlocks}
+    where ${practitionerBlocks.practitionerId} = ${slots.practitionerId}
+      and ${practitionerBlocks.startsAt} < ${slots.endsAt}
+      and ${practitionerBlocks.endsAt} > ${slots.startsAt})`,
+);
+
 export async function isSlotFree(db: Executor, slotId: string): Promise<boolean> {
   if (!isUuid(slotId)) {
     return false;
@@ -57,7 +65,7 @@ export async function isSlotFree(db: Executor, slotId: string): Promise<boolean>
   const [row] = await db
     .select({ id: slots.id })
     .from(slots)
-    .where(and(eq(slots.id, slotId), noConfirmedBooking));
+    .where(and(eq(slots.id, slotId), noConfirmedBooking, noBlockedPeriod));
   return row !== undefined;
 }
 
@@ -85,6 +93,7 @@ export async function listAvailableSlots(db: Executor, query: AvailableSlotsQuer
         gt(slots.startsAt, query.after),
         lte(slots.startsAt, query.until),
         noConfirmedBooking,
+        noBlockedPeriod,
       ),
     )
     .orderBy(asc(slots.startsAt));

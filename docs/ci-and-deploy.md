@@ -88,3 +88,18 @@ The script:
 3. prints the SHA to deploy.
 
 Wait for `ci` to publish that SHA's image. Then run `deploy` for each product to `staging`, then to `production`.
+
+## Blocked-time migration recovery
+
+Migration `0002_curvy_fantastic_four.sql` adds `practitioner_block`, its practitioner
+reference, period index and validation checks. It does not update or delete existing
+bookings, slots or accounts. Integration tests apply all migrations to an empty
+clinic and reapply this addition to the previous schema containing a confirmed
+booking, checking that the booking stays unchanged.
+
+If the application needs recovery, keep this additive table and its migration
+record. The previous application can read its existing tables, but it does not
+enforce blocked periods. Suspend booking and moving before reverting application
+code, and deploy a corrected version before reopening those journeys. Prefer a
+corrective migration over dropping the table: dropping it would lose saved periods
+and reasons. No destructive rollback is required for this change.

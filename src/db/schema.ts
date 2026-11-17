@@ -98,6 +98,26 @@ export const practitioners = pgTable(
   ],
 );
 
+/** Staff-only periods of unavailable practitioner time. Existing bookings are preserved. */
+export const practitionerBlocks = pgTable(
+  'practitioner_block',
+  {
+    id: uuid('id').primaryKey(),
+    practitionerId: uuid('practitioner_id')
+      .notNull()
+      .references(() => practitioners.id),
+    startsAt: instant('starts_at').notNull(),
+    endsAt: instant('ends_at').notNull(),
+    reason: text('reason'),
+    createdAt: instant('created_at').notNull(),
+  },
+  (t) => [
+    index('practitioner_block_period_idx').on(t.practitionerId, t.startsAt, t.endsAt),
+    check('practitioner_block_ends_after_start', sql`"ends_at" > "starts_at"`),
+    check('practitioner_block_reason_length', sql`"reason" is null or length("reason") <= 500`),
+  ],
+);
+
 export const slots = pgTable(
   'slot',
   {

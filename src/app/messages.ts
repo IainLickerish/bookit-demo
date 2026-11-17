@@ -2,6 +2,7 @@ import { BOOKING_ERRORS, isBookingErrorCode } from '@/server/bookings/errors';
 
 const NOTICES = {
   booked: 'Booking confirmed.',
+  block_saved: 'Blocked time saved.',
   cancelled: 'Booking cancelled.',
   cancelled_late: 'Booking cancelled. This was a late cancellation.',
   rescheduled: 'Booking rescheduled.',
@@ -24,3 +25,11 @@ export function errorText(code: string | undefined): string | null {
 }
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export const BLOCK_MESSAGES = {
+  practitionerId: 'Choose a practitioner from this clinic.',
+  startsAt: 'Enter a valid start in the clinic time zone. Times skipped or repeated when clocks change cannot be used.',
+  endsAt:
+    'Enter an end after the start in the clinic time zone. Times skipped or repeated when clocks change cannot be used.',
+  reason: 'Keep the reason to 500 characters or fewer.',
+} as const;
