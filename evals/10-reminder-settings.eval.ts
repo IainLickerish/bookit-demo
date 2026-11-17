@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { ADMIN, PATIENT_1, signIn, step } from './support';
 
+test.use({ actionTimeout: 10_000 });
+
 test('Clinic staff can save reminders off and on and see each choice after reopening settings', async ({ page }) => {
   await step(page, 'Sign in as clinic staff', async () => {
     await signIn(page, ADMIN);
@@ -92,8 +94,11 @@ test('Visitors and clients cannot view or change the reminder setting', async ({
     });
   } finally {
     await step(page, 'Restore the original reminder choice', async () => {
-      await signIn(page, ADMIN);
       await page.goto('/admin/settings');
+      if (!(await page.getByTestId('admin-reminders-enabled').isVisible())) {
+        await signIn(page, ADMIN);
+        await page.goto('/admin/settings');
+      }
       await page.getByTestId('admin-reminders-enabled').setChecked(original);
       await page.getByTestId('admin-save-settings').click();
       await expect(page.getByTestId('admin-settings-saved')).toBeVisible();
