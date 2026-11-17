@@ -1,12 +1,16 @@
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type TestPool = EventEmitter & { end: ReturnType<typeof vi.fn<() => Promise<void>>> };
-const fixture = vi.hoisted(() => ({
-  handle: undefined as undefined | { db: object; pool: TestPool },
-  stop: vi.fn<() => Promise<void>>(),
-  migrate: vi.fn<() => Promise<void>>(),
-}));
+const fixture = vi.hoisted(() => {
+  // These tests exercise the mocked container, regardless of the integration database environment.
+  vi.stubEnv('BOOKIT_TEST_DATABASE_URL', '');
+  return {
+    handle: undefined as undefined | { db: object; pool: TestPool },
+    stop: vi.fn<() => Promise<void>>(),
+    migrate: vi.fn<() => Promise<void>>(),
+  };
+});
 
 vi.mock('@testcontainers/postgresql', () => ({
   PostgreSqlContainer: class {
@@ -23,6 +27,10 @@ vi.mock('@/db/migrate', () => ({ runMigrations: fixture.migrate }));
 
 import { startTestDatabase } from '../helpers/database';
 
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
 beforeEach(() => {
   vi.resetAllMocks();
   fixture.handle = { db: {}, pool: Object.assign(new EventEmitter(), { end: vi.fn(async () => undefined) }) };
@@ -31,6 +39,7 @@ beforeEach(() => {
 describe('disposable database cleanup', () => {
   it('waits for every connection to close even when the pool ends first', async () => {
     const database = await startTestDatabase();
+    expect(database.url).toBe('postgresql://database.example.test/bookit');
     const pool = fixture.handle!.pool;
     const first = new EventEmitter();
     const second = new EventEmitter();
