@@ -144,29 +144,34 @@ describe('day-before reminders', () => {
     const newSlotId = await slot('2026-10-22T09:00:00Z', clinic.practitioners.saturdays);
     clock.set('2026-10-20T08:00:00Z');
     smtp.messages.length = 0;
-    const blocker = await database.handle.pool.connect();
-    let sending: Promise<void> | undefined;
+    let release!: () => void;
+    const proceed = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reached!: () => void;
+    const claimed = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const original = database.db.transaction.bind(database.db);
+    const pause = vi.spyOn(database.db, 'transaction').mockImplementationOnce(async (body, config) => {
+      const result = await original(body, config);
+      // The durable claim has committed. Hold delivery until the move/cancel commits.
+      reached();
+      await proceed;
+      return result;
+    });
+    const sending = sendDueReminders(deps());
     try {
-      await blocker.query('begin');
-      // Pause delivery after its durable claim, without blocking booking changes.
-      await blocker.query('select id from clinic_settings where id = 1 for update');
-      sending = sendDueReminders(deps());
-      await vi.waitFor(
-        async () => {
-          const [row] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
-          expect(row!.reminderAttemptedAt).not.toBeNull();
-        },
-        { timeout: 5000, interval: 20 },
-      );
+      await claimed;
       if (change === 'move') {
         await rescheduleBooking(deps(), { patientId: booking.patientId, bookingId: booking.id, newSlotId });
       } else {
         await cancelBooking(deps(), { patientId: booking.patientId, bookingId: booking.id });
       }
     } finally {
-      await blocker.query('rollback');
-      blocker.release();
+      release();
       await sending;
+      pause.mockRestore();
     }
     expect(smtp.messages).toHaveLength(0);
     if (change === 'move') {
@@ -283,6 +288,136 @@ describe('day-before reminders', () => {
       await sendDueReminders(deps());
       expect(smtp.messages).toHaveLength(1);
       expect(textBody(smtp.messages[0]!.raw)).toContain('Sam Sports');
+    },
+  );
+
+  it.each(['create', 'move'] as const)('waits for re-enabling to commit before a concurrent %s', async (operation) => {
+    const existing = operation === 'move' ? await book('2026-10-22T08:00:00Z') : null;
+    const target = await slot('2026-10-20T10:00:00Z');
+    const values = {
+      clinicName: clinic.settings.clinicName,
+      timeZone: clinic.settings.timeZone,
+      lateCancellationHours: clinic.settings.lateCancellationHours,
+      includeContactInConfirmation: clinic.settings.includeContactInConfirmation,
+      remindersEnabled: false,
+    };
+    await updateAdminSettings(database.db, clock, values);
+    const concurrent = createDatabase(database.url, { application_name: 'reminder-booking-transition' });
+    let release!: () => void;
+    const proceed = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reached!: () => void;
+    const reachedTransition = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const enabling = database.db.transaction(async (tx) => {
+      await updateAdminSettings(tx, clock, { ...values, remindersEnabled: true });
+      // The skip update is finished, but the enabling transaction has not committed.
+      reached();
+      await proceed;
+    });
+    await reachedTransition;
+    let completed = false;
+    const changing = (
+      existing
+        ? rescheduleBooking(
+            { ...deps(), db: concurrent.db },
+            { patientId: existing.patientId, bookingId: existing.id, newSlotId: target },
+          )
+        : bookSlot({ ...deps(), db: concurrent.db }, { patientId: clinic.patient1.id, slotId: target })
+    ).then((result) => {
+      completed = true;
+      return result;
+    });
+    try {
+      await vi.waitFor(
+        async () => {
+          const waiting = await database.handle.pool.query(
+            "select pid from pg_stat_activity where application_name = 'reminder-booking-transition' and wait_event_type = 'Lock'",
+          );
+          expect(completed || waiting.rowCount === 1).toBe(true);
+        },
+        { timeout: 5000, interval: 20 },
+      );
+      expect(completed, 'a booking must not commit inside the off-to-on transition').toBe(false);
+    } finally {
+      release();
+      await enabling;
+      await changing;
+      await concurrent.pool.end();
+    }
+    // The booking serialised after enabling, so it is eligible for one reminder.
+    smtp.messages.length = 0;
+    await sendDueReminders(deps());
+    await sendDueReminders(deps());
+    expect(smtp.messages).toHaveLength(1);
+  });
+
+  it.each(['create', 'move'] as const)(
+    'skips a %s committed while off before re-enabling can finish',
+    async (operation) => {
+      const existing = operation === 'move' ? await book('2026-10-22T08:00:00Z') : null;
+      const target = await slot('2026-10-20T10:00:00Z');
+      const values = {
+        clinicName: clinic.settings.clinicName,
+        timeZone: clinic.settings.timeZone,
+        lateCancellationHours: clinic.settings.lateCancellationHours,
+        includeContactInConfirmation: clinic.settings.includeContactInConfirmation,
+        remindersEnabled: false,
+      };
+      await updateAdminSettings(database.db, clock, values);
+      const concurrent = createDatabase(database.url, { application_name: 'reminder-enabling-transition' });
+      let release!: () => void;
+      const proceed = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let reached!: () => void;
+      const reachedBooking = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      const original = database.db.transaction.bind(database.db);
+      const pause = vi.spyOn(database.db, 'transaction').mockImplementationOnce((body, config) =>
+        original(async (tx) => {
+          const result = await body(tx);
+          // The booking has been inserted/moved while off, but is not committed yet.
+          reached();
+          await proceed;
+          return result;
+        }, config),
+      );
+      const changing = existing
+        ? rescheduleBooking(deps(), { patientId: existing.patientId, bookingId: existing.id, newSlotId: target })
+        : bookSlot(deps(), { patientId: clinic.patient1.id, slotId: target });
+      await reachedBooking;
+      let completed = false;
+      const enabling = updateAdminSettings(concurrent.db, clock, { ...values, remindersEnabled: true }).then(() => {
+        completed = true;
+      });
+      try {
+        await vi.waitFor(
+          async () => {
+            const waiting = await database.handle.pool.query(
+              "select pid from pg_stat_activity where application_name = 'reminder-enabling-transition' and wait_event_type = 'Lock'",
+            );
+            expect(completed || waiting.rowCount === 1).toBe(true);
+          },
+          { timeout: 5000, interval: 20 },
+        );
+        expect(completed, 'enabling must wait for an in-flight booking made while off').toBe(false);
+      } finally {
+        release();
+        await changing;
+        await enabling;
+        pause.mockRestore();
+        await concurrent.pool.end();
+      }
+      const booking = await changing;
+      const [row] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+      expect(row!.reminderSkippedAt).not.toBeNull();
+      smtp.messages.length = 0;
+      await sendDueReminders(deps());
+      expect(smtp.messages).toHaveLength(0);
     },
   );
 

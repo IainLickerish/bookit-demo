@@ -30,7 +30,8 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
   const phone = normalisePhone(request.phone);
   const now = deps.clock.now();
   const { booking, confirmation } = await deps.db.transaction(async (tx) => {
-    const settings = await loadClinicSettings(tx);
+    // Serialise with reminder settings transitions before taking any booking locks.
+    const settings = await loadClinicSettings(tx, 'share');
     const patient = await findUserById(tx, request.patientId);
     if (!patient || patient.role !== 'patient') {
       throw new BookingError('not_a_patient');
