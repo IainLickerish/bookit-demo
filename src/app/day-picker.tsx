@@ -24,6 +24,7 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
         <label>
           Date
           <input
+            key={view.date}
             type="date"
             name="date"
             defaultValue={view.date}
