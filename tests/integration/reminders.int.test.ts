@@ -245,6 +245,47 @@ describe('day-before reminders', () => {
     },
   );
 
+  it.each([false, true])(
+    'skips reminders due while off when staff enable without a worker check (concurrent worker: %s)',
+    async (concurrent) => {
+      const booking = await book();
+      const future = await book('2026-10-22T08:00:00Z');
+      const other = await loadClinicSettings(beacon.db);
+      const settings = (remindersEnabled: boolean) => ({
+        clinicName: clinic.settings.clinicName,
+        timeZone: clinic.settings.timeZone,
+        lateCancellationHours: clinic.settings.lateCancellationHours,
+        includeContactInConfirmation: clinic.settings.includeContactInConfirmation,
+        remindersEnabled,
+      });
+      await updateAdminSettings(database.db, clock, settings(false));
+      clock.set('2026-10-20T08:00:00Z');
+      smtp.messages.length = 0;
+      // No worker runs between becoming due and the staff action.
+      if (concurrent) {
+        await Promise.all([updateAdminSettings(database.db, clock, settings(true)), sendDueReminders(deps())]);
+      } else {
+        await updateAdminSettings(database.db, clock, settings(true));
+      }
+      await sendDueReminders(deps());
+      expect(smtp.messages).toHaveLength(0);
+      const rows = await database.db.select().from(bookings);
+      expect(rows.find((row) => row.id === booking.id)!.reminderSkippedAt).not.toBeNull();
+      expect(rows.find((row) => row.id === future.id)!.reminderSkippedAt).toBeNull();
+      expect(await loadClinicSettings(beacon.db)).toEqual(other);
+      await rescheduleBooking(deps(), {
+        patientId: booking.patientId,
+        bookingId: booking.id,
+        newSlotId: await slot('2026-10-21T09:00:00Z', clinic.practitioners.saturdays),
+      });
+      clock.set('2026-10-20T09:00:00Z');
+      await sendDueReminders(deps());
+      await sendDueReminders(deps());
+      expect(smtp.messages).toHaveLength(1);
+      expect(textBody(smtp.messages[0]!.raw)).toContain('Sam Sports');
+    },
+  );
+
   it('does not skip a booking that becomes due only after reminders are switched back on', async () => {
     await book('2026-10-22T08:00:00Z');
     await database.db.update(clinicSettings).set({ remindersEnabled: false });
