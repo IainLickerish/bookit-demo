@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Response } from '@playwright/test';
 import { PATIENT_3, PRACTITIONER, londonDate, mailTo, pickFreeSlot, signIn, step } from './support';
 
 test('Rapidly confirming twice shows Booking confirmed and one matching confirmed booking without an unavailable error', async ({
@@ -14,22 +14,38 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
     return ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
   });
   await step(page, 'Press Confirm booking twice in quick succession', async () => {
-    let submissions = 0;
-    const bothSubmitted = new Promise<void>((resolve) => {
-      page.on('response', (response) => {
-        if (response.request().method() === 'POST' && ++submissions === 2) resolve();
-      });
+    const responses: Response[] = [];
+    let bothSubmitted!: () => void;
+    const submitted = new Promise<void>((resolve) => {
+      bothSubmitted = resolve;
     });
+    const onResponse = (response: Response) => {
+      const request = response.request();
+      if (request.method() === 'POST' && request.headers()['next-action']) {
+        responses.push(response);
+        if (responses.length === 2) bothSubmitted();
+      }
+    };
+    page.on('response', onResponse);
     // Dispatch both clicks together so navigation cannot remove the form between them.
     await page.getByTestId('confirm-booking').evaluate((button: HTMLButtonElement) => {
       button.click();
       button.click();
     });
-    await bothSubmitted;
+    await submitted;
+    page.off('response', onResponse);
+    for (const response of responses) {
+      expect(await response.finished(), 'the confirmation response completes').toBeNull();
+      expect(await response.headerValue('x-action-redirect')).toBe('/bookings?notice=booked;push');
+    }
     await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
     await expect(page.getByTestId('notice')).toHaveText('Booking confirmed.');
     await expect(page.getByTestId('booking-error')).toHaveCount(0);
     await expect(page.getByTestId('slot-taken')).toHaveCount(0);
+    const row = page.getByTestId('upcoming-bookings').getByTestId('booking-row').filter({ hasText: when });
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText(PRACTITIONER);
+    await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
   });
   await step(page, 'Reload My bookings and see exactly one matching confirmed session', async () => {
     await page.reload();
