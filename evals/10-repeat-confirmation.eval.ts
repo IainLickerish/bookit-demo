@@ -1,4 +1,4 @@
-import { expect, test, type Response } from '@playwright/test';
+import { expect, test, type APIResponse } from '@playwright/test';
 import { PATIENT_3, PRACTITIONER, londonDate, mailTo, pickFreeSlot, signIn, step } from './support';
 
 test('Rapidly confirming twice shows Booking confirmed and one matching confirmed booking without an unavailable error', async ({
@@ -14,14 +14,19 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
     return ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
   });
   await step(page, 'Press Confirm booking twice in quick succession', async () => {
-    const responses: Response[] = [];
-    const onResponse = (response: Response) => {
-      const request = response.request();
-      if (request.method() === 'POST') {
-        responses.push(response);
+    const responses: APIResponse[] = [];
+    await page.route('**/*', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
       }
-    };
-    page.on('response', onResponse);
+      // Read the whole response before passing it to the browser. Native
+      // redirects do not reliably settle Playwright's response.finished().
+      const response = await route.fetch({ maxRedirects: 0 });
+      await response.body();
+      await route.fulfill({ response });
+      responses.push(response);
+    });
     // Wait for React to attach the form before dispatching both clicks together.
     // Otherwise the browser can coalesce two native navigations into one POST.
     await expect
@@ -37,13 +42,10 @@ test('Rapidly confirming twice shows Booking confirmed and one matching confirme
       button.click();
     });
     await expect.poll(() => responses.length, { message: 'both confirmation responses arrive' }).toBe(2);
-    page.off('response', onResponse);
+    await page.unrouteAll({ behavior: 'wait' });
     for (const response of responses) {
-      expect(
-        await test.step('The confirmation response finishes', () => response.finished(), { timeout: 10_000 }),
-        'the confirmation response completes',
-      ).toBeNull();
-      const redirect = (await response.headerValue('x-action-redirect')) ?? (await response.headerValue('location'));
+      const headers = response.headers();
+      const redirect = headers['x-action-redirect'] ?? headers.location;
       expect(redirect, 'each confirmation redirects to the saved booking').toMatch(
         /^(?:https?:\/\/[^/]+)?\/bookings\?notice=booked(?:;push)?$/,
       );
