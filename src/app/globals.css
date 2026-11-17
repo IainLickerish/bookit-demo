@@ -515,6 +515,10 @@
     max-width: 1120px;
   }
 
+  .staff-page > .page-actions {
+    margin-bottom: 24px;
+  }
+
   .staff-filters {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
