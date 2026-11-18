@@ -39,11 +39,11 @@ beforeAll(async () => {
     settings: { clinicName: 'Beacon Dental', slotHorizonDays: 7 },
   });
   fixture = await seedAdminBookings(acme.db, clock);
-  beaconFixture = await seedAdminBookings(beacon.db, clock, [
-    ...ADMIN_PATIENT_NAMES.slice(0, 2),
-    accentedName,
-    ADMIN_PATIENT_NAMES[3]!,
-  ]);
+  beaconFixture = await seedAdminBookings(
+    beacon.db,
+    clock,
+    ADMIN_PATIENT_NAMES.map((name, index) => (index === 1 ? accentedName : name)),
+  );
   adminToken = (await createSession(acme.db, clock, clinic.admin.id)).token;
   patientToken = (await createSession(acme.db, clock, clinic.patient1.id)).token;
   beaconAdminToken = (await createSession(beacon.db, clock, beaconClinic.admin.id)).token;
@@ -93,7 +93,7 @@ function beaconExport(token: string) {
   return adminReportResponse(
     { db: beacon.db, clock, log: beaconLogs.log },
     token,
-    new URLSearchParams('date=2026-10-25&status=cancelled'),
+    new URLSearchParams('date=2026-10-25&status=confirmed'),
     'csv',
   );
 }
@@ -109,7 +109,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     const [header, booking, end] = records;
     expect(header).toContain('"Patient"');
     expect(booking).toBe(
-      `"${beaconFixture.bookingIds[2]}","${accentedName}","Report Practitioner","2026-10-25T23:30:00.000Z","2026-10-26T00:15:00.000Z","cancelled","yes",""`,
+      `"${beaconFixture.bookingIds[1]}","${accentedName}","Report Practitioner","2026-10-24T23:15:00.000Z","2026-10-25T00:00:00.000Z","confirmed","no",""`,
     );
     expect(end).toBe('');
   });
