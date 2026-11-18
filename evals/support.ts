@@ -17,6 +17,9 @@ export const PATIENT_3 = 'patient3@patients.acmephysio.test';
 export const ADMIN = 'admin@acmephysio.test';
 export const PRACTITIONER = 'Alex Physiotherapist';
 
+export const BOOKED_URL = /\/bookings\?booking=[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}&notice=booked$/;
+export const RESCHEDULED_URL = /\/bookings\?booking=[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}&notice=rescheduled$/;
+
 /** The password every seeded account shares in a demo copy. */
 export const demoPassword = (): string => {
   const value = process.env.EVAL_PASSWORD;
@@ -100,7 +103,7 @@ export async function bookSlot(page: Page, slotId: string): Promise<string> {
   const when = ((await page.getByTestId('book-when').textContent()) ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
   await givePhone(page);
   await page.getByTestId('confirm-booking').click();
-  await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+  await expect(page).toHaveURL(BOOKED_URL);
   return when;
 }
 

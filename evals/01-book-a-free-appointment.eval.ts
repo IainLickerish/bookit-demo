@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { PATIENT_1, londonDate, mailTo, pickFreeSlot, signIn, step } from './support';
+import { BOOKED_URL, PATIENT_1, londonDate, mailTo, pickFreeSlot, signIn, step } from './support';
 
 test('A client can book a free appointment and gets a confirmation email', async ({ page }) => {
   const before = await step(page, 'Sign in as a client', async () => {
@@ -17,7 +17,7 @@ test('A client can book a free appointment and gets a confirmation email', async
   });
 
   await step(page, 'See the confirmed session in My bookings', async () => {
-    await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+    await expect(page).toHaveURL(BOOKED_URL);
     await expect(page.getByTestId('notice')).toHaveText('Booking confirmed.');
     const row = page.getByTestId('upcoming-bookings').getByTestId('booking-row').filter({ hasText: slot.time });
     await expect(row.first().getByTestId('booking-status')).toHaveText('Confirmed');

@@ -7,6 +7,7 @@ import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
+import { AddToCalendar } from './add-to-calendar';
 
 function statusText(booking: BookingView): string {
   if (booking.status === 'confirmed') {
@@ -18,13 +19,16 @@ function statusText(booking: BookingView): string {
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   const patient = await requirePatient();
   const params = await searchParams;
-  const notice = noticeText(single(params.notice));
+  const noticeCode = single(params.notice);
   const error = errorText(single(params.error));
   const db = getDatabase();
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
+  const isConfirmation = noticeCode === 'booked' || noticeCode === 'rescheduled';
+  const confirmed = isConfirmation ? upcoming.find((booking) => booking.id === single(params.booking)) : undefined;
+  const notice = confirmed || !isConfirmation ? noticeText(noticeCode) : null;
 
   const row = (booking: BookingView, changeable: boolean) => (
     <li
@@ -43,7 +47,8 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <AddToCalendar bookingId={booking.id} />
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -66,7 +71,17 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   return (
     <section>
       <h1>My bookings</h1>
-      {notice ? (
+      {confirmed && notice ? (
+        <div className="notice" data-testid="booking-confirmation">
+          <p role="status" className="font-medium" data-testid="notice">
+            {notice}
+          </p>
+          <p className="mt-1 mb-3">
+            {formatSlot(confirmed.startsAt, settings.timeZone)} with {confirmed.practitionerName}
+          </p>
+          <AddToCalendar bookingId={confirmed.id} />
+        </div>
+      ) : notice ? (
         <p role="status" className="notice" data-testid="notice">
           {notice}
         </p>

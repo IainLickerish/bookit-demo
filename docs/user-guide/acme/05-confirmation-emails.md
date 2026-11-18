@@ -10,6 +10,7 @@ audience: patient
 Booking and rescheduling confirmations are sent from `noreply@acmephysio.test`.
 They describe the physiotherapist, appointment date and local time. Acme includes
 contact details when available; providing a phone number is optional.
+Open the attached calendar file to add the confirmed session to your calendar.
 
 In this fictional demonstration, email is delivered to the local Mailpit inbox,
 not to a real email service. **My bookings** at `/bookings` is the place to check

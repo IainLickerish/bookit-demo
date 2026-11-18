@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   PATIENT_2,
   PATIENT_3,
+  RESCHEDULED_URL,
   bookSlot,
   bookingRow,
   londonDate,
@@ -29,7 +30,7 @@ test('A client can move and cancel their own booking, and the old time becomes f
     const movedId = (await target.getAttribute('data-slot-id')) ?? '';
     const movedWhen = ((await target.textContent()) ?? '').trim();
     await target.click();
-    await expect(page).toHaveURL(/\/bookings\?notice=rescheduled$/);
+    await expect(page).toHaveURL(RESCHEDULED_URL);
     await expect(bookingRow(page, 'upcoming-bookings', movedWhen)).toBeVisible();
     return { movedId, movedWhen };
   });

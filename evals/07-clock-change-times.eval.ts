@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   ADMIN,
+  BOOKED_URL,
   PATIENT_1,
+  RESCHEDULED_URL,
   bookSlot,
   bookingRow,
   dateInPeriod,
@@ -76,7 +78,7 @@ test('Clients see the correct UK date and time when reviewing a booking, in My b
       async () => {
         await givePhone(page);
         await page.getByTestId('confirm-booking').click();
-        await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+        await expect(page).toHaveURL(BOOKED_URL);
         await page.reload();
         const row = bookingRow(page, 'upcoming-bookings', appointment.when);
         await expect(row.getByTestId('booking-status')).toHaveText('Confirmed');
@@ -94,7 +96,7 @@ test('Clients see the correct UK date and time when reviewing a booking, in My b
       const target = choices.last();
       const movedWhen = ukWhen((await target.getAttribute('data-starts-at')) ?? '');
       await target.click();
-      await expect(page).toHaveURL(/\/bookings\?notice=rescheduled$/);
+      await expect(page).toHaveURL(RESCHEDULED_URL);
       await expect(bookingRow(page, 'upcoming-bookings', movedWhen).getByTestId('booking-status')).toHaveText(
         'Confirmed',
       );

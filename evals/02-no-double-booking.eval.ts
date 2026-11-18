@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  BOOKED_URL,
   PATIENT_1,
   PATIENT_2,
   PATIENT_3,
@@ -52,7 +53,7 @@ test('When two clients try to book the same time at once, only one gets it', asy
         )
         .catch(() => undefined);
     await Promise.all([settled(a), settled(b)]);
-    const booked = [a.url(), b.url()].filter((u) => u.endsWith('/bookings?notice=booked'));
+    const booked = [a.url(), b.url()].filter((u) => BOOKED_URL.test(u));
     expect(booked, 'exactly one client got the time').toHaveLength(1);
   });
 });

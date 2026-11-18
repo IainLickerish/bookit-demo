@@ -257,6 +257,39 @@ test('REQ-18.2-01 patient sees the three-hour appointment, rerun seed preserves 
   }
 });
 
+test('each clinic provides its own calendar details and refuses the other clinic’s booking link', async ({
+  browser,
+}) => {
+  const contexts = await Promise.all([signIn(browser, acme, 'patient1'), signIn(browser, beacon, 'patient1')]);
+  try {
+    const downloads = await Promise.all(
+      [acme, beacon].map(async (clinic, index) => {
+        const context = contexts[index]!;
+        const page = context.pages()[0]!;
+        await page.goto(`${clinic.url}/slots?date=2026-10-22`);
+        await page.getByTestId('slot-link').first().click();
+        await page.getByTestId('confirm-booking').click();
+        const link = page.getByTestId('booking-confirmation').getByTestId('add-to-calendar');
+        await expect(link).toBeVisible();
+        const path = (await link.getAttribute('href'))!;
+        const file = await context.request.get(new URL(path, clinic.url).href);
+        expect(file.status()).toBe(200);
+        expect(file.headers()['cache-control']).toBe('private, no-store');
+        const contents = (await file.text()).replace(/\r\n /g, '');
+        expect(contents).toContain(
+          `SUMMARY:${clinic.tenant.settings.clinicName} with ${clinic.tenant.practitioners[0]!.name}\r\n`,
+        );
+        expect(contents).toContain(`\\n${clinic.tenant.settings.sessionMinutes} minutes\r\n`);
+        return path;
+      }),
+    );
+    const wrongClinic = await contexts[1]!.request.get(new URL(downloads[0]!, beacon.url).href);
+    expect(wrongClinic.status()).toBe(404);
+  } finally {
+    await Promise.all(contexts.map((context) => context.close()));
+  }
+});
+
 test('REQ-18.1-06 container build requires GIT_COMMIT and the production image refuses the virtual clock', async () => {
   test.setTimeout(900_000);
   const directory = tenantEvidenceDirectory('production-build');

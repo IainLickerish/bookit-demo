@@ -1,5 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { PATIENT_2, PRACTITIONER, bookingRow, londonDate, mailTo, pickFreeSlot, signIn, step } from './support';
+import {
+  BOOKED_URL,
+  PATIENT_2,
+  PRACTITIONER,
+  bookingRow,
+  londonDate,
+  mailTo,
+  pickFreeSlot,
+  signIn,
+  step,
+} from './support';
 
 async function openBooking(page: Page, daysAhead: number): Promise<string> {
   await step(page, 'Sign in as a client with no phone number on file', async () => {
@@ -20,7 +30,7 @@ test('A client with no phone number on file can leave the phone box empty and se
   const when = await openBooking(page, 17);
   await step(page, 'Confirm the booking with the phone box empty', async () => {
     await page.getByTestId('confirm-booking').click();
-    await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+    await expect(page).toHaveURL(BOOKED_URL);
     await expect(page.getByTestId('notice')).toHaveText('Booking confirmed.');
   });
   await step(page, 'Reload My bookings and see the confirmed session', async () => {
@@ -36,7 +46,7 @@ test('A client with no phone number on file can book when the phone box contains
   });
   await step(page, 'Confirm the booking and see the confirmed session', async () => {
     await page.getByTestId('confirm-booking').click();
-    await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+    await expect(page).toHaveURL(BOOKED_URL);
     await expect(bookingRow(page, 'upcoming-bookings', when).getByTestId('booking-status')).toHaveText('Confirmed');
   });
 });
@@ -48,7 +58,7 @@ test('A booking without a phone number sends a confirmation email with the appoi
   const { before, reference } = await step(page, 'Confirm the booking without a phone number', async () => {
     const before = new Set((await mailTo(PATIENT_2)).map((message) => message.ID));
     await page.getByTestId('confirm-booking').click();
-    await expect(page).toHaveURL(/\/bookings\?notice=booked$/);
+    await expect(page).toHaveURL(BOOKED_URL);
     const reference = await bookingRow(page, 'upcoming-bookings', when).getAttribute('data-booking-id');
     expect(reference).toBeTruthy();
     return { before, reference };
