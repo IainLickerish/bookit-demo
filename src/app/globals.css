@@ -171,6 +171,10 @@
     @apply inline-flex min-h-11 items-center;
   }
 
+  .site-nav :is(a, button) {
+    @apply min-w-11;
+  }
+
   .page-main {
     @apply py-8;
   }

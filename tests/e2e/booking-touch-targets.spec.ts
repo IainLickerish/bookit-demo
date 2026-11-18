@@ -5,7 +5,14 @@ test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
 
 test('Clients can tap full-size time choices to book and move on a phone', async ({ page }) => {
   await signIn(page, 'patient2@patients.example.test');
-  await page.getByTestId('nav-book').tap();
+  const bookLink = page.getByTestId('nav-book');
+  const bookTarget = await bookLink.evaluate((link) => {
+    const { width, height } = link.getBoundingClientRect();
+    return { width, height };
+  });
+  expect.soft(bookTarget.width, 'Book link width').toBeGreaterThanOrEqual(44);
+  expect.soft(bookTarget.height, 'Book link height').toBeGreaterThanOrEqual(44);
+  await bookLink.tap();
 
   const bookingChoices = page.getByTestId('slot-link');
   const originalTime = await bookingChoices.first().innerText();
