@@ -36,7 +36,19 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
 }
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
-  it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
+  it('downloads only the filtered bookings and preserves non-ASCII client names', async () => {
+    const response = await report(`practitionerId=${fixture.practitionerId}&date=2026-10-25`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-disposition')).toBe('attachment; filename="bookings.csv"');
+
+    const csv = Buffer.from(await response.arrayBuffer()).toString('utf8');
+    const [, ...records] = csv.trimEnd().split('\r\n');
+    expect(records.map((record) => record.split(',').slice(0, 2))).toEqual([
+      [`"${fixture.bookingIds[1]}"`, '"Łukasz Wiśniewski"'],
+      [`"${fixture.bookingIds[2]}"`, '"Siobhán Ó Briain"'],
+    ]);
+  });
+  it('exports fictional names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
@@ -74,6 +86,17 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     }
     const expired = await createSession(acme.db, manualClock('2026-10-19T07:00:00Z'), clinic.admin.id);
     expect((await report('', expired.token)).status).toBe(401);
+  });
+  it('keeps filtered CSV downloads private for clients and signed-out visitors', async () => {
+    const query = `practitionerId=${fixture.practitionerId}&date=2026-10-25`;
+    const patient = await report(query, patientToken);
+    const visitor = await report(query, '');
+    expect(patient.status).toBe(403);
+    expect(await patient.text()).toBe('Admin access required');
+    expect(patient.headers.has('content-disposition')).toBe(false);
+    expect(visitor.status).toBe(401);
+    expect(await visitor.text()).toBe('Sign-in required');
+    expect(visitor.headers.has('content-disposition')).toBe(false);
   });
   it('rechecks the current role even for an existing admin session', async () => {
     const user = await createUser(acme.db, clock, {
