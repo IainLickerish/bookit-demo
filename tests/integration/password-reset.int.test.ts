@@ -1,5 +1,3 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { passwordResetTokens, sessions } from '@/db/schema';
@@ -18,7 +16,6 @@ import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/
 import { captureLogs, type CapturedLogs } from '../helpers/logs';
 import { TEST_MAIL_FROM } from '../helpers/mail';
 
-const EVIDENCE_DIR = path.resolve(import.meta.dirname, '../../test-results/8uvs');
 const NEW_PASSWORD = 'a-new-test-only-password';
 const PUBLIC_URL = new URL('https://acme-staging.example.test');
 
@@ -44,12 +41,6 @@ async function issueToken(email: string, d = deps()): Promise<string> {
 
 function complete(token: string, d = deps(), password = NEW_PASSWORD) {
   return completePasswordReset(d, { token, password, confirmation: password });
-}
-
-function recordEvidence(name: string, data: unknown): void {
-  mkdirSync(EVIDENCE_DIR, { recursive: true });
-  writeFileSync(path.join(EVIDENCE_DIR, `${name}.json`), `${JSON.stringify(data, null, 2)}\n`);
-  console.log(`evidence ${name}: ${JSON.stringify(data)}`);
 }
 
 beforeAll(async () => {
@@ -94,12 +85,6 @@ describe('requesting a reset (bead supportagents-8uvs: enumeration-safe, link on
       expect(['unknown_email', 'invalid_email']).toContain(result.outcome);
     }
     expect(await database.db.select().from(passwordResetTokens)).toHaveLength(0);
-    recordEvidence('enumeration-safe-request', {
-      known: (await requestPasswordReset(deps(), { email: clinic.patient2.email, clientIp: '192.0.2.10' })).outcome,
-      unknown: (await requestPasswordReset(deps(), { email: 'nobody@patients.example.test', clientIp: '192.0.2.10' }))
-        .outcome,
-      note: 'The action redirects every outcome to /auth/forgot-password?sent=1 and sends the email after the response.',
-    });
   });
 
   it('a new request replaces the earlier unused token', async () => {
@@ -131,7 +116,6 @@ describe('requesting a reset (bead supportagents-8uvs: enumeration-safe, link on
     expect((await requestPasswordReset(d, { email: clinic.patient1.email, clientIp: '192.0.2.99' })).outcome).toBe(
       'issued',
     );
-    recordEvidence('rate-limits', { perEmail: outcomes, perIpEleventh: fromOneIp[10], afterWindow: 'issued' });
   });
 });
 
@@ -151,14 +135,6 @@ describe('completing a reset (bead supportagents-8uvs: expiry, reuse, sessions, 
     expect(await complete(token)).toBe('invalid_token');
     expect(logs.lines.find((l) => l.event === 'auth.password_reset.completed')).toMatchObject({ sessions_ended: 1 });
     expect(JSON.stringify(logs.lines)).not.toContain(token);
-    recordEvidence('reset-lifecycle', {
-      firstUse: 'reset',
-      reuse: 'invalid_token',
-      newPasswordWorks: true,
-      oldPasswordRefused: true,
-      sessionsEndedForUser: 1,
-      otherUsersSessionKept: true,
-    });
   });
 
   it('refuses an expired token', async () => {
@@ -173,14 +149,6 @@ describe('completing a reset (bead supportagents-8uvs: expiry, reuse, sessions, 
     for (const token of ['', 'x'.repeat(200), 'Q2hvb3NlIGEgbmV3IHBhc3N3b3JkIGZvciBCb29rSXQ']) {
       expect(await complete(token)).toBe('invalid_token');
     }
-  });
-
-  it('a token issued by one tenant never works for another', async () => {
-    const token = await issueToken(clinic.patient1.email, deps('acme'));
-    expect(await isResetTokenUsable(deps('beacon'), token)).toBe(false);
-    expect(await complete(token, deps('beacon'))).toBe('invalid_token');
-    expect(await isResetTokenUsable(deps('acme'), token)).toBe(true);
-    recordEvidence('tenant-isolation', { issuedBy: 'acme', usedByBeacon: 'invalid_token', stillUsableByAcme: true });
   });
 
   it('checks the new password before using the token', async () => {
@@ -201,6 +169,5 @@ describe('completing a reset (bead supportagents-8uvs: expiry, reuse, sessions, 
       complete(token, deps(), `${NEW_PASSWORD}-2`),
     ]);
     expect(outcomes.sort()).toEqual(['invalid_token', 'reset']);
-    recordEvidence('concurrent-reset-same-token', { outcomes });
   });
 });

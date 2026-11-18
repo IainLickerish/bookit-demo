@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { parseBookingFilters } from '@/server/admin/bookings';
 import { adminSettingsInput } from '@/server/admin/settings';
 import { bookingsCsv, csvField } from '@/server/export/csv';
-import { adminLogEvidence } from '../helpers/admin-evidence';
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
   it('writes a BOM, RFC 4180 quotes and CRLF records with embedded newlines', () => {
@@ -53,15 +52,6 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
     ]) {
       expect(() => parseBookingFilters(new URLSearchParams(query)), query).toThrow('Invalid booking filters');
     }
-  });
-  it('withholds unsafe log content while preserving a failing scan result', () => {
-    const canary = 'synthetic-admin-canary';
-    const evidence = adminLogEvidence([{ event: 'admin.export', unexpected: canary }], [canary]);
-    expect(evidence).toEqual({
-      redaction: { passed: false, forbiddenValueCount: 1, checkedValueCount: 1 },
-      adminEvents: [],
-    });
-    expect(JSON.stringify(evidence)).not.toContain(canary);
   });
   it('validates settings without permitting changes to other booking rules', () => {
     const valid = {

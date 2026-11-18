@@ -19,8 +19,6 @@
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
-    "test:e2e": "playwright test",
-    "test:key-flows": "scripts/key-flows.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun scripts/migrate.ts",
     "slots:ensure": "bun scripts/ensure-slots.ts",

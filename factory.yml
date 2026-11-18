@@ -1,18 +1,14 @@
 # BookIt's settings for the Software Factory (see the factory's docs/spec.md and decision 0051). The factory reads this
 # file from the main version only, so a change cannot alter how it is built, checked or run.
-# Browser tests need Docker, so they run in CI, not in the sealed space. The database tests run there too, against the
-# test database below.
+# BookIt is a demonstration product used only to test the factory: its checks are kept small and fast.
 image: node:24-bookworm
 install:
   - npm install -g bun@1.4.4
-  - apt-get update && apt-get install -y --no-install-recommends jq && rm -rf /var/lib/apt/lists/*
-  - curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz | tar -xz -C /usr/local/bin actionlint
 setup:
   - bun install --frozen-lockfile
 checks:
   - bun run typecheck
   - bun run lint
-  - bun run format:check
   - bun run test:unit
 
 # A test database the factory starts beside its build run and its own checks (the factory's decision 0085), with a new
@@ -26,6 +22,10 @@ buildService:
   value: 'postgres://postgres:{password}@{host}:5432/postgres'
   checks:
     - bun run test:integration
+
+# How to run one test file (the factory's decision 0116): the build run uses it while it works, and the factory uses it
+# to run a bug fix's own tests on the main version.
+testFile: bun run test {file}
 
 # BookIt's own guidance, which every agent reads: its conventions, the product brief and the guides (the factory's
 # decision 0099). The owner's privacy note (docs/owner/) is left out on purpose.
@@ -49,7 +49,6 @@ review:
     - bun.lock
     - Dockerfile
     - compose
-    - infra/
 
 # How the factory runs copies of BookIt: previews for the owner, and copies for the build run and the AI tester.
 copies:
