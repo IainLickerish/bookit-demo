@@ -3,7 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { clinicSettingsInput } from '../settings';
 
-export const tenantName = z.enum(['acme', 'beacon']);
+export const tenantName = z.enum(['acme']);
 export type TenantName = z.infer<typeof tenantName>;
 const text = z.string().min(1).max(300);
 const fictionalEmail = z.email().refine((value) => value.endsWith('.test'));
@@ -21,9 +21,9 @@ export const tenantSchema = z
   .strictObject({
     version: z.literal(1),
     tenant: tenantName,
-    product: z.enum(['ACME', 'BEACON']),
-    client: z.enum(['ACMEPHYSIO', 'BEACONDENTAL']),
-    domain: z.enum(['acmephysio.test', 'beacondental.test']),
+    product: z.enum(['ACME']),
+    client: z.enum(['ACMEPHYSIO']),
+    domain: z.enum(['acmephysio.test']),
     allowedSenderDomains: z.array(text).length(1),
     mailFrom: fictionalEmail,
     branding: z.strictObject({ practitionerLabel: text, welcome: text }),
@@ -49,8 +49,8 @@ export const tenantSchema = z
       .max(5),
   })
   .superRefine((tenant, ctx) => {
-    const domain = tenant.tenant === 'acme' ? 'acmephysio.test' : 'beacondental.test';
-    const client = tenant.tenant === 'acme' ? 'ACMEPHYSIO' : 'BEACONDENTAL';
+    const domain = 'acmephysio.test';
+    const client = 'ACMEPHYSIO';
     const invalid =
       tenant.domain !== domain ||
       tenant.client !== client ||

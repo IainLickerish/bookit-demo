@@ -22,7 +22,7 @@ try {
   );
 } catch {
   console.error(
-    'Credential creation refused. Select acme or beacon and a fresh private directory; existing files are never replaced.',
+    'Credential creation refused. Select acme and a fresh private directory; existing files are never replaced.',
   );
   process.exitCode = 1;
 }

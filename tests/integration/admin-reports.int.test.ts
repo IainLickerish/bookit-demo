@@ -1,7 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { users } from '@/db/schema';
 import { createSession } from '@/server/auth/session';
 import { adminReportResponse } from '@/server/admin/http';
@@ -9,66 +7,28 @@ import { updateAdminSettings } from '@/server/admin/settings';
 import { loadClinicSettings } from '@/server/settings';
 import { createUser } from '@/server/users';
 import { seedAdminBookings, ADMIN_PATIENT_NAMES } from '../helpers/admin-fixture';
-import { adminEvidenceContext, adminLogEvidence } from '../helpers/admin-evidence';
 import { seedClinic, TEST_PASSWORD, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { captureLogs } from '../helpers/logs';
 
 let acme: TestDatabase;
-let beacon: TestDatabase;
 let clinic: SeededClinic;
 let adminToken: string;
 let patientToken: string;
 let fixture: Awaited<ReturnType<typeof seedAdminBookings>>;
 const clock = manualClock('2026-10-20T07:00:00Z');
 const logs = captureLogs(clock, 'acme');
-const observed: object[] = [];
-const evidenceDirectory = `test-results/m0-24b/integration-${randomUUID()}`;
 
 beforeAll(async () => {
   acme = await startTestDatabase();
-  beacon = await startTestDatabase();
   clinic = await seedClinic(acme.db, clock, { settings: { slotHorizonDays: 7 } });
-  await seedClinic(beacon.db, clock, { settings: { clinicName: 'Beacon Dental', slotHorizonDays: 7 } });
   fixture = await seedAdminBookings(acme.db, clock);
   adminToken = (await createSession(acme.db, clock, clinic.admin.id)).token;
   patientToken = (await createSession(acme.db, clock, clinic.patient1.id)).token;
-  await mkdir(evidenceDirectory, { recursive: true });
-});
-afterEach((context) => {
-  observed.push({ test: context.task.name, expected: 'pass', state: context.task.result?.state ?? 'pending' });
 });
 afterAll(async () => {
-  try {
-    await mkdir(evidenceDirectory, { recursive: true });
-    const safeLogs = adminLogEvidence(logs.lines, [
-      TEST_PASSWORD,
-      adminToken ?? '',
-      patientToken ?? '',
-      ...ADMIN_PATIENT_NAMES,
-    ]);
-    await writeFile(
-      `${evidenceDirectory}/evidence.json`,
-      JSON.stringify(
-        {
-          ...adminEvidenceContext(),
-          ...safeLogs,
-          observed,
-          isolation: 'Separate disposable Postgres databases; foreign session and tenant selector refused',
-        },
-        null,
-        2,
-      ),
-    );
-    expect(safeLogs.redaction.passed, 'retained evidence must contain no credential canary or patient name').toBe(true);
-  } finally {
-    const stopped = await Promise.allSettled([acme?.stop(), beacon?.stop()]);
-    expect(
-      stopped.every((result) => result.status === 'fulfilled'),
-      'both disposable databases stop',
-    ).toBe(true);
-  }
+  await acme?.stop();
 });
 
 function report(query = '', token: string | undefined = adminToken, format: 'csv' | 'report' = 'csv') {
@@ -86,7 +46,6 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     expect([...bytes.subarray(0, 3)]).toEqual([239, 187, 191]);
     for (const name of ADMIN_PATIENT_NAMES.slice(0, 3)) expect(bytes.toString('utf8')).toContain(name);
     expect(bytes.toString('utf8')).toContain('"Ada, ""Clinic""\nTest"');
-    await writeFile(`${evidenceDirectory}/fictional-bookings.csv`, bytes);
     expect(logs.lines).toContainEqual(expect.objectContaining({ event: 'admin.export', tenant: 'acme', row_count: 4 }));
     const text = JSON.stringify(logs.lines);
     for (const value of [...ADMIN_PATIENT_NAMES, TEST_PASSWORD, adminToken, patientToken])
@@ -127,15 +86,8 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     await acme.db.update(users).set({ role: 'patient' }).where(eq(users.id, user.id));
     expect((await report('', token)).status).toBe(403);
   });
-  it('never authorises an Acme session against Beacon or accepts request tenant selectors', async () => {
-    const foreign = await adminReportResponse(
-      { db: beacon.db, clock, log: captureLogs(clock, 'beacon').log },
-      adminToken,
-      new URLSearchParams(),
-      'csv',
-    );
-    expect(foreign.status).toBe(401);
-    for (const query of ['tenant=beacon', 'product=BEACON', 'date=2026-02-30', 'date=2026-10-25&date=2026-10-26']) {
+  it('refuses request clinic selectors and malformed dates', async () => {
+    for (const query of ['tenant=other', 'product=OTHER', 'date=2026-02-30', 'date=2026-10-25&date=2026-10-26']) {
       expect((await report(query)).status).toBe(400);
     }
   });

@@ -6,8 +6,8 @@ review can name it.
 
 ## What it is
 
-A booking service for two made-up clinics, Acme Physio and Beacon Dental. It works when clients can manage routine
-appointments themselves and staff can rely on the clinic's diary, so reception has less to do.
+A booking service for a made-up clinic, Acme Physio, used only to test the Software Factory. It works when clients
+can manage routine sessions themselves and staff can rely on the clinic's diary, so reception has less to do.
 
 - **PR-1** Keep changes about arranging appointments and keeping the clinic's diary accurate.
 
