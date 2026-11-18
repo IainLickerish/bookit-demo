@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
+import { rescheduleBookingPath } from '@/lib/routes';
 import { formatSlot, localDateOf } from '@/lib/time';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
@@ -37,7 +38,7 @@ export default async function ReschedulePage({
   const remaining = Math.max(0, view.settings.maxReschedulesPerBooking - booking.rescheduleCount);
   const changeable = booking.status === 'confirmed' && booking.startsAt > clock.now();
   const choices = view.slots.filter((s) => s.id !== booking.slotId);
-  const path = `/bookings/${booking.id}/reschedule`;
+  const path = rescheduleBookingPath(booking.id);
 
   return (
     <section>

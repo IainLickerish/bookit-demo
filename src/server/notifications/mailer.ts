@@ -5,6 +5,7 @@ export interface OutgoingEmail {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 }
 
 export interface SentEmail {
@@ -43,8 +44,18 @@ export const disabledMailer: Mailer = {
 };
 
 /** Sends through an SMTP server such as Mailpit (`smtp://mailpit:1025`). */
-export function createSmtpMailer(url: string): Mailer {
-  const transport = nodemailer.createTransport(url);
+export function createSmtpMailer(url: string, timeoutMs?: number): Mailer {
+  const transport = nodemailer.createTransport(
+    timeoutMs === undefined
+      ? url
+      : {
+          url,
+          dnsTimeout: timeoutMs,
+          connectionTimeout: timeoutMs,
+          greetingTimeout: timeoutMs,
+          socketTimeout: timeoutMs,
+        },
+  );
   return {
     kind: 'smtp',
     async send(email) {

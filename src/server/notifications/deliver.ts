@@ -1,6 +1,8 @@
 import { emailHash, type Logger } from '@/lib/logger';
 import { reportError } from '../error-reporting';
-import type { Mailer, OutgoingEmail } from './mailer';
+import { getMailer, type Mailer, type OutgoingEmail } from './mailer';
+
+const DEFAULT_MAIL_FROM = 'noreply@bookit.test';
 
 export interface MailSettings {
   mailer: Mailer;
@@ -8,7 +10,11 @@ export interface MailSettings {
   from: string;
 }
 
-export type EmailKind = 'confirmation' | 'password_reset';
+export function mailSettings(mailer: Mailer = getMailer()): MailSettings {
+  return { mailer, from: (process.env.BOOKIT_MAIL_FROM ?? '').trim() || DEFAULT_MAIL_FROM };
+}
+
+export type EmailKind = 'confirmation' | 'password_reset' | 'reminder';
 
 /**
  * Sends one email and logs `email.<kind>.sent` or `email.<kind>.failed` with
@@ -36,7 +42,9 @@ export async function deliverEmail(
       { event: `email.${kind}.failed`, ...fields, error_name: error instanceof Error ? error.name : 'unknown' },
       'Email failed',
     );
-    reportError(error, { operation: `${kind}_email` });
+    // An SMTP refusal can include the recipient's address in its message.
+    const reported = kind === 'reminder' ? new Error('Reminder email delivery failed.') : error;
+    reportError(reported, { operation: `${kind}_email` });
     return false;
   }
 }

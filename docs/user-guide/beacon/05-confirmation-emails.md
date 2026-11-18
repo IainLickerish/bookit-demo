@@ -15,3 +15,9 @@ This is a fictional demonstration: messages go to the local Mailpit inbox rather
 than a real mail service. If a message is missing, check **My bookings** at
 `/bookings` for the current appointment. For help, ask Bella Byrne at
 `bella@beacondental.test`.
+
+## Reminder emails
+
+If your clinic has turned on reminders, look for an email about 24 hours before
+your appointment. It shows when you are booked and who you will see. Follow a link
+in the email and sign in to reschedule or to find the booking and cancel it.
