@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { formatSlot } from '../src/lib/time';
 import {
   ADMIN,
   PATIENT_1,
@@ -35,7 +36,7 @@ test('Staff at both clinics download filtered bookings with accented client name
     const context = await browser.newContext({ baseURL: clinic.url });
     try {
       const page = await context.newPage();
-      const { bookingId, confirmedWhen, cancelledWhen } = await step(
+      const { bookingId, confirmedWhen, cancelledId, cancelledWhen } = await step(
         page,
         `Make a confirmed booking and a cancelled booking at ${clinic.name}`,
         async () => {
@@ -49,16 +50,19 @@ test('Staff at both clinics download filtered bookings with accented client name
 
           const toCancel = await pickFreeSlot(page, date, clinic.practitioner);
           const cancelledWhen = await bookSlot(page, toCancel.id);
-          await bookingRow(page, 'upcoming-bookings', cancelledWhen).getByTestId('cancel-booking').click();
+          const cancelledRow = bookingRow(page, 'upcoming-bookings', cancelledWhen);
+          const cancelledId = await cancelledRow.getAttribute('data-booking-id');
+          expect(cancelledId).toBeTruthy();
+          await cancelledRow.getByTestId('cancel-booking').click();
           await expect(bookingRow(page, 'other-bookings', cancelledWhen).getByTestId('booking-status')).toHaveText(
             'Cancelled',
           );
-          return { bookingId, confirmedWhen, cancelledWhen };
+          return { bookingId, confirmedWhen, cancelledId, cancelledWhen };
         },
       );
       await page.getByTestId('sign-out').click();
       await expect(page).toHaveURL(/\/auth\/sign-in$/);
-      await step(page, `Sign in at ${clinic.name} and filter to the confirmed booking`, async () => {
+      const listed = await step(page, `Sign in at ${clinic.name} and filter to confirmed bookings`, async () => {
         await signIn(page, clinic.admin);
         await expect(page.getByTestId('clinic-name')).toHaveText(clinic.name);
         await page.getByTestId('nav-admin').click();
@@ -66,18 +70,20 @@ test('Staff at both clinics download filtered bookings with accented client name
         await page.getByTestId('admin-filter').click();
         await expect(page).toHaveURL((url) => url.searchParams.get('date') === date);
         const rows = page.getByTestId('admin-booking-row');
-        const cancelled = rows.filter({ hasText: cancelledWhen });
-        await expect(cancelled).toContainText('Cancelled');
+        const cancelled = rows.filter({ hasText: cancelledWhen }).getByRole('cell', { name: 'Cancelled', exact: true });
+        await expect(cancelled.first()).toBeVisible();
 
         await page.getByTestId('admin-status').selectOption('confirmed');
         await page.getByTestId('admin-filter').click();
         await expect(page).toHaveURL(
           (url) => url.searchParams.get('date') === date && url.searchParams.get('status') === 'confirmed',
         );
-        await expect(rows).toHaveCount(1);
-        await expect(rows.getByRole('cell', { name: clinic.client, exact: true })).toBeVisible();
-        await expect(rows).toContainText(confirmedWhen);
-        await expect(rows).toContainText('Confirmed');
+        const confirmed = rows.filter({ hasText: confirmedWhen });
+        await expect(confirmed.getByRole('cell', { name: clinic.client, exact: true })).toBeVisible();
+        await expect(rows.getByRole('cell', { name: 'Cancelled', exact: true })).toHaveCount(0);
+        return rows.evaluateAll((bookings) =>
+          bookings.map((row) => Array.from(row.querySelectorAll('td'), (cell) => cell.textContent?.trim())),
+        );
       });
 
       await step(
@@ -91,10 +97,20 @@ test('Staff at both clinics download filtered bookings with accented client name
           expect(download.suggestedFilename()).toBe('bookings.csv');
           const csv = await readFile(await download.path(), 'utf8');
           const records = csv.split('\r\n');
-          expect(records).toHaveLength(3);
-          expect(records[1]).toContain(`"${bookingId}","${clinic.client}","${clinic.practitioner}",`);
-          expect(records[1]).toContain(',"confirmed","no",');
-          expect(records[2]).toBe('');
+          expect(records.at(-1)).toBe('');
+          const bookings = records.slice(1, -1).map((record) => {
+            const [id, patient, practitioner, startsAt, , status] = record.slice(1, -1).split('","');
+            return { id, patient, practitioner, startsAt, status };
+          });
+          expect(bookings).toContainEqual(expect.objectContaining({ id: bookingId, patient: clinic.client }));
+          expect(bookings).not.toContainEqual(expect.objectContaining({ id: cancelledId }));
+          const exported = bookings.map(({ patient, practitioner, startsAt, status }) => [
+            patient,
+            practitioner,
+            formatSlot(new Date(startsAt ?? ''), 'Europe/London'),
+            status === 'confirmed' ? 'Confirmed' : status,
+          ]);
+          expect(exported).toEqual(listed);
         },
       );
     } finally {
