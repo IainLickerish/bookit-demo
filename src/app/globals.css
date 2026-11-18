@@ -140,7 +140,7 @@
     @apply border-b border-line bg-white;
   }
   .site-header-inner {
-    @apply mx-auto flex max-w-[720px] flex-wrap items-center justify-between gap-x-8 gap-y-2 px-5 py-3 sm:px-8;
+    @apply mx-auto flex max-w-[720px] flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-3 sm:px-8;
   }
   .site-header-inner-staff {
     @apply max-w-[1120px];
@@ -151,12 +151,12 @@
     overflow-wrap: anywhere;
   }
   .main-nav {
-    @apply flex flex-wrap items-center gap-x-4 gap-y-1 font-medium;
+    @apply flex flex-wrap items-center gap-x-3 gap-y-1 font-medium;
     font-size: 0.9375rem;
   }
   .main-nav a,
   .main-nav button {
-    @apply inline-flex min-h-11 items-center text-pine;
+    @apply inline-flex min-h-11 min-w-11 items-center text-pine;
   }
   .page-shell {
     @apply mx-auto max-w-[720px] px-5 py-8 sm:px-8 sm:py-12;
@@ -171,9 +171,15 @@
     @apply mb-4 block size-1.5 rounded-full bg-clay;
     content: '';
   }
-  .card {
-    @apply rounded-[20px] border border-line bg-white p-6;
+  .card,
+  .empty-state,
+  .table-card {
+    @apply rounded-[20px] border border-line bg-white;
     box-shadow: 0 4px 20px #16241f08;
+  }
+  .card,
+  .empty-state {
+    @apply p-6;
   }
   .account-card {
     @apply mx-auto max-w-[440px];
@@ -286,11 +292,10 @@
     font-variant-numeric: tabular-nums;
   }
   .empty-state {
-    @apply rounded-[20px] border border-line bg-white p-6 text-muted;
+    @apply text-muted;
   }
   .table-card {
-    @apply overflow-hidden rounded-[20px] border border-line bg-white;
-    box-shadow: 0 4px 20px #16241f08;
+    @apply overflow-hidden;
   }
   .table-scroll {
     @apply overflow-x-auto;

@@ -63,6 +63,8 @@ test('booking and moving retain their actions inside the new phone layout', asyn
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, state().patient1);
   await pageDesign(page, 'My bookings');
+  await cardDesign(page, 'no-upcoming');
+  expect((await page.getByTestId('nav-book').boundingBox())!.width).toBeGreaterThanOrEqual(44);
   await expect(page.getByTestId('upcoming-title')).toHaveCSS('font-family', /Fraunces/);
   await page.getByTestId('nav-book').click();
   await page.getByTestId('date-input').fill('2026-10-22');
