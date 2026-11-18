@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { requireAdmin } from '@/server/admin/context';
 import { loadClinicSettings } from '@/server/settings';
+import { PageHeader } from '../../page-header';
 import type { SearchParams } from '../../messages';
 import { saveSettingsAction } from './actions';
 
@@ -9,8 +10,8 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
   await requireAdmin();
   const [settings, params] = await Promise.all([loadClinicSettings(getDatabase()), searchParams]);
   return (
-    <section>
-      <h1>Clinic settings</h1>
+    <section className="staff-page">
+      <PageHeader>Clinic settings</PageHeader>
       <p>
         <Link href="/admin" prefetch={false} className="underline">
           Back to bookings
@@ -28,7 +29,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             : 'Settings could not be saved. Please try again.'}
         </p>
       ) : null}
-      <form action={saveSettingsAction} className="mt-6 space-y-4">
+      <form action={saveSettingsAction} className="card settings-form">
         <label>
           Clinic name
           <input

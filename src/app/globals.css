@@ -1,32 +1,319 @@
 @import 'tailwindcss';
 
+@font-face {
+  font-family: Figtree;
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('/fonts/figtree-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Figtree;
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('/fonts/figtree-latin-wght-normal.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Fraunces;
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Fraunces;
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-wght-normal.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  --color-ivory: #faf8f4;
+  --color-ink: #16241f;
+  --color-muted: #5a6862;
+  --color-line: #e6e1d8;
+  --color-field: #8c9792;
+  --color-stone: #f1eee8;
+  --color-pine: #1d5c4b;
+  --color-pine-hover: #164a3c;
+  --color-sage: #e9f1ec;
+  --color-clay: #b9603f;
+  --color-brick: #a8261b;
+  --color-brick-tint: #fcebe8;
+  --font-sans: Figtree, sans-serif;
+  --font-display: Fraunces, Georgia, serif;
+  --text-sm: 0.8125rem;
+}
+
 @layer base {
+  body {
+    @apply min-h-screen bg-ivory font-sans text-base text-ink;
+    line-height: 1.6;
+  }
+  h1,
+  h2 {
+    @apply font-display font-medium;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
   h1 {
-    @apply mb-4 text-2xl font-semibold;
+    font-size: 1.75rem;
   }
   h2 {
-    @apply mt-6 mb-2 text-lg font-semibold;
+    @apply mt-8 mb-4;
+    font-size: 1.375rem;
   }
-  label {
-    @apply block text-sm font-medium;
+  a {
+    @apply text-pine underline-offset-4;
   }
+  a:hover {
+    text-decoration: underline;
+  }
+  button,
   input,
   select {
-    @apply mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2;
+    font: inherit;
+  }
+  button {
+    cursor: pointer;
+  }
+  label {
+    @apply block font-medium;
+    font-size: 0.9375rem;
+  }
+  input:not([type='hidden'], [type='checkbox']),
+  select {
+    @apply mt-2 block min-h-12 w-full min-w-0 rounded-xl border border-field bg-white px-3 py-2 text-ink;
+    font-size: 1rem;
+  }
+  input[type='checkbox'] {
+    @apply size-5 shrink-0 accent-pine;
+  }
+  label:has(input[type='checkbox']) {
+    @apply min-h-12;
+  }
+  input[aria-invalid='true'],
+  select[aria-invalid='true'] {
+    @apply border-brick;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: 4px;
+  }
+  th,
+  td {
+    @apply px-4 py-4 align-top;
+  }
+  th {
+    @apply bg-stone font-medium text-muted;
+  }
+  tbody tr {
+    @apply border-t border-line;
+  }
+  @media (min-width: 640px) {
+    h1 {
+      font-size: 2rem;
+    }
   }
 }
 
 @layer components {
+  .site-header {
+    @apply border-b border-line bg-white;
+  }
+  .site-header-inner {
+    @apply mx-auto flex max-w-[720px] flex-wrap items-center justify-between gap-x-8 gap-y-2 px-5 py-3 sm:px-8;
+  }
+  .site-header-inner-staff {
+    @apply max-w-[1120px];
+  }
+  .clinic-name {
+    @apply min-w-0 font-display text-[22px] font-medium text-ink;
+    letter-spacing: -0.025em;
+    overflow-wrap: anywhere;
+  }
+  .main-nav {
+    @apply flex flex-wrap items-center gap-x-4 gap-y-1 font-medium;
+    font-size: 0.9375rem;
+  }
+  .main-nav a,
+  .main-nav button {
+    @apply inline-flex min-h-11 items-center;
+  }
+  .page-shell {
+    @apply mx-auto max-w-[720px] px-5 py-8 sm:px-8 sm:py-12;
+  }
+  .page-shell:has(.staff-page) {
+    @apply max-w-[1120px];
+  }
+  .page-header {
+    @apply mb-8;
+  }
+  .page-header::before {
+    @apply mb-4 block size-1.5 rounded-full bg-clay;
+    content: '';
+  }
+  .card {
+    @apply rounded-[20px] border border-line bg-white p-6;
+    box-shadow: 0 4px 20px #16241f08;
+  }
+  .account-card {
+    @apply mx-auto max-w-[440px];
+  }
+  .button,
+  .button-secondary {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-5 py-3 text-center font-medium;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    transition:
+      background-color 150ms ease-out,
+      border-color 150ms ease-out;
+  }
   .button {
-    @apply inline-block rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800;
+    @apply border border-pine bg-pine text-white hover:border-pine-hover hover:bg-pine-hover;
   }
   .button-secondary {
-    @apply inline-block rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100;
+    @apply border border-field bg-white text-pine hover:border-pine hover:bg-stone;
+  }
+  .button:hover,
+  .button-secondary:hover {
+    text-decoration: none;
+  }
+  .account-card form > .button {
+    @apply w-full;
+  }
+  .notice,
+  .alert {
+    @apply relative mb-6 rounded-xl border p-4 pl-12;
   }
   .notice {
-    @apply mb-4 rounded border border-teal-200 bg-teal-50 px-4 py-3 text-sm;
+    @apply border-sage bg-sage text-pine;
   }
   .alert {
-    @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
+    @apply border-brick-tint bg-brick-tint text-brick;
+  }
+  .notice::before,
+  .alert::before {
+    @apply absolute top-5 left-4 block size-5;
+    content: '';
+    background-color: currentColor;
+    mask: url('/icons/check-circle.svg') center / contain no-repeat;
+  }
+  .alert::before {
+    mask-image: url('/icons/alert-circle.svg');
+  }
+  .day-picker {
+    @apply mb-8 space-y-6;
+  }
+  .day-navigation {
+    @apply flex flex-wrap items-center justify-between gap-2;
+    font-size: 0.9375rem;
+  }
+  .day-navigation a {
+    @apply inline-flex min-h-11 items-center;
+  }
+  .shown-date {
+    @apply order-first w-full rounded-xl border border-pine bg-stone px-3 py-3 text-center font-medium sm:order-none sm:w-auto;
+    font-variant-numeric: tabular-nums;
+  }
+  .slot-grid {
+    @apply grid gap-3 sm:grid-cols-2;
+  }
+  .slot-time {
+    @apply w-full;
+    font-variant-numeric: tabular-nums;
+  }
+  .booking-card {
+    @apply grid grid-cols-[56px_1fr] items-start gap-4;
+  }
+  .booking-date {
+    @apply flex min-h-16 flex-col items-center justify-center rounded-xl bg-sage text-pine;
+    font-variant-numeric: tabular-nums;
+  }
+  .booking-date-day {
+    @apply text-2xl font-semibold leading-tight;
+  }
+  .booking-date-month {
+    @apply text-sm font-medium;
+  }
+  .booking-when {
+    @apply text-lg font-semibold;
+    font-variant-numeric: tabular-nums;
+  }
+  .booking-details {
+    @apply min-w-0;
+  }
+  .booking-status {
+    @apply mt-2 inline-flex rounded-full bg-sage px-3 py-1 text-sm font-medium text-pine;
+  }
+  .booking-status[data-status='cancelled'] {
+    @apply bg-stone text-muted;
+  }
+  .booking-actions {
+    @apply col-span-2 flex flex-wrap justify-end gap-2 border-t border-line pt-4;
+  }
+  .booking-summary {
+    @apply mb-6 space-y-4 border-b border-line pb-6;
+    font-variant-numeric: tabular-nums;
+  }
+  .empty-state {
+    @apply rounded-[20px] border border-line bg-white p-6 text-muted;
+  }
+  .table-card {
+    @apply overflow-hidden rounded-[20px] border border-line bg-white;
+    box-shadow: 0 4px 20px #16241f08;
+  }
+  .table-scroll {
+    @apply overflow-x-auto;
+  }
+  .bookings-table {
+    @apply w-full text-left;
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .bookings-table td:nth-child(3) {
+    @apply whitespace-nowrap;
+  }
+  .bookings-table .booking-status {
+    @apply mt-0 whitespace-nowrap;
+  }
+  .settings-form {
+    @apply mt-8 max-w-[720px] space-y-4;
+  }
+  @media (max-width: 639px) {
+    .booking-confirmation {
+      padding-bottom: calc(112px + env(safe-area-inset-bottom));
+    }
+    .booking-action-bar {
+      @apply fixed right-0 bottom-0 left-0 z-10 border-t border-line bg-white px-5 pt-4;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+    .booking-action-bar .button {
+      @apply w-full;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .button,
+    .button-secondary {
+      transition: none;
+    }
   }
 }

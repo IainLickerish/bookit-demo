@@ -5,6 +5,7 @@ import { formatSlot } from '@/lib/time';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { findBookableSlot, isSlotFree } from '@/server/slots/queries';
+import { PageHeader } from '../../page-header';
 import { bookAction } from '../../bookings/actions';
 import { errorText, single, type SearchParams } from '../../messages';
 
@@ -25,14 +26,14 @@ export default async function BookSlotPage({
   }
   const free = await isSlotFree(db, slot.id);
   return (
-    <section className="max-w-md">
-      <h1>Confirm your booking</h1>
+    <section className="card account-card booking-confirmation">
+      <PageHeader>Confirm your booking</PageHeader>
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
         </p>
       ) : null}
-      <dl className="mb-6 space-y-1">
+      <dl className="booking-summary">
         <div>
           <dt className="inline font-medium">With: </dt>
           <dd className="inline" data-testid="book-practitioner">
@@ -59,9 +60,11 @@ export default async function BookSlotPage({
               data-testid="book-phone"
             />
           </label>
-          <button type="submit" className="button" data-testid="confirm-booking">
-            Confirm booking
-          </button>
+          <div className="booking-action-bar">
+            <button type="submit" className="button" data-testid="confirm-booking">
+              Confirm booking
+            </button>
+          </div>
         </form>
       ) : (
         <p className="alert" data-testid="slot-taken">

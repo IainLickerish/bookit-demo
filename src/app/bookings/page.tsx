@@ -5,6 +5,8 @@ import { formatSlot } from '@/lib/time';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
+import { PageHeader } from '../page-header';
+import { BookingDate } from '../booking-date';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
 
@@ -29,21 +31,25 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+      className="card booking-card"
       data-testid="booking-row"
       data-booking-id={booking.id}
       data-status={booking.status}
     >
-      <div>
-        <p className="font-medium" data-testid="booking-when">
+      <BookingDate when={booking.startsAt} timeZone={settings.timeZone} />
+      <div className="booking-details">
+        <p className="booking-when" data-testid="booking-when">
           {formatSlot(booking.startsAt, settings.timeZone)}
         </p>
-        <p className="text-sm text-slate-600">
-          With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
+        <p className="text-muted">
+          With {booking.practitionerName} ·{' '}
+          <span className="booking-status" data-status={booking.status} data-testid="booking-status">
+            {statusText(booking)}
+          </span>
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="booking-actions">
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -65,7 +71,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
 
   return (
     <section>
-      <h1>My bookings</h1>
+      <PageHeader>My bookings</PageHeader>
       {notice ? (
         <p role="status" className="notice" data-testid="notice">
           {notice}
@@ -78,7 +84,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       ) : null}
       <h2>Upcoming</h2>
       {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">
+        <p className="empty-state" data-testid="no-upcoming">
           You have no upcoming appointments.{' '}
           <Link href="/slots" prefetch={false} className="underline">
             Book one
@@ -86,14 +92,14 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           .
         </p>
       ) : (
-        <ul className="space-y-2" data-testid="upcoming-bookings">
+        <ul className="space-y-4" data-testid="upcoming-bookings">
           {upcoming.map((b) => row(b, true))}
         </ul>
       )}
       {others.length > 0 ? (
         <>
           <h2>Past and cancelled</h2>
-          <ul className="space-y-2" data-testid="other-bookings">
+          <ul className="space-y-4" data-testid="other-bookings">
             {others.map((b) => row(b, false))}
           </ul>
         </>

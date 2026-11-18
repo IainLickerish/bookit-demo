@@ -7,6 +7,7 @@ import { findBookingForPatient } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
+import { PageHeader } from '../../../page-header';
 import { DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
 import { rescheduleAction } from '../../actions';
@@ -40,7 +41,7 @@ export default async function ReschedulePage({
 
   return (
     <section>
-      <h1>Reschedule your appointment</h1>
+      <PageHeader>Reschedule your appointment</PageHeader>
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
@@ -63,14 +64,16 @@ export default async function ReschedulePage({
         </p>
       ) : (
         <>
-          <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
+          <p className="mb-6 text-sm text-muted" data-testid="reschedules-remaining">
             You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
           </p>
           <DayPicker view={view} path={path} />
           {choices.length === 0 ? (
-            <p data-testid="no-slots">No free times on this day. Try another day.</p>
+            <p className="empty-state" data-testid="no-slots">
+              No free times on this day. Try another day.
+            </p>
           ) : (
-            <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
+            <ul className="slot-grid" data-testid="slot-list">
               {choices.map((slot) => (
                 <li key={slot.id}>
                   <form action={rescheduleAction}>
@@ -78,7 +81,7 @@ export default async function ReschedulePage({
                     <input type="hidden" name="newSlotId" value={slot.id} />
                     <button
                       type="submit"
-                      className="button-secondary w-full"
+                      className="button-secondary slot-time"
                       data-testid="reschedule-to"
                       data-slot-id={slot.id}
                       data-starts-at={slot.startsAt.toISOString()}

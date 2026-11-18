@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import { RESET_TOKEN_TTL_MINUTES } from '@/server/auth/password-reset';
+import { PageHeader } from '../../page-header';
 import { single, type SearchParams } from '../../messages';
 import { requestPasswordResetAction } from '../password-reset-actions';
 
 export default async function ForgotPasswordPage({ searchParams }: { searchParams: SearchParams }) {
   const sent = single((await searchParams).sent) === '1';
   return (
-    <section className="max-w-sm">
-      <h1>Reset your password</h1>
+    <section className="card account-card">
+      <PageHeader>Reset your password</PageHeader>
       {sent ? (
         <p role="status" className="notice" data-testid="forgot-password-sent">
           If an account uses that email address, we have sent it a link to reset the password. The link works for{' '}

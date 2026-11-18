@@ -9,6 +9,7 @@ import {
   type BookingFilters,
 } from '@/server/admin/bookings';
 import { loadClinicSettings } from '@/server/settings';
+import { PageHeader } from '../page-header';
 import type { SearchParams } from '../messages';
 
 export default async function AdminBookingsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -30,14 +31,14 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   const rows = invalid ? [] : await listAdminBookings(db, filters, settings.timeZone);
   const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
   return (
-    <section>
-      <h1>Clinic bookings</h1>
+    <section className="staff-page">
+      <PageHeader>Clinic bookings</PageHeader>
       <p>
         <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
           Clinic settings
         </Link>
       </p>
-      <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
+      <form method="get" action="/admin" className="card my-8 grid gap-4 sm:grid-cols-3">
         <label>
           Practitioner
           <select name="practitionerId" defaultValue={filters.practitionerId ?? ''} data-testid="admin-practitioner">
@@ -78,34 +79,38 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           <a href={`/api/admin/export?${exportQuery}`} className="button-secondary my-3" data-testid="admin-export">
             Export filtered bookings (CSV)
           </a>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Clinic bookings in {settings.timeZone}</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Patient</th>
-                  <th scope="col">Practitioner</th>
-                  <th scope="col">Appointment</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-t" data-testid="admin-booking-row">
-                    <td className="py-3">{row.patientName}</td>
-                    <td>{row.practitionerName}</td>
-                    <td>{formatSlot(row.startsAt, settings.timeZone)}</td>
-                    <td>
-                      {row.status === 'confirmed'
-                        ? 'Confirmed'
-                        : row.lateCancellation
-                          ? 'Cancelled (late)'
-                          : 'Cancelled'}
-                    </td>
+          <div className="table-card">
+            <div className="table-scroll" tabIndex={0} data-testid="admin-table-scroll">
+              <table className="bookings-table">
+                <caption className="sr-only">Clinic bookings in {settings.timeZone}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Patient</th>
+                    <th scope="col">Practitioner</th>
+                    <th scope="col">Appointment</th>
+                    <th scope="col">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.id} data-testid="admin-booking-row">
+                      <td>{row.patientName}</td>
+                      <td>{row.practitionerName}</td>
+                      <td>{formatSlot(row.startsAt, settings.timeZone)}</td>
+                      <td>
+                        <span className="booking-status" data-status={row.status}>
+                          {row.status === 'confirmed'
+                            ? 'Confirmed'
+                            : row.lateCancellation
+                              ? 'Cancelled (late)'
+                              : 'Cancelled'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
           {rows.length === 0 ? <p>No bookings match these filters.</p> : null}
         </>

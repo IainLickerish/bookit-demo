@@ -7,6 +7,7 @@ import { runtimeIdentity } from '@/lib/runtime-identity';
 import { isResetTokenUsable } from '@/server/auth/password-reset';
 import { MIN_PASSWORD_LENGTH } from '@/server/auth/password';
 import { requestLogger } from '@/server/request-context';
+import { PageHeader } from '../../../page-header';
 import { single, type SearchParams } from '../../../messages';
 import { completePasswordResetAction } from '../../password-reset-actions';
 
@@ -32,8 +33,8 @@ export default async function ResetPasswordPage({
   );
   if (!usable) {
     return (
-      <section className="max-w-sm">
-        <h1>Reset your password</h1>
+      <section className="card account-card">
+        <PageHeader>Reset your password</PageHeader>
         <p role="alert" className="alert" data-testid="reset-password-invalid">
           This reset link has expired or has already been used.
         </p>
@@ -46,8 +47,8 @@ export default async function ResetPasswordPage({
   const error = single((await searchParams).error);
   const message = error !== undefined && Object.hasOwn(ERRORS, error) ? ERRORS[error] : null;
   return (
-    <section className="max-w-sm">
-      <h1>Choose a new password</h1>
+    <section className="card account-card">
+      <PageHeader>Choose a new password</PageHeader>
       {message ? (
         <p role="alert" className="alert" data-testid="reset-password-error">
           {message}

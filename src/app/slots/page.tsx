@@ -4,6 +4,7 @@ import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
 import { requirePatient } from '@/server/request-context';
 import { loadDayView } from '@/server/slots/day-view';
+import { PageHeader } from '../page-header';
 import { DayPicker } from '../day-picker';
 import { single, type SearchParams } from '../messages';
 
@@ -16,18 +17,20 @@ export default async function SlotsPage({ searchParams }: { searchParams: Search
   });
   return (
     <section>
-      <h1>Book an appointment</h1>
+      <PageHeader>Book an appointment</PageHeader>
       <DayPicker view={view} path="/slots" />
       {view.slots.length === 0 ? (
-        <p data-testid="no-slots">No free times on this day. Try another day.</p>
+        <p className="empty-state" data-testid="no-slots">
+          No free times on this day. Try another day.
+        </p>
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
+        <ul className="slot-grid" data-testid="slot-list">
           {view.slots.map((slot) => (
             <li key={slot.id}>
               <Link
                 href={`/book/${slot.id}`}
                 prefetch={false}
-                className="button-secondary block text-center"
+                className="button-secondary slot-time"
                 data-testid="slot-link"
                 data-slot-id={slot.id}
                 data-starts-at={slot.startsAt.toISOString()}

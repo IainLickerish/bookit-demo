@@ -15,3 +15,8 @@ Times are shown in Europe/London and adjust for the seasonal clock change.
 Need a hand? Contact Bella Byrne, Reception Lead, at `bella@beacondental.test`.
 We can help Monday to Saturday, 08:00 to 18:00, Europe/London. Please sign out
 when you have finished on a shared device.
+
+The clinic name appears at the top of each page. Pages use an ivory background,
+white cards and green buttons, with a short title above the content. On a phone,
+the **Confirm booking** button stays at the bottom of the screen while you check
+your booking. The booking steps and the clinic’s words are unchanged.

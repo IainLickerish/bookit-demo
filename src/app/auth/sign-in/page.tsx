@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { FORGOT_PASSWORD_PATH } from '@/lib/routes';
 import { currentUser } from '@/server/request-context';
+import { PageHeader } from '../../page-header';
 import { single, type SearchParams } from '../../messages';
 import { signIn } from '../actions';
 
@@ -13,8 +14,8 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
   const error = single(query.error);
   const passwordReset = single(query.notice) === 'password_reset';
   return (
-    <section className="max-w-sm">
-      <h1>Sign in</h1>
+    <section className="card account-card">
+      <PageHeader>Sign in</PageHeader>
       {passwordReset ? (
         <p role="status" className="notice" data-testid="sign-in-notice">
           Your password has been changed. Sign in with your new password.
