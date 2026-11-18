@@ -1,3 +1,4 @@
+import { assertSlotNotBlocked } from '../slots/time-blocks';
 import { and, eq } from 'drizzle-orm';
 import { bookings, slots } from '@/db/schema';
 import { isUniqueViolation } from '../errors';
@@ -43,6 +44,7 @@ export async function rescheduleBooking(
     if (!target) {
       throw new BookingError('slot_not_found');
     }
+    await assertSlotNotBlocked(tx, target);
     assertSlotBookable(target.startsAt, now, settings);
     try {
       await tx

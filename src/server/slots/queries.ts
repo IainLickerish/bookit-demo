@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, lte, notExists, sql } from 'drizzle-orm';
 import type { Executor } from '@/db/client';
-import { bookings, practitioners, slots } from '@/db/schema';
+import { bookings, practitioners, slots, timeBlocks } from '@/db/schema';
 import { isUuid } from '../bookings/queries';
 
 export interface SlotView {
@@ -46,6 +46,10 @@ export async function findBookableSlot(db: Executor, slotId: string): Promise<Sl
   return row ?? null;
 }
 
+const noTimeBlock = notExists(
+  sql`(select 1 from ${timeBlocks} where ${timeBlocks.practitionerId} = ${slots.practitionerId} and ${timeBlocks.startsAt} < ${slots.endsAt} and ${timeBlocks.endsAt} > ${slots.startsAt})`,
+);
+
 const noConfirmedBooking = notExists(
   sql`(select 1 from ${bookings} where ${bookings.slotId} = ${slots.id} and ${bookings.status} = 'confirmed')`,
 );
@@ -57,7 +61,7 @@ export async function isSlotFree(db: Executor, slotId: string): Promise<boolean>
   const [row] = await db
     .select({ id: slots.id })
     .from(slots)
-    .where(and(eq(slots.id, slotId), noConfirmedBooking));
+    .where(and(eq(slots.id, slotId), noConfirmedBooking, noTimeBlock));
   return row !== undefined;
 }
 
@@ -85,6 +89,7 @@ export async function listAvailableSlots(db: Executor, query: AvailableSlotsQuer
         gt(slots.startsAt, query.after),
         lte(slots.startsAt, query.until),
         noConfirmedBooking,
+        noTimeBlock,
       ),
     )
     .orderBy(asc(slots.startsAt));

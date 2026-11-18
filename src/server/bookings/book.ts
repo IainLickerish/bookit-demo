@@ -1,3 +1,4 @@
+import { assertSlotNotBlocked } from '../slots/time-blocks';
 import type { Database } from '@/db/client';
 import { bookings } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
@@ -39,6 +40,7 @@ export async function bookSlot(deps: BookingDependencies, request: BookSlotReque
     if (!slot) {
       throw new BookingError('slot_not_found');
     }
+    await assertSlotNotBlocked(tx, slot);
     assertSlotBookable(slot.startsAt, now, settings);
     const id = newId(deps.clock);
     try {
