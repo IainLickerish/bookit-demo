@@ -6,11 +6,7 @@
   "domain": "beacondental.test",
   "allowedSenderDomains": ["beacondental.test"],
   "mailFrom": "noreply@beacondental.test",
-  "branding": {
-    "visitLabel": "appointment",
-    "practitionerLabel": "clinician",
-    "welcome": "Book appointments with your dentist or hygienist"
-  },
+  "branding": { "practitionerLabel": "clinician", "welcome": "Book appointments with your dentist or hygienist" },
   "settings": {
     "clinicName": "Beacon Dental",
     "timeZone": "Europe/London",

@@ -101,6 +101,32 @@ describe('REQ-18.2-01 real Postgres seed and isolation', () => {
     expect((await a.db.select().from(clinicSettings))[0]?.clinicName).toBe('Acme Admin Changed');
     expect((await a.db.select().from(bookings).where(eq(bookings.id, booking!.id)))[0]?.status).toBe('cancelled');
   });
+  // Fingerprints written by seed version 1 before the calendar change (73688e1).
+  it.each([
+    { tenant: acme, fingerprint: '3b29a773c0ee0e47dcb5f49275a116726842fea9df1ea5fbd06f5444d743bfa1' },
+    { tenant: beacon, fingerprint: '63fbda6918a8f981aa301573dc78f73fd67870f3df465319056421f3b61010aa' },
+  ])(
+    'retains existing $tenant.tenant bookings when starting a database from before the calendar change',
+    async ({ tenant, fingerprint }) => {
+      const existing = await startTestDatabase();
+      try {
+        const input = { tenant, environment: 'staging', passwords: makePasswords(tenant) };
+        await seedTenant(existing.db, clock, input);
+        // Recreate the old seed marker. The pre-existing booking rows use the same schema and seed values.
+        await existing.db.execute(sql`update bookit_seed_state set fingerprint = ${fingerprint} where singleton`);
+        const before = await existing.db.select().from(bookings).orderBy(bookings.id);
+        expect(before).toHaveLength(3);
+
+        await expect(seedTenant(existing.db, clock, input)).resolves.toMatchObject({
+          outcome: 'unchanged',
+          counts: { bookings: 3 },
+        });
+        expect(await existing.db.select().from(bookings).orderBy(bookings.id)).toEqual(before);
+      } finally {
+        await existing.stop();
+      }
+    },
+  );
   it('refuses foreign-tenant/environment/config seeding and container identity, retaining all data', async () => {
     await expect(
       seedTenant(a.db, clock, { tenant: beacon, environment: 'staging', passwords: passwordsB }),
