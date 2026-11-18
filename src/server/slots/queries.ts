@@ -47,7 +47,7 @@ export async function findBookableSlot(db: Executor, slotId: string): Promise<Sl
 }
 
 const noTimeBlock = notExists(
-  sql`(select 1 from ${timeBlocks} where ${timeBlocks.practitionerId} = ${slots.practitionerId} and ${timeBlocks.startsAt} < ${slots.endsAt} and ${timeBlocks.endsAt} > ${slots.startsAt})`,
+  sql`(select 1 from ${timeBlocks} where ${timeBlocks.practitionerId} = ${slots.practitionerId} and ${timeBlocks.startsAt} < ${slots.endsAt} and ${timeBlocks.endsAt} >= ${slots.startsAt})`,
 );
 
 const noConfirmedBooking = notExists(

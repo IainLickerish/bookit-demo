@@ -25,8 +25,9 @@ change cannot be used: choose another time. If there is an error, your entries
 stay in the form so you can correct them.
 
 Clients cannot book any session that overlaps the saved block, even partly.
-A session ending exactly when the block starts, or starting exactly when it ends,
-is still available. Blocks may cover several days and may overlap each other.
+A session ending exactly when the block starts is still available.
+A session starting exactly when the block ends is blocked and included in
+the warning if already confirmed. Blocks may cover several days and may overlap each other.
 
 **Saved time blocks** shows the times and reason. If confirmed bookings overlap,
 you see a warning with the clients' names, email addresses, phone numbers where

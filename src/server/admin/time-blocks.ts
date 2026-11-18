@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lte } from 'drizzle-orm';
 import { bookings, practitioners, slots, timeBlocks, users } from '@/db/schema';
 import { newId } from '@/lib/ids';
 import { findSessionUser } from '../auth/session';
@@ -61,7 +61,7 @@ export async function listTimeBlocks(deps: AdminReportDependencies, token: strin
         slots,
         and(
           eq(slots.practitionerId, timeBlocks.practitionerId),
-          lt(slots.startsAt, timeBlocks.endsAt),
+          lte(slots.startsAt, timeBlocks.endsAt),
           gt(slots.endsAt, timeBlocks.startsAt),
         ),
       )

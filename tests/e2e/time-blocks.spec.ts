@@ -82,10 +82,13 @@ for (const tenant of ['acme', 'beacon']) {
       await signIn(client, server.url, clinic.patient2.email);
       await client.goto(`${server.url}/slots?practitioner=${clinic.practitioners.weekdays}&date=2026-10-22`);
       await expect(client.locator(`[data-slot-id="${slots[1]!.id}"]`)).toHaveCount(0);
-      await expect(client.locator(`[data-slot-id="${slots[2]!.id}"]`)).toBeVisible();
-      await client.goto(`${server.url}/book/${slots[1]!.id}`);
-      await expect(client.getByTestId('confirm-booking')).toHaveCount(0);
-      await expect(client.getByTestId('slot-taken')).toBeVisible();
+      await expect(client.locator(`[data-slot-id="${slots[2]!.id}"]`)).toHaveCount(0);
+      await expect(client.locator(`[data-slot-id="${slots[3]!.id}"]`)).toBeVisible();
+      for (const blocked of [slots[1]!, slots[2]!]) {
+        await client.goto(`${server.url}/book/${blocked.id}`);
+        await expect(client.getByTestId('confirm-booking')).toHaveCount(0);
+        await expect(client.getByTestId('slot-taken')).toBeVisible();
+      }
       await client.goto(`${server.url}/admin`);
       await expect(client).toHaveURL(`${server.url}/bookings`);
       await expect(client.getByTestId('time-block-list')).toHaveCount(0);

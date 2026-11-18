@@ -15,7 +15,7 @@ import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/database';
 import { captureLogs } from '../helpers/logs';
-import { testMail } from '../helpers/mail';
+import { recordingMailer, testMail } from '../helpers/mail';
 
 let database: TestDatabase;
 let other: TestDatabase;
@@ -76,10 +76,10 @@ describe('staff time blocks', () => {
     expect(await listTimeBlocks(deps(), token)).toHaveLength(1);
   });
 
-  it('hides every overlapping slot but allows touching boundaries and other practitioners, including future generated slots', async () => {
+  it('hides overlapping slots including the block end, allows slots ending at its start and preserves other practitioners and future generation', async () => {
     const before = await available();
     const otherBefore = await available(clinic.practitioners.saturdays);
-    await createTimeBlock(deps(), token, input(clinic.practitioners.weekdays, '2026-10-22T09:45', '2026-10-22T10:31'));
+    await createTimeBlock(deps(), token, input(clinic.practitioners.weekdays, '2026-10-22T09:45', '2026-10-22T10:30'));
     const after = await available();
     const removed = before.filter((row) => !after.some((free) => row.id === free.id));
     expect(removed.map((row) => row.startsAt.toISOString())).toEqual([
@@ -110,7 +110,8 @@ describe('staff time blocks', () => {
     });
     const cancelled = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: (await slot('08:45')).id });
     await cancelBooking(deps(), { patientId: clinic.patient2.id, bookingId: cancelled.id });
-    const untouched = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: (await slot('09:30')).id });
+    const boundary = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: (await slot('09:30')).id });
+    const untouched = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: (await slot('10:15')).id });
     const before = await database.db.select().from(bookings).orderBy(bookings.id);
     await createTimeBlock(deps(), token, input(clinic.practitioners.weekdays, '2026-10-22T09:30', '2026-10-22T10:30'));
     const [block] = await listTimeBlocks(deps(), token);
@@ -123,6 +124,13 @@ describe('staff time blocks', () => {
         practitionerName: 'Pat Physio',
         startsAt: first.startsAt,
         endsAt: first.endsAt,
+      },
+      {
+        id: boundary.id,
+        startsAt: boundary.startsAt,
+        endsAt: boundary.endsAt,
+        patientName: clinic.patient2.name,
+        email: clinic.patient2.email,
       },
     ]);
     expect(block!.affectedBookings.map((row) => row.id)).not.toContain(untouched.id);
@@ -169,6 +177,28 @@ describe('staff time blocks', () => {
     expect(moved.status).toBe('confirmed');
     await cancelBooking(deps(), { patientId: clinic.patient1.id, bookingId: original.id });
     expect(await isSlotFree(database.db, moved.slotId)).toBe(true);
+  });
+
+  it('refuses booking and moving into a slot starting exactly at the block end without changing bookings or sending email', async () => {
+    const boundary = await slot('09:30');
+    const original = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: (await slot('08:00')).id });
+    const before = await database.db.select().from(bookings).orderBy(bookings.id);
+    const mailer = recordingMailer();
+    const boundaryDeps = { ...deps(), mail: testMail(mailer) };
+    await createTimeBlock(deps(), token, input(clinic.practitioners.weekdays, '2026-10-22T09:45', '2026-10-22T10:30'));
+    await expect(bookSlot(boundaryDeps, { patientId: clinic.patient2.id, slotId: boundary.id })).rejects.toMatchObject({
+      code: 'slot_blocked',
+    });
+    await expect(
+      rescheduleBooking(boundaryDeps, {
+        patientId: clinic.patient1.id,
+        bookingId: original.id,
+        newSlotId: boundary.id,
+      }),
+    ).rejects.toMatchObject({ code: 'slot_blocked' });
+    expect(await database.db.select().from(bookings).orderBy(bookings.id)).toEqual(before);
+    expect(mailer.sent).toEqual([]);
+    expect(await isSlotFree(database.db, boundary.id)).toBe(false);
   });
 
   it('serialises a block racing with booking or moving: the booking is refused or appears in the warning', async () => {

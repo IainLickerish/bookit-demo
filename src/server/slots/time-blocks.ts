@@ -1,4 +1,4 @@
-import { and, eq, gt, lt } from 'drizzle-orm';
+import { and, eq, gte, lt } from 'drizzle-orm';
 import type { Transaction } from '@/db/client';
 import { practitioners, timeBlocks } from '@/db/schema';
 import { BookingError } from '../bookings/errors';
@@ -23,7 +23,7 @@ export async function assertSlotNotBlocked(tx: Transaction, slot: SlotView): Pro
       and(
         eq(timeBlocks.practitionerId, slot.practitionerId),
         lt(timeBlocks.startsAt, slot.endsAt),
-        gt(timeBlocks.endsAt, slot.startsAt),
+        gte(timeBlocks.endsAt, slot.startsAt),
       ),
     )
     .limit(1);
