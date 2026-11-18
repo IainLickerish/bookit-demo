@@ -116,6 +116,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
   it('refuses clients and staff from another clinic access to a populated download', async () => {
     for (const [token, status] of [
       [beaconPatientToken, 403],
+      [patientToken, 401],
       [adminToken, 401],
     ] as const) {
       const response = await beaconExport(token);
