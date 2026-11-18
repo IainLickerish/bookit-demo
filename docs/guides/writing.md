@@ -1,12 +1,12 @@
 # Writing for BookIt
 
-Each rule has a short ID (WR-1 and so on) so a review can name it. The rules apply to screens, emails and the clinics'
+Each rule has a short ID (WR-1 and so on) so a review can name it. The rules apply to screens, emails and the clinic's
 user guides alike.
 
 ## Voice
 
 Sound like the receptionist at a good private clinic: warm, calm, assured and brief. Speak to the reader as "you" and
-about the clinic by its name. Acme Physio is formal and concise; Beacon Dental is warmer and plain. Premium means
+about the clinic by its name. Acme Physio is formal and concise. Premium means
 confident and specific, never flowery or full of hype.
 
 ## Rules
@@ -25,19 +25,15 @@ confident and specific, never flowery or full of hype.
   headings may spell out the day's name. Numbers with units are digits: "45 minutes".
 - **WR-8** No em dashes. Use a full stop, a comma or a colon instead.
 
-## Each clinic's words
+## The clinic's words
 
-Use the words each clinic already uses with its clients:
-
-|                 | Acme Physio     | Beacon Dental |
-| --------------- | --------------- | ------------- |
-| An appointment  | session         | appointment   |
-| The person seen | physiotherapist | clinician     |
+Use the words Acme Physio already uses with its clients: a **session** (not an appointment) with a
+**physiotherapist**.
 
 Shared labels: "Book", "My bookings", "Clinic bookings", "Sign in", "Confirmed" and "Cancelled".
 
-- **WR-9** Use each clinic's own words consistently, and keep each clinic's user guide (`docs/user-guide/`) in step
-  when a change alters what clients see or do or the words they read.
+- **WR-9** Use the clinic's own words consistently, and keep its user guide (`docs/user-guide/acme/`) in step when a
+  change alters what clients see or do or the words they read.
 
 ## Examples
 

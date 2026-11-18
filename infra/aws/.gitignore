@@ -1,7 +1,0 @@
-# Terraform working files. The provider lock file is committed.
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfplan
-crash.log
-terraform.tfvars

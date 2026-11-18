@@ -33,31 +33,38 @@ describe('REQ-18.2-01 tenant configuration boundaries', () => {
       after,
     ]);
   });
-  it.each(['acme', 'beacon'] as const)('%s has canonical domains, isolated identity and clinic rules', (name) => {
-    const tenant = loadTenant(name);
-    expect(tenant.product).toBe(name.toUpperCase());
+  it('Acme has canonical domains, its own identity and clinic rules', () => {
+    const tenant = loadTenant('acme');
+    expect(tenant.product).toBe('ACME');
     expect(tenant.settings).toMatchObject({
       timeZone: 'Europe/London',
       slotHorizonDays: 220,
-      lateCancellationHours: name === 'acme' ? 24 : 48,
-      sessionMinutes: name === 'acme' ? 45 : 30,
-      maxReschedulesPerBooking: name === 'acme' ? 3 : 2,
-      includeContactInConfirmation: name === 'acme',
+      lateCancellationHours: 24,
+      sessionMinutes: 45,
+      maxReschedulesPerBooking: 3,
+      includeContactInConfirmation: true,
     });
     expect(tenant.allowedSenderDomains).toEqual([tenant.domain]);
     expect(tenant.allowedSenderDomains).not.toContain(`patients.${tenant.domain}`);
   });
-  it.each(['../../etc/passwd', 'cobalt', '', 'ACME'])('refuses an unconfigured tenant %j', (name) => {
+  it.each(['../../etc/passwd', 'beacon', '', 'ACME'])('refuses an unconfigured tenant %j', (name) => {
     expect(() => loadTenant(name)).toThrow();
   });
   it('rejects cross-client contacts, sender subdomains and account/domain mismatches', () => {
     const tenant = loadTenant('acme');
-    expect(tenantSchema.safeParse({ ...tenant, domain: 'beacondental.test' }).success).toBe(false);
+    expect(tenantSchema.safeParse({ ...tenant, domain: 'example.test' }).success).toBe(false);
     expect(tenantSchema.safeParse({ ...tenant, allowedSenderDomains: ['patients.acmephysio.test'] }).success).toBe(
       false,
     );
-    expect(tenantSchema.safeParse({ ...tenant, accounts: loadTenant('beacon').accounts }).success).toBe(false);
-    expect(tenantSchema.safeParse({ ...tenant, contacts: loadTenant('beacon').contacts }).success).toBe(false);
+    const foreign = (email: string) => email.replace('acmephysio.test', 'example.test');
+    expect(
+      tenantSchema.safeParse({ ...tenant, accounts: tenant.accounts.map((a) => ({ ...a, email: foreign(a.email) })) })
+        .success,
+    ).toBe(false);
+    expect(
+      tenantSchema.safeParse({ ...tenant, contacts: tenant.contacts.map((c) => ({ ...c, email: foreign(c.email) })) })
+        .success,
+    ).toBe(false);
     expect(tenantSchema.safeParse({ ...tenant, password: 'unexpected-field' }).success).toBe(false);
   });
   it('requires complete caller-supplied passwords without returning sensitive validation input', () => {
@@ -74,41 +81,34 @@ describe('REQ-18.2-01 tenant configuration boundaries', () => {
   });
 });
 
-describe('REQ-18.1-03 sixteen tenant-specific guide articles', () => {
-  for (const name of ['acme', 'beacon'] as const) {
-    const tenant = loadTenant(name);
-    const directory = `docs/user-guide/${name}`;
-    const files = readdirSync(directory).sort();
-    it(`${name} has eight numbered articles with typed front matter and no foreign client facts`, () => {
-      expect(files).toHaveLength(8);
-      for (const [index, file] of files.entries()) {
-        const content = readFileSync(`${directory}/${file}`, 'utf8');
-        expect(content).toMatch(
-          new RegExp(
-            `^---\nid: ['"]${String(index + 1).padStart(2, '0')}['"]\ntenant: ${name}\ntitle: .+\naudience: (patient|admin)\n---\n`,
-          ),
-        );
-        expect(content).not.toMatch(
-          name === 'acme' ? /Beacon|beacondental\.test|BEACON-SEED-MARKER/ : /Acme|acmephysio\.test/,
-        );
-      }
-    });
-    it(`${name} states the actual booking, cancellation, reschedule and email facts`, () => {
-      const body = files.map((file) => readFileSync(`${directory}/${file}`, 'utf8')).join('\n');
-      expect(body).toContain(
-        name === 'acme' ? 'sessions with your physiotherapist' : 'appointments with your dentist or hygienist',
+describe('REQ-18.1-03 the user guide', () => {
+  const tenant = loadTenant('acme');
+  const directory = 'docs/user-guide/acme';
+  const files = readdirSync(directory).sort();
+  it('has eight numbered articles with typed front matter', () => {
+    expect(files).toHaveLength(8);
+    for (const [index, file] of files.entries()) {
+      const content = readFileSync(`${directory}/${file}`, 'utf8');
+      expect(content).toMatch(
+        new RegExp(
+          `^---\nid: ['"]${String(index + 1).padStart(2, '0')}['"]\ntenant: acme\ntitle: .+\naudience: (patient|admin)\n---\n`,
+        ),
       );
-      expect(body).toContain(`**${tenant.settings.sessionMinutes} minutes**`);
-      expect(body).toContain(`**${tenant.settings.lateCancellationHours} hours**`);
-      expect(body).toContain(`**${tenant.settings.maxReschedulesPerBooking} reschedules per booking**`);
-      expect(body).toContain(tenant.mailFrom);
-    });
-    it(`${name} Article 08 documents a password-reset path`, () => {
-      const article = readFileSync(`${directory}/08-account-and-password.md`, 'utf8');
-      // DEF-05 route correctness is tested outside BookIt, so the reviewed
-      // documentation-only fix can pass the same ordinary product suite.
-      expect(article).toMatch(/`\/[a-z/-]+`/);
-      expect(article).toContain('password');
-    });
-  }
+    }
+  });
+  it('states the actual booking, cancellation, reschedule and email facts', () => {
+    const body = files.map((file) => readFileSync(`${directory}/${file}`, 'utf8')).join('\n');
+    expect(body).toContain('sessions with your physiotherapist');
+    expect(body).toContain(`**${tenant.settings.sessionMinutes} minutes**`);
+    expect(body).toContain(`**${tenant.settings.lateCancellationHours} hours**`);
+    expect(body).toContain(`**${tenant.settings.maxReschedulesPerBooking} reschedules per booking**`);
+    expect(body).toContain(tenant.mailFrom);
+  });
+  it('Article 08 documents a password-reset path', () => {
+    const article = readFileSync(`${directory}/08-account-and-password.md`, 'utf8');
+    // DEF-05 route correctness is tested outside BookIt, so the reviewed
+    // documentation-only fix can pass the same ordinary product suite.
+    expect(article).toMatch(/`\/[a-z/-]+`/);
+    expect(article).toContain('password');
+  });
 });

@@ -1,2 +1,0 @@
-# CSV evidence preserves its BOM and RFC 4180 CRLF records on every platform.
-docs/evidence/*.csv -text whitespace=cr-at-eol
