@@ -27,6 +27,10 @@ buildService:
   checks:
     - bun run test:integration
 
+# How to run one test file (the factory's decision 0116): the build run uses it while it works, and the factory uses it
+# to run a bug fix's own tests on the main version.
+testFile: bun run test {file}
+
 # BookIt's own guidance, which every agent reads: its conventions, the product brief and the guides (the factory's
 # decision 0099). The owner's privacy note (docs/owner/) is left out on purpose.
 guidance:
