@@ -1,3 +1,9 @@
+import { cookies } from 'next/headers';
+import { SESSION_COOKIE } from '@/server/auth/session';
+import { adminDependencies } from '@/server/admin/context';
+import { listTimeBlocks } from '@/server/admin/time-blocks';
+import { TimeBlockForm } from './time-block-form';
+import { TimeBlockList } from './time-block-list';
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { formatSlot } from '@/lib/time';
@@ -27,6 +33,8 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   }
   const db = getDatabase();
   const [settings, practitioners] = await Promise.all([loadClinicSettings(db), listAdminPractitioners(db)]);
+  const blocks = await listTimeBlocks(await adminDependencies(), (await cookies()).get(SESSION_COOKIE)?.value);
+  const practitionerLabel = process.env.BOOKIT_TENANT === 'beacon' ? 'Clinician' : 'Physiotherapist';
   const rows = invalid ? [] : await listAdminBookings(db, filters, settings.timeZone);
   const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
   return (
@@ -36,6 +44,11 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
         <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
           Clinic settings
         </Link>
+      </p>
+      <p className="mt-2">
+        <a href="#time-blocks" className="underline" data-testid="admin-time-blocks-link">
+          Block out time
+        </a>
       </p>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
         <label>
@@ -110,6 +123,20 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           {rows.length === 0 ? <p>No bookings match these filters.</p> : null}
         </>
       )}
+      <section id="time-blocks" className="mt-8" aria-labelledby="time-blocks-heading">
+        <h2 id="time-blocks-heading">Block out time</h2>
+        <p>
+          Stop clients booking time when a {practitionerLabel.toLowerCase()} is away. Any slot that overlaps the block
+          will be unavailable. Existing bookings stay confirmed.
+        </p>
+        <TimeBlockForm
+          practitioners={practitioners}
+          timeZone={settings.timeZone}
+          practitionerLabel={practitionerLabel}
+        />
+        <h2>Saved time blocks</h2>
+        <TimeBlockList blocks={blocks} timeZone={settings.timeZone} />
+      </section>
     </section>
   );
 }

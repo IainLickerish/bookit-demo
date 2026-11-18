@@ -1,6 +1,7 @@
 import { BOOKING_ERRORS, isBookingErrorCode } from '@/server/bookings/errors';
 
 const NOTICES = {
+  time_block_saved: 'Time block saved.',
   booked: 'Booking confirmed.',
   cancelled: 'Booking cancelled.',
   cancelled_late: 'Booking cancelled. This was a late cancellation.',

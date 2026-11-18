@@ -113,7 +113,7 @@ describe('staff time blocks', () => {
     const before = await database.db.select().from(bookings).orderBy(bookings.id);
     await createTimeBlock(deps(), token, input(clinic.practitioners.weekdays, '2026-10-22T09:30', '2026-10-22T10:30'));
     const [block] = await listTimeBlocks(deps(), token);
-    expect(block.affectedBookings).toMatchObject([
+    expect(block!.affectedBookings).toMatchObject([
       {
         id: first.id,
         patientName: clinic.patient1.name,
@@ -124,7 +124,7 @@ describe('staff time blocks', () => {
         endsAt: first.endsAt,
       },
     ]);
-    expect(block.affectedBookings.map((row) => row.id)).not.toContain(untouched.id);
+    expect(block!.affectedBookings.map((row) => row.id)).not.toContain(untouched.id);
     expect(await database.db.select().from(bookings).orderBy(bookings.id)).toEqual(before);
     await runMigrations(database.url);
     expect(await database.db.select().from(bookings).orderBy(bookings.id)).toEqual(before);
@@ -142,7 +142,7 @@ describe('staff time blocks', () => {
     await runMigrations(database.url);
     expect(await database.db.select().from(bookings)).toEqual(before);
     await createTimeBlock(deps(), token, input(clinic.practitioners.weekdays));
-    expect((await listTimeBlocks(deps(), token))[0].affectedBookings.map((row) => row.id)).toEqual([saved.id]);
+    expect((await listTimeBlocks(deps(), token))[0]!.affectedBookings.map((row) => row.id)).toEqual([saved.id]);
   });
 
   it('refuses stale booking and move submissions and keeps the original booking; outside time still books, moves and cancels', async () => {
