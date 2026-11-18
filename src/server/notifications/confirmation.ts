@@ -1,4 +1,5 @@
 import { formatSlot } from '@/lib/time';
+import { BOOKING_CALENDAR_CONTENT_TYPE, BOOKING_CALENDAR_FILENAME, bookingCalendar } from '../bookings/calendar';
 import { reportError } from '../error-reporting';
 import type { BookingView } from '../bookings/queries';
 import type { ClinicSettings } from '../settings';
@@ -29,10 +30,13 @@ export function formatPhone(phone: string): string {
 export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   const { booking, patient, settings } = input;
   const when = formatSlot(booking.startsAt, settings.timeZone);
+  const moved = booking.rescheduleCount > 0;
   const lines = [
     `Dear ${patient.name},`,
     '',
-    `Your appointment at ${settings.clinicName} is confirmed.`,
+    moved
+      ? `Your booking at ${settings.clinicName} has moved.`
+      : `Your appointment at ${settings.clinicName} is confirmed.`,
     '',
     `When: ${when} (${settings.timeZone})`,
     `With: ${booking.practitionerName}`,
@@ -41,11 +45,24 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   if (settings.includeContactInConfirmation && booking.phone) {
     lines.push(`Contact phone: ${formatPhone(booking.phone)}`);
   }
-  lines.push('', 'To cancel or reschedule, sign in to BookIt and open My bookings.', '', settings.clinicName);
+  lines.push(
+    '',
+    'Open the attached file to add this time to your calendar.',
+    'To cancel or reschedule, sign in to BookIt and open My bookings.',
+    '',
+    settings.clinicName,
+  );
   return {
     from: input.from,
     to: patient.email,
-    subject: `Booking confirmed: ${when}`,
+    subject: `${moved ? 'Booking rescheduled' : 'Booking confirmed'}: ${when}`,
     text: `${lines.join('\n')}\n`,
+    attachments: [
+      {
+        filename: BOOKING_CALENDAR_FILENAME,
+        contentType: BOOKING_CALENDAR_CONTENT_TYPE,
+        content: bookingCalendar(booking, settings),
+      },
+    ],
   };
 }

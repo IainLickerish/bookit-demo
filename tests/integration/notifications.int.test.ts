@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
@@ -74,6 +75,31 @@ beforeEach(async () => {
 });
 
 describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stand-in, no real email)', () => {
+  it('attaches a calendar file for the confirmed time to both booking and move emails', async () => {
+    // Choose both slots before booking, as the available list drops the first one once booked.
+    const slotId = await freeSlotId();
+    const newSlotId = await freeSlotId(1);
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId });
+    const moved = await rescheduleBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id, newSlotId });
+
+    expect(smtp.messages).toHaveLength(2);
+    expect(smtp.messages[1]!.raw).toContain('Subject: Booking rescheduled:');
+    for (const [index, confirmed] of [booking, moved].entries()) {
+      const message = smtp.messages[index]!;
+      expect(message.to).toEqual([clinic.patient1.email]);
+      expect(message.raw).toMatch(/Content-Type: text\/calendar\b/i);
+      const attachment = message.raw.match(
+        /Content-Disposition: attachment; filename=booking\.ics\r\n\r\n([\s\S]+?)\r\n--/i,
+      );
+      expect(attachment).not.toBeNull();
+      const calendar = Buffer.from(attachment![1]!, 'base64').toString('utf8');
+      expect(calendar).toContain(`UID:${booking.id}@bookit.test\r\n`);
+      expect(calendar).toContain(`SEQUENCE:${index}\r\n`);
+      expect(calendar).toContain(`DTSTART:${confirmed.startsAt.toISOString().slice(0, 19).replace(/[-:]/g, '')}Z\r\n`);
+      expect(calendar).toContain(`DTEND:${confirmed.endsAt.toISOString().slice(0, 19).replace(/[-:]/g, '')}Z\r\n`);
+    }
+  });
+
   it('sends one confirmation with the contact phone when the clinic includes contact details', async () => {
     await saveClinicSettings(database.db, clock, { ...clinic.settings, includeContactInConfirmation: true });
     const booking = await bookSlot(deps(), {

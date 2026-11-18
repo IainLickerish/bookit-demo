@@ -1,8 +1,11 @@
 import { and, eq } from 'drizzle-orm';
 import { bookings, slots } from '@/db/schema';
 import { isUniqueViolation } from '../errors';
+import { composeConfirmation } from '../notifications/confirmation';
+import { deliverEmail } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
+import { findUserById } from '../users';
 import type { BookingDependencies } from './book';
 import { BookingError } from './errors';
 import { findBookingForPatient, isUuid, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
@@ -22,7 +25,7 @@ export async function rescheduleBooking(
     throw new BookingError('booking_not_found');
   }
   const now = deps.clock.now();
-  const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
+  const { booking, previousSlotId, confirmation } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
       .select({
@@ -60,10 +63,15 @@ export async function rescheduleBooking(
       throw error;
     }
     const moved = await findBookingForPatient(tx, request.patientId, request.bookingId);
-    if (!moved) {
-      throw new Error('A booking updated in this transaction could not be read back.');
+    const patient = await findUserById(tx, request.patientId);
+    if (!moved || !patient) {
+      throw new Error('The updated booking or its patient could not be read back.');
     }
-    return { booking: moved, previousSlotId: locked.slotId };
+    return {
+      booking: moved,
+      previousSlotId: locked.slotId,
+      confirmation: composeConfirmation({ booking: moved, patient, settings, from: deps.mail.from }),
+    };
   });
   deps.log.info(
     {
@@ -75,5 +83,6 @@ export async function rescheduleBooking(
     },
     'Booking rescheduled',
   );
+  await deliverEmail(deps.mail, deps.log, confirmation, 'confirmation', { booking_id: booking.id });
   return booking;
 }
