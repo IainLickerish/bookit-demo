@@ -77,6 +77,7 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
       bookingId,
       newSlotId: formText(formData, 'newSlotId'),
     });
+    revalidatePath('/bookings');
     destination = `/bookings?booking=${booking.id}&notice=rescheduled`;
   } catch (error) {
     const code = refusalCode(error, deps.log, 'reschedule');

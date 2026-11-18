@@ -115,6 +115,34 @@ test('Back keeps the calendar link hidden after cancelling', async ({ page }) =>
   await expect(cancelled.getByTestId('booking-status')).toHaveText('Cancelled');
 });
 
+test('Back shows the same moved time as the calendar download', async ({ page }) => {
+  await signIn(page, 'patient2@patients.example.test');
+  await page.goto('/slots?date=2026-10-28');
+  await page.getByTestId('slot-link').first().click();
+  const originalWhen = (await page.getByTestId('book-when').innerText()).replace(/ \(\d+ minutes\)$/, '');
+  await page.getByTestId('confirm-booking').click();
+  const confirmation = page.getByTestId('booking-confirmation');
+  await expect(confirmation).toContainText(originalWhen);
+  const originalConfirmation = page.url();
+  const row = page.getByTestId('booking-row').filter({ hasText: originalWhen });
+  await row.getByTestId('reschedule-link').click();
+  const choice = page.getByTestId('reschedule-to').first();
+  const movedWhen = await choice.innerText();
+  expect(movedWhen).not.toBe(originalWhen);
+  await choice.click();
+  await expect(confirmation.getByTestId('notice')).toHaveText('Booking rescheduled.');
+  await expect(confirmation).toContainText(movedWhen);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/reschedule$/);
+  await page.goBack();
+  await expect(page).toHaveURL(originalConfirmation);
+  const calendar = await downloadCalendar(page, 'booking-confirmation');
+  expect(calendar).toContain(`DESCRIPTION:${movedWhen.replaceAll(',', '\\,')}`);
+  await expect(confirmation).toContainText(movedWhen);
+  await expect(confirmation).not.toContainText(originalWhen);
+});
+
 test('a double-click downloads only one calendar file', async ({ page }) => {
   await signIn(page, 'patient1@patients.example.test');
   await page.goto('/slots?date=2026-10-27');
