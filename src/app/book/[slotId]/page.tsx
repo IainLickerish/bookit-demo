@@ -26,7 +26,7 @@ export default async function BookSlotPage({
   }
   const free = await isSlotFree(db, slot.id);
   return (
-    <section className="card account-card booking-confirmation">
+    <section className="card account-card booking-confirmation" data-testid="account-card">
       <PageHeader>Confirm your booking</PageHeader>
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
@@ -60,7 +60,7 @@ export default async function BookSlotPage({
               data-testid="book-phone"
             />
           </label>
-          <div className="booking-action-bar">
+          <div className="booking-action-bar" data-testid="booking-action-bar">
             <button type="submit" className="button" data-testid="confirm-booking">
               Confirm booking
             </button>
@@ -72,7 +72,7 @@ export default async function BookSlotPage({
         </p>
       )}
       <p className="mt-6 text-sm">
-        <Link href="/slots" prefetch={false} className="underline">
+        <Link href="/slots" prefetch={false} className="underline" data-testid="choose-different-time">
           Choose a different time
         </Link>
       </p>

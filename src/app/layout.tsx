@@ -17,7 +17,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const [settings, user] = await Promise.all([loadClinicSettings(getDatabase()), currentUser()]);
   return (
     <html lang="en-GB">
-      <body>
+      <body data-testid="page-body">
         <header className="site-header">
           <div className={`site-header-inner${user?.role === 'admin' ? ' site-header-inner-staff' : ''}`}>
             <Link href="/" prefetch={false} className="clinic-name" data-testid="clinic-name">

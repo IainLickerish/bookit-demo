@@ -29,7 +29,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             : 'Settings could not be saved. Please try again.'}
         </p>
       ) : null}
-      <form action={saveSettingsAction} className="card settings-form">
+      <form action={saveSettingsAction} className="card settings-form" data-testid="settings-form">
         <label>
           Clinic name
           <input
@@ -66,7 +66,6 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
             type="checkbox"
             name="includeContactInConfirmation"
             defaultChecked={settings.includeContactInConfirmation}
-            className="w-auto"
             data-testid="admin-include-contact"
           />
           Include contact details in confirmation emails

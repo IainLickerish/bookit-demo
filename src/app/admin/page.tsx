@@ -79,7 +79,7 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           <a href={`/api/admin/export?${exportQuery}`} className="button-secondary my-3" data-testid="admin-export">
             Export filtered bookings (CSV)
           </a>
-          <div className="table-card">
+          <div className="table-card" data-testid="admin-table-card">
             <div className="table-scroll" tabIndex={0} data-testid="admin-table-scroll">
               <table className="bookings-table">
                 <caption className="sr-only">Clinic bookings in {settings.timeZone}</caption>

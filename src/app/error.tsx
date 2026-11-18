@@ -7,7 +7,7 @@ export default function ErrorPage({ reset }: { error: Error & { digest?: string 
     <section className="card" role="alert" data-testid="error-page">
       <PageHeader>Something went wrong</PageHeader>
       <p className="mb-4">Please try again. If it keeps happening, contact the clinic.</p>
-      <button type="button" className="button" onClick={() => reset()}>
+      <button type="button" className="button" onClick={() => reset()} data-testid="retry-page">
         Try again
       </button>
     </section>

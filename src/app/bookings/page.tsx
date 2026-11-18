@@ -41,8 +41,8 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         <p className="booking-when" data-testid="booking-when">
           {formatSlot(booking.startsAt, settings.timeZone)}
         </p>
-        <p className="text-muted">
-          With {booking.practitionerName} ·{' '}
+        <p className="booking-meta">
+          <span>With {booking.practitionerName} · </span>
           <span className="booking-status" data-status={booking.status} data-testid="booking-status">
             {statusText(booking)}
           </span>
@@ -82,7 +82,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           {error}
         </p>
       ) : null}
-      <h2>Upcoming</h2>
+      <h2 data-testid="upcoming-title">Upcoming</h2>
       {upcoming.length === 0 ? (
         <p className="empty-state" data-testid="no-upcoming">
           You have no upcoming appointments.{' '}

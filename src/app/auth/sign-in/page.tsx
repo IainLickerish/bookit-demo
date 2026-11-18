@@ -14,7 +14,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
   const error = single(query.error);
   const passwordReset = single(query.notice) === 'password_reset';
   return (
-    <section className="card account-card">
+    <section className="card account-card" data-testid="account-card">
       <PageHeader>Sign in</PageHeader>
       {passwordReset ? (
         <p role="status" className="notice" data-testid="sign-in-notice">

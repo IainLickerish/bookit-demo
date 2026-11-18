@@ -7,7 +7,7 @@ import { requestPasswordResetAction } from '../password-reset-actions';
 export default async function ForgotPasswordPage({ searchParams }: { searchParams: SearchParams }) {
   const sent = single((await searchParams).sent) === '1';
   return (
-    <section className="card account-card">
+    <section className="card account-card" data-testid="account-card">
       <PageHeader>Reset your password</PageHeader>
       {sent ? (
         <p role="status" className="notice" data-testid="forgot-password-sent">

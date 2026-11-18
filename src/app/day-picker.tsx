@@ -9,7 +9,7 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
   const previous = addDaysToLocalDate(view.date, -1);
   const next = addDaysToLocalDate(view.date, 1);
   return (
-    <div className="card day-picker">
+    <div className="card day-picker" data-testid="day-picker">
       <form method="get" action={path} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <label>
           Practitioner
