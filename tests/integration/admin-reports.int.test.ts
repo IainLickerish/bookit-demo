@@ -20,9 +20,14 @@ let beacon: TestDatabase;
 let clinic: SeededClinic;
 let adminToken: string;
 let patientToken: string;
+let beaconAdminToken: string;
+let beaconPatientToken: string;
 let fixture: Awaited<ReturnType<typeof seedAdminBookings>>;
+let beaconFixture: Awaited<ReturnType<typeof seedAdminBookings>>;
+const accentedName = 'Róisín Murphy';
 const clock = manualClock('2026-10-20T07:00:00Z');
 const logs = captureLogs(clock, 'acme');
+const beaconLogs = captureLogs(clock, 'beacon');
 const observed: object[] = [];
 const evidenceDirectory = `test-results/m0-24b/integration-${randomUUID()}`;
 
@@ -30,10 +35,19 @@ beforeAll(async () => {
   acme = await startTestDatabase();
   beacon = await startTestDatabase();
   clinic = await seedClinic(acme.db, clock, { settings: { slotHorizonDays: 7 } });
-  await seedClinic(beacon.db, clock, { settings: { clinicName: 'Beacon Dental', slotHorizonDays: 7 } });
+  const beaconClinic = await seedClinic(beacon.db, clock, {
+    settings: { clinicName: 'Beacon Dental', slotHorizonDays: 7 },
+  });
   fixture = await seedAdminBookings(acme.db, clock);
+  beaconFixture = await seedAdminBookings(beacon.db, clock, [
+    ...ADMIN_PATIENT_NAMES.slice(0, 2),
+    accentedName,
+    ADMIN_PATIENT_NAMES[3]!,
+  ]);
   adminToken = (await createSession(acme.db, clock, clinic.admin.id)).token;
   patientToken = (await createSession(acme.db, clock, clinic.patient1.id)).token;
+  beaconAdminToken = (await createSession(beacon.db, clock, beaconClinic.admin.id)).token;
+  beaconPatientToken = (await createSession(beacon.db, clock, beaconClinic.patient1.id)).token;
   await mkdir(evidenceDirectory, { recursive: true });
 });
 afterEach((context) => {
@@ -75,7 +89,45 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
   return adminReportResponse({ db: acme.db, clock, log: logs.log }, token, new URLSearchParams(query), format);
 }
 
+function beaconExport(token: string) {
+  return adminReportResponse(
+    { db: beacon.db, clock, log: beaconLogs.log },
+    token,
+    new URLSearchParams('date=2026-10-25&status=cancelled'),
+    'csv',
+  );
+}
+
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
+  it('downloads only matching bookings and preserves the accented client name', async () => {
+    const response = await beaconExport(beaconAdminToken);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+    expect(response.headers.get('content-disposition')).toBe('attachment; filename="bookings.csv"');
+    const records = (await response.text()).split('\r\n');
+    expect(records).toHaveLength(3);
+    const [header, booking, end] = records;
+    expect(header).toContain('"Patient"');
+    expect(booking).toBe(
+      `"${beaconFixture.bookingIds[2]}","${accentedName}","Report Practitioner","2026-10-25T23:30:00.000Z","2026-10-26T00:15:00.000Z","cancelled","yes",""`,
+    );
+    expect(end).toBe('');
+  });
+  it('refuses clients and staff from another clinic access to a populated download', async () => {
+    for (const [token, status] of [
+      [beaconPatientToken, 403],
+      [adminToken, 401],
+    ] as const) {
+      const response = await beaconExport(token);
+      expect(response.status).toBe(status);
+      expect(response.headers.has('content-disposition')).toBe(false);
+      expect(await response.text()).not.toContain(accentedName);
+    }
+
+    const allowed = await beaconExport(beaconAdminToken);
+    expect(allowed.status).toBe(200);
+    expect(await allowed.text()).toContain(`"${accentedName}"`);
+  });
   it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);

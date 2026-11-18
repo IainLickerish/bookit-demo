@@ -24,7 +24,7 @@ Vitest uses disposable PostgreSQL containers and local SMTP/Sentry fixtures.
 Playwright also builds the Docker image and starts two isolated Compose projects
 for the tenant checks. The owner's key flows (`evals/`) are kept, but neither CI
 nor the Software Factory runs them any more; `bun run test:key-flows` still starts
-a Compose copy with the Acme test data and a fixed date and runs them by hand.
+separate Acme and Beacon Compose copies with a fixed date and runs them by hand.
 First runs download pinned base images; tests never use
 a live model, hosted Sentry or a real email service. Container test projects are
 stopped afterwards, preserving their volumes and sanitised evidence for review.
@@ -197,9 +197,9 @@ separate password-reset change. Expected fixes and deliberate-defect tests live
 only in SupportAgents, outside this repository. BookIt's ordinary suite passes
 without changing the Article 08 baseline.
 
-The demonstration baseline also contains late-cancellation, non-ASCII CSV export
-and clock-change slot-label defects. Their reproductions, expected fixes and
+The demonstration baseline also contains late-cancellation and clock-change
+slot-label defects. Their reproductions, expected fixes and
 failing-then-passing tests live in SupportAgents under `demo/bookit-expected/`.
-BookIt's ordinary tests exercise unaffected cancellation/export/display cases and
+BookIt's ordinary tests exercise unaffected cancellation and display cases and
 must pass both on this baseline and after each expected fix. The tenant seed keeps
-its Unicode names and DST reference slots so those defects remain reproducible.
+its DST reference slots so the clock-change defect remains reproducible.

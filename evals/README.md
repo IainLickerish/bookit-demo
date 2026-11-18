@@ -5,7 +5,7 @@ word for word. They use a copy of BookIt the way a person would, with fixed test
 matching BookIt's test clock), so every run sees exactly the same days, times and screens.
 
 Nothing runs them automatically: the owner switched them off in the Software Factory and in GitHub's checks on
-17 November 2026. To run them yourself on a fresh copy (Docker needed):
+17 November 2026. To run them yourself on fresh Acme and Beacon copies (Docker needed):
 
 ```sh
 bun run test:key-flows
