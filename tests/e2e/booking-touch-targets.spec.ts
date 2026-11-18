@@ -48,21 +48,25 @@ test('Clients can tap full-size time choices to book and move on a phone', async
   expect.soft(Math.min(...moveHeights), 'shortest rescheduling time choice').toBeGreaterThanOrEqual(48);
 });
 
-test('Clients can tap a one-letter clinic name to return home on a phone', async ({ page }) => {
+test('Clients can tap a one-letter clinic name to return to My bookings on a phone', async ({ page }) => {
   const [settings] = await query<{ clinic_name: string }>('select clinic_name from clinic_settings');
   if (!settings) {
     throw new Error('The browser test clinic settings were not seeded.');
   }
   await query('update clinic_settings set clinic_name = $1', ['I']);
   try {
-    await page.goto('/auth/sign-in');
+    await signIn(page, 'patient1@patients.example.test');
+    await page.getByTestId('nav-book').tap();
+    const pageHeader = page.getByTestId('page-header');
+    await expect(pageHeader).toHaveText('Book an appointment');
     const clinicLink = page.getByTestId('clinic-name');
     await expect(clinicLink).toHaveText('I');
     const clinicTarget = await measureTarget(clinicLink);
     expect.soft(clinicTarget.width, 'clinic name link width').toBeGreaterThanOrEqual(44);
     expect.soft(clinicTarget.height, 'clinic name link height').toBeGreaterThanOrEqual(44);
     await clinicLink.tap();
-    await expect(page).toHaveURL('/');
+    await expect(page).toHaveURL(/\/bookings$/);
+    await expect(pageHeader).toHaveText('My bookings');
   } finally {
     await query('update clinic_settings set clinic_name = $1', [settings.clinic_name]);
   }
