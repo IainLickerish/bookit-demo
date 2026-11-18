@@ -235,15 +235,24 @@
     @apply mb-8 space-y-6;
   }
   .day-navigation {
-    @apply flex flex-wrap items-center justify-between gap-2;
+    @apply grid grid-cols-2 items-center gap-2 sm:grid-cols-[1fr_auto_1fr];
     font-size: 0.9375rem;
   }
   .day-navigation a {
     @apply inline-flex min-h-11 items-center;
   }
+  .day-navigation > :last-child {
+    @apply justify-self-end;
+  }
   .shown-date {
-    @apply order-first w-full rounded-xl border border-pine bg-stone px-3 py-3 text-center font-medium sm:order-none sm:w-auto;
+    @apply relative order-first col-span-2 mx-auto max-w-full rounded-xl border border-pine bg-stone px-4 py-3 text-center font-medium sm:order-none sm:col-span-1;
     font-variant-numeric: tabular-nums;
+  }
+  .shown-calendar-date {
+    @apply block;
+  }
+  .today-dot {
+    @apply absolute top-2 right-2 size-1.5 rounded-full bg-clay;
   }
   .slot-grid {
     @apply grid gap-3 sm:grid-cols-2;
@@ -299,6 +308,10 @@
   }
   .table-scroll {
     @apply overflow-x-auto;
+  }
+  .table-scroll:focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: -3px;
   }
   .bookings-table {
     @apply w-full text-left;

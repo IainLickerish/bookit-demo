@@ -32,6 +32,28 @@ async function cardDesign(page: Page, selector: string): Promise<void> {
   await expect(card).not.toHaveCSS('box-shadow', 'none');
 }
 
+async function dayCardDesign(page: Page, weekday: string, date: string, today: boolean): Promise<void> {
+  const card = page.getByTestId('shown-date');
+  const dayName = page.getByTestId('shown-weekday');
+  const calendarDate = page.getByTestId('shown-calendar-date');
+  await expect(card).toHaveText(`${weekday}, ${date}`);
+  await expect(dayName).toHaveText(weekday);
+  await expect(calendarDate).toHaveText(date);
+  const dayBox = (await dayName.boundingBox())!;
+  const dateBox = (await calendarDate.boundingBox())!;
+  expect(dateBox.y).toBeGreaterThanOrEqual(dayBox.y + dayBox.height);
+  expect((await card.boundingBox())!.width).toBeLessThanOrEqual(240);
+  await expect(card).toHaveCSS('background-color', 'rgb(241, 238, 232)');
+  await expect(card).toHaveCSS('border-color', 'rgb(29, 92, 75)');
+  const dot = page.getByTestId('today-dot');
+  await expect(dot).toHaveCount(today ? 1 : 0);
+  if (today) {
+    await expect(dot).toHaveAttribute('aria-hidden', 'true');
+    await expect(dot).toHaveCSS('background-color', 'rgb(185, 96, 63)');
+    expect((await dot.boundingBox())!.width).toBe(6);
+  }
+}
+
 test('premium sign-in uses local fonts, the palette and accessible phone controls', async ({ page }) => {
   const fontRequests: string[] = [];
   page.on('request', (request) => {
@@ -67,11 +89,13 @@ test('booking and moving retain their actions inside the new phone layout', asyn
   expect((await page.getByTestId('nav-book').boundingBox())!.width).toBeGreaterThanOrEqual(44);
   await expect(page.getByTestId('upcoming-title')).toHaveCSS('font-family', /Fraunces/);
   await page.getByTestId('nav-book').click();
+  await dayCardDesign(page, 'Tuesday', '20 October 2026', true);
   await page.getByTestId('date-input').fill('2026-10-22');
   await page.getByTestId('show-slots').click();
   await pageDesign(page, 'Book an appointment');
   await cardDesign(page, 'day-picker');
   await expect(page.getByTestId('shown-date')).toContainText('22 October 2026');
+  await dayCardDesign(page, 'Thursday', '22 October 2026', false);
   const slot = page.getByTestId('slot-link').first();
   await expect(slot).toHaveCSS('font-variant-numeric', 'tabular-nums');
   expect((await slot.boundingBox())!.height).toBeGreaterThanOrEqual(48);
@@ -94,6 +118,11 @@ test('booking and moving retain their actions inside the new phone layout', asyn
   await expect(row.getByTestId('booking-status')).toHaveCSS('background-color', 'rgb(233, 241, 236)');
   await row.getByTestId('reschedule-link').click();
   await pageDesign(page, 'Reschedule your appointment');
+  await dayCardDesign(page, 'Thursday', '22 October 2026', false);
+  const rescheduleUrl = page.url();
+  await page.goto(`${rescheduleUrl}?date=2026-10-20`);
+  await dayCardDesign(page, 'Tuesday', '20 October 2026', true);
+  await page.goto(rescheduleUrl);
   await page.getByTestId('reschedule-to').first().click();
   await expect(page.getByTestId('notice')).toHaveText('Booking rescheduled.');
   await page.getByTestId('cancel-booking').first().click();
@@ -116,6 +145,15 @@ test('staff home, filters, table and settings fit laptop and narrow screens', as
     if (width === 1366) expect(shell.width).toBe(1120);
     await cardDesign(page, 'admin-table-card');
     await expect(page.getByTestId('admin-table-scroll')).toHaveCSS('overflow-x', 'auto');
+    await page.getByTestId('admin-export').focus();
+    await page.keyboard.press('Tab');
+    const tableScroll = page.getByTestId('admin-table-scroll');
+    await expect(tableScroll).toBeFocused();
+    await expect(tableScroll).toHaveCSS('outline-style', 'solid');
+    await expect(tableScroll).toHaveCSS('outline-color', 'rgb(29, 92, 75)');
+    await expect(tableScroll).toHaveCSS('outline-width', '2px');
+    // The ring must sit inside the rounded card, which clips outward outlines.
+    await expect(tableScroll).toHaveCSS('outline-offset', '-3px');
   }
   await page.getByTestId('admin-settings-link').click();
   await pageDesign(page, 'Clinic settings');
@@ -215,9 +253,11 @@ test('both clinics share the design and keep their booking and staff journeys', 
       await pageDesign(page, 'My bookings');
       await cardDesign(page, 'booking-row');
       await page.getByTestId('nav-book').click();
+      await dayCardDesign(page, 'Tuesday', '20 October 2026', true);
       await page.getByTestId('date-input').fill('2026-10-23');
       await page.getByTestId('show-slots').click();
       await pageDesign(page, 'Book an appointment');
+      await dayCardDesign(page, 'Friday', '23 October 2026', false);
       await expect(page.getByTestId('practitioner-select')).toContainText(tenant.practitioners[0]!.name);
       await page.getByTestId('slot-link').first().click();
       await pageDesign(page, 'Confirm your booking');
@@ -228,6 +268,7 @@ test('both clinics share the design and keep their booking and staff journeys', 
       const bookingId = await newBooking.getAttribute('data-booking-id');
       await newBooking.getByTestId('reschedule-link').click();
       await pageDesign(page, 'Reschedule your appointment');
+      await dayCardDesign(page, 'Friday', '23 October 2026', false);
       await page.getByTestId('reschedule-to').first().click();
       await expect(page.getByTestId('notice')).toHaveText('Booking rescheduled.');
       const moved = page.locator(`[data-booking-id="${bookingId}"]`);

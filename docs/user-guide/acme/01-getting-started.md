@@ -20,3 +20,6 @@ The clinic name appears at the top of each page. Pages use an ivory background,
 white cards and green buttons, with a short title above the content. On a phone,
 the **Confirm booking** button stays at the bottom of the screen while you check
 your booking. The booking steps and the clinic’s words are unchanged.
+
+When choosing or moving a booking, the selected day appears with its weekday
+above the date. A small clay dot marks today.
