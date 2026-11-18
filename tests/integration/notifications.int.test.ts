@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
@@ -74,8 +74,13 @@ beforeEach(async () => {
   logs = captureLogs(clock);
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stand-in, no real email)', () => {
   it('attaches a calendar file for the confirmed time to both booking and move emails', async () => {
+    vi.stubEnv('BOOKIT_TENANT', 'acme');
     // Choose both slots before booking, as the available list drops the first one once booked.
     const slotId = await freeSlotId();
     const newSlotId = await freeSlotId(1);
@@ -83,7 +88,7 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
     const moved = await rescheduleBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id, newSlotId });
 
     expect(smtp.messages).toHaveLength(2);
-    expect(smtp.messages[1]!.raw).toContain('Subject: Booking rescheduled:');
+    expect(smtp.messages[1]!.raw).toContain('Subject: Session rescheduled:');
     for (const [index, confirmed] of [booking, moved].entries()) {
       const message = smtp.messages[index]!;
       expect(message.to).toEqual([clinic.patient1.email]);

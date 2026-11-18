@@ -26,7 +26,7 @@ export const tenantSchema = z
     domain: z.enum(['acmephysio.test', 'beacondental.test']),
     allowedSenderDomains: z.array(text).length(1),
     mailFrom: fictionalEmail,
-    branding: z.strictObject({ practitionerLabel: text, welcome: text }),
+    branding: z.strictObject({ visitLabel: text, practitionerLabel: text, welcome: text }),
     settings: clinicSettingsInput.strict(),
     supportHours: text,
     tone: text,

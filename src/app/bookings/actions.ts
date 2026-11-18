@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { Logger } from '@/lib/logger';
 import { bookSlot } from '@/server/bookings/book';
@@ -55,6 +56,9 @@ export async function cancelAction(formData: FormData): Promise<void> {
       patientId: patient.id,
       bookingId: formText(formData, 'bookingId'),
     });
+    if (result.booking.status === 'cancelled') {
+      revalidatePath('/bookings');
+    }
     destination = result.late ? '/bookings?notice=cancelled_late' : '/bookings?notice=cancelled';
   } catch (error) {
     destination = `/bookings?error=${refusalCode(error, deps.log, 'cancel')}`;

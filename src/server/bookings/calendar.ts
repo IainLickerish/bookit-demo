@@ -1,6 +1,7 @@
 import { formatSlot } from '@/lib/time';
 import type { ClinicSettings } from '../settings';
 import type { BookingView } from './queries';
+import { bookingWords } from './words';
 
 export const BOOKING_CALENDAR_FILENAME = 'booking.ics';
 export const BOOKING_CALENDAR_CONTENT_TYPE = 'text/calendar; charset=utf-8';
@@ -43,6 +44,8 @@ export function bookingCalendar(
 ): string {
   const when = formatSlot(booking.startsAt, settings.timeZone);
   const minutes = (booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000;
+  const { visitLabel, practitionerLabel } = bookingWords();
+  const description = `${when} (${settings.timeZone})\n${minutes} minutes\nYour ${practitionerLabel} is ${booking.practitionerName}.`;
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -53,9 +56,9 @@ export function bookingCalendar(
     `SEQUENCE:${booking.rescheduleCount}`,
     `DTSTART:${calendarTime(booking.startsAt)}`,
     `DTEND:${calendarTime(booking.endsAt)}`,
-    `SUMMARY:${calendarText(`${settings.clinicName} with ${booking.practitionerName}`)}`,
+    `SUMMARY:${calendarText(`${settings.clinicName} ${visitLabel} with ${booking.practitionerName}`)}`,
     `LOCATION:${calendarText(settings.clinicName)}`,
-    `DESCRIPTION:${calendarText(`${when} (${settings.timeZone})\n${minutes} minutes`)}`,
+    `DESCRIPTION:${calendarText(description)}`,
     'END:VEVENT',
     'END:VCALENDAR',
     '',

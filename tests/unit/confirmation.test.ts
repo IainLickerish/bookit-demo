@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { BookingView } from '@/server/bookings/queries';
 import { composeConfirmation, formatPhone } from '@/server/notifications/confirmation';
 import { deliverEmail } from '@/server/notifications/deliver';
@@ -65,6 +65,27 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
       from: TEST_MAIL_FROM,
     });
     expect(email.text).toContain('Contact phone: +44 7700 900001\n');
+  });
+
+  it.each([
+    ['acme', 'Acme Physio', 'Session', 'session', 'physiotherapist'],
+    ['beacon', 'Beacon Dental', 'Appointment', 'appointment', 'clinician'],
+  ])('uses %s wording in the move confirmation', (tenant, clinicName, title, visit, role) => {
+    vi.stubEnv('BOOKIT_TENANT', tenant);
+    try {
+      const email = composeConfirmation({
+        booking: { ...booking(null), rescheduleCount: 1, practitionerName: 'Taylor Reed' },
+        patient,
+        settings: { ...settings, clinicName },
+        from: TEST_MAIL_FROM,
+      });
+      expect(email.subject).toBe(`${title} rescheduled: Thu, 22 Oct 2026, 10:30`);
+      expect(email.text).toMatch(new RegExp(`^${clinicName}\\n`));
+      expect(email.text).toContain(`Your ${visit} has moved.`);
+      expect(email.text).toContain(`Your ${role} is Taylor Reed.`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('leaves the phone line out with no phone when contact collection is disabled', () => {

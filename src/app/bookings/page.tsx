@@ -27,7 +27,9 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
   const isConfirmation = noticeCode === 'booked' || noticeCode === 'rescheduled';
-  const confirmed = isConfirmation ? upcoming.find((booking) => booking.id === single(params.booking)) : undefined;
+  const confirmed = isConfirmation
+    ? bookings.find((booking) => booking.status === 'confirmed' && booking.id === single(params.booking))
+    : undefined;
   const notice = confirmed || !isConfirmation ? noticeText(noticeCode) : null;
 
   const row = (booking: BookingView, changeable: boolean) => (
@@ -79,7 +81,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           <p className="mt-1 mb-3">
             {formatSlot(confirmed.startsAt, settings.timeZone)} with {confirmed.practitionerName}
           </p>
-          <AddToCalendar bookingId={confirmed.id} />
+          {confirmed.startsAt > now ? <AddToCalendar bookingId={confirmed.id} /> : null}
         </div>
       ) : notice ? (
         <p role="status" className="notice" data-testid="notice">

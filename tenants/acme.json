@@ -6,7 +6,11 @@
   "domain": "acmephysio.test",
   "allowedSenderDomains": ["acmephysio.test"],
   "mailFrom": "noreply@acmephysio.test",
-  "branding": { "practitionerLabel": "physiotherapist", "welcome": "Book sessions with your physiotherapist" },
+  "branding": {
+    "visitLabel": "session",
+    "practitionerLabel": "physiotherapist",
+    "welcome": "Book sessions with your physiotherapist"
+  },
   "settings": {
     "clinicName": "Acme Physio",
     "timeZone": "Europe/London",

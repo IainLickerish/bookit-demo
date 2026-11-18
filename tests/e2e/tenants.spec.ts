@@ -276,10 +276,11 @@ test('each clinic provides its own calendar details and refuses the other clinic
         expect(file.status()).toBe(200);
         expect(file.headers()['cache-control']).toBe('private, no-store');
         const contents = (await file.text()).replace(/\r\n /g, '');
-        expect(contents).toContain(
-          `SUMMARY:${clinic.tenant.settings.clinicName} with ${clinic.tenant.practitioners[0]!.name}\r\n`,
-        );
-        expect(contents).toContain(`\\n${clinic.tenant.settings.sessionMinutes} minutes\r\n`);
+        const { clinicName, sessionMinutes } = clinic.tenant.settings;
+        const { visitLabel, practitionerLabel } = clinic.tenant.branding;
+        const practitioner = clinic.tenant.practitioners[0]!.name;
+        expect(contents).toContain(`SUMMARY:${clinicName} ${visitLabel} with ${practitioner}\r\n`);
+        expect(contents).toContain(`\\n${sessionMinutes} minutes\\nYour ${practitionerLabel} is ${practitioner}.\r\n`);
         return path;
       }),
     );

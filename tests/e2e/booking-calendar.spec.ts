@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { signIn } from './support';
+import { E2E_START, query, signIn } from './support';
 
 test.use({ trace: 'off', viewport: { width: 390, height: 844 } });
 
@@ -65,4 +65,65 @@ test('downloads the confirmed booking from the confirmation and My bookings', as
   await expect(cancelled.getByTestId('booking-status')).toHaveText('Cancelled');
   await expect(cancelled.getByTestId('add-to-calendar')).toHaveCount(0);
   expect((await page.request.get(href)).status()).toBe(404);
+});
+
+test('keeps the confirmation when the booking reaches its start time', async ({ page }) => {
+  await signIn(page, 'patient2@patients.example.test');
+  await page.goto('/slots?date=2026-10-23');
+  const slot = page.getByTestId('slot-link').first();
+  const slotId = (await slot.getAttribute('data-slot-id'))!;
+  const startsAt = (await slot.getAttribute('data-starts-at'))!;
+  await slot.click();
+  await page.getByTestId('confirm-booking').click();
+  const confirmation = page.getByTestId('booking-confirmation');
+  const calendar = confirmation.getByTestId('add-to-calendar');
+  await expect(calendar).toBeVisible();
+  const href = (await calendar.getAttribute('href'))!;
+  // Put this fixture at the fixed clock's current time without advancing the shared clock.
+  const placeSlot = (when: string) =>
+    query(
+      'update slot set starts_at = $2::timestamptz, ends_at = $2::timestamptz + (ends_at - starts_at) where id = $1',
+      [slotId, when],
+    );
+  try {
+    await placeSlot(E2E_START);
+    await page.reload();
+    await expect(confirmation.getByTestId('notice')).toHaveText('Booking confirmed.');
+    await expect(confirmation.getByTestId('add-to-calendar')).toHaveCount(0);
+    expect((await page.request.get(href)).status()).toBe(404);
+  } finally {
+    await placeSlot(startsAt);
+  }
+});
+
+test('Back keeps the calendar link hidden after cancelling', async ({ page }) => {
+  await signIn(page, 'patient1@patients.example.test');
+  await page.goto('/slots?date=2026-10-26');
+  await page.getByTestId('slot-link').first().click();
+  await page.getByTestId('confirm-booking').click();
+  await expect(page.getByTestId('booking-confirmation').getByTestId('add-to-calendar')).toBeVisible();
+  await page.getByTestId('nav-my-bookings').click();
+  const booking = page.getByTestId('upcoming-bookings').getByTestId('booking-row');
+  await expect(booking.getByTestId('add-to-calendar')).toBeVisible();
+  const when = await booking.getByTestId('booking-when').innerText();
+  await booking.getByTestId('cancel-booking').click();
+  await expect(page.getByTestId('notice')).toHaveText('Booking cancelled.');
+  await page.goBack();
+  await expect(page).toHaveURL(/\/bookings$/);
+  await expect(page.getByTestId('add-to-calendar')).toHaveCount(0);
+  const cancelled = page.getByTestId('other-bookings').getByTestId('booking-row').filter({ hasText: when });
+  await expect(cancelled.getByTestId('booking-status')).toHaveText('Cancelled');
+});
+
+test('a double-click downloads only one calendar file', async ({ page }) => {
+  await signIn(page, 'patient1@patients.example.test');
+  await page.goto('/slots?date=2026-10-27');
+  await page.getByTestId('slot-link').first().click();
+  await page.getByTestId('confirm-booking').click();
+  const calendar = page.getByTestId('booking-confirmation').getByTestId('add-to-calendar');
+  const downloads: string[] = [];
+  page.on('download', (file) => downloads.push(file.suggestedFilename()));
+  await Promise.all([page.waitForEvent('download'), calendar.dblclick()]);
+  await expect(page.waitForEvent('download', { timeout: 500 })).rejects.toThrow('Timeout');
+  expect(downloads).toEqual(['booking.ics']);
 });

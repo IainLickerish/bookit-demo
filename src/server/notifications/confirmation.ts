@@ -1,7 +1,8 @@
 import { formatSlot } from '@/lib/time';
 import { BOOKING_CALENDAR_CONTENT_TYPE, BOOKING_CALENDAR_FILENAME, bookingCalendar } from '../bookings/calendar';
-import { reportError } from '../error-reporting';
 import type { BookingView } from '../bookings/queries';
+import { bookingWords } from '../bookings/words';
+import { reportError } from '../error-reporting';
 import type { ClinicSettings } from '../settings';
 import type { OutgoingEmail } from './mailer';
 
@@ -31,15 +32,16 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   const { booking, patient, settings } = input;
   const when = formatSlot(booking.startsAt, settings.timeZone);
   const moved = booking.rescheduleCount > 0;
+  const { visitLabel, practitionerLabel } = bookingWords();
+  const visitTitle = visitLabel.charAt(0).toUpperCase() + visitLabel.slice(1);
   const lines = [
+    ...(moved ? [settings.clinicName, ''] : []),
     `Dear ${patient.name},`,
     '',
-    moved
-      ? `Your booking at ${settings.clinicName} has moved.`
-      : `Your appointment at ${settings.clinicName} is confirmed.`,
+    moved ? `Your ${visitLabel} has moved.` : `Your appointment at ${settings.clinicName} is confirmed.`,
     '',
     `When: ${when} (${settings.timeZone})`,
-    `With: ${booking.practitionerName}`,
+    moved ? `Your ${practitionerLabel} is ${booking.practitionerName}.` : `With: ${booking.practitionerName}`,
     `Booking reference: ${booking.id}`,
   ];
   if (settings.includeContactInConfirmation && booking.phone) {
@@ -55,7 +57,7 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   return {
     from: input.from,
     to: patient.email,
-    subject: `${moved ? 'Booking rescheduled' : 'Booking confirmed'}: ${when}`,
+    subject: `${moved ? `${visitTitle} rescheduled` : 'Booking confirmed'}: ${when}`,
     text: `${lines.join('\n')}\n`,
     attachments: [
       {

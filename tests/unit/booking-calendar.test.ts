@@ -1,27 +1,39 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bookingCalendar } from '@/server/bookings/calendar';
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe('booking calendar', () => {
   it('includes the clinic, practitioner, UK local date and time, and saved slot length in winter and summer', () => {
-    const clinic = { clinicName: 'Acme Physio', timeZone: 'Europe/London' };
-    for (const [startsAt, endsAt, utcStart, utcEnd, localStart, length] of [
-      [
-        '2026-12-01T09:00:00Z',
-        '2026-12-01T09:45:00Z',
-        '20261201T090000Z',
-        '20261201T094500Z',
-        'Tue, 1 Dec 2026, 09:00',
-        45,
-      ],
-      [
-        '2027-04-01T08:00:00Z',
-        '2027-04-01T08:30:00Z',
-        '20270401T080000Z',
-        '20270401T083000Z',
-        'Thu, 1 Apr 2027, 09:00',
-        30,
-      ],
-    ] as const) {
+    for (const { tenant, clinicName, visit, role, startsAt, endsAt, utcStart, utcEnd, localStart, length } of [
+      {
+        tenant: 'acme',
+        clinicName: 'Acme Physio',
+        visit: 'session',
+        role: 'physiotherapist',
+        startsAt: '2026-12-01T09:00:00Z',
+        endsAt: '2026-12-01T09:45:00Z',
+        utcStart: '20261201T090000Z',
+        utcEnd: '20261201T094500Z',
+        localStart: 'Tue, 1 Dec 2026, 09:00',
+        length: 45,
+      },
+      {
+        tenant: 'beacon',
+        clinicName: 'Beacon Dental',
+        visit: 'appointment',
+        role: 'clinician',
+        startsAt: '2027-04-01T08:00:00Z',
+        endsAt: '2027-04-01T08:30:00Z',
+        utcStart: '20270401T080000Z',
+        utcEnd: '20270401T083000Z',
+        localStart: 'Thu, 1 Apr 2027, 09:00',
+        length: 30,
+      },
+    ]) {
+      vi.stubEnv('BOOKIT_TENANT', tenant);
       const calendar = bookingCalendar(
         {
           id: '019a0000-0000-7000-8000-00000000b001',
@@ -29,22 +41,23 @@ describe('booking calendar', () => {
           endsAt: new Date(endsAt),
           updatedAt: new Date('2026-10-20T07:00:00Z'),
           rescheduleCount: 0,
-          practitionerName: 'Alex Physio',
+          practitionerName: 'Taylor Reed',
         },
-        clinic,
+        { clinicName, timeZone: 'Europe/London' },
       ).replace(/\r\n /g, '');
 
-      expect(calendar).toContain('SUMMARY:Acme Physio with Alex Physio\r\n');
-      expect(calendar).toContain('LOCATION:Acme Physio\r\n');
+      expect(calendar).toContain(`SUMMARY:${clinicName} ${visit} with Taylor Reed\r\n`);
+      expect(calendar).toContain(`LOCATION:${clinicName}\r\n`);
       expect(calendar).toContain(`DTSTART:${utcStart}\r\n`);
       expect(calendar).toContain(`DTEND:${utcEnd}\r\n`);
       expect(calendar).toContain(
-        `DESCRIPTION:${localStart.replaceAll(',', '\\,')} (Europe/London)\\n${length} minutes\r\n`,
+        `DESCRIPTION:${localStart.replaceAll(',', '\\,')} (Europe/London)\\n${length} minutes\\nYour ${role} is Taylor Reed.\r\n`,
       );
     }
   });
 
   it('escapes calendar text and folds long lines without splitting UTF-8 characters', () => {
+    vi.stubEnv('BOOKIT_TENANT', 'test');
     const startsAt = new Date('2026-12-01T09:00:00Z');
     const calendar = bookingCalendar(
       {
@@ -62,7 +75,7 @@ describe('booking calendar', () => {
     expect(lines.every((line) => Buffer.byteLength(line) <= 75)).toBe(true);
     expect(lines.some((line) => line.startsWith(' '))).toBe(true);
     expect(calendar.replace(/\r\n /g, '')).toContain(
-      `SUMMARY:${'É'.repeat(40)} with Zoë\\, née Léon\\; physio\\\\trainer\\nEast wing\r\n`,
+      `SUMMARY:${'É'.repeat(40)} appointment with Zoë\\, née Léon\\; physio\\\\trainer\\nEast wing\r\n`,
     );
   });
 });
