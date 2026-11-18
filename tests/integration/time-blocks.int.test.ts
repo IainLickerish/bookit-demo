@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Client } from 'pg';
 import { bookings, timeBlocks, users } from '@/db/schema';
 import { createTimeBlock, listTimeBlocks } from '@/server/admin/time-blocks';
 import { createSession } from '@/server/auth/session';
@@ -197,6 +198,77 @@ describe('staff time blocks', () => {
       else expect(result.reason).toMatchObject({ code: 'slot_blocked' });
       expect(await isSlotFree(database.db, target.id)).toBe(false);
     }
+  });
+
+  it.each([false, true])('waits for an in-flight block before %s booking or moving into its time', async (move) => {
+    const target = await slot('08:45');
+    const original = move
+      ? await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: (await slot('08:00')).id })
+      : null;
+    const client = new Client(database.url);
+    await client.connect();
+    let outcome: Promise<unknown> | undefined;
+    try {
+      await client.query('begin');
+      await client.query('select id from practitioner where id = $1 for update', [target.practitionerId]);
+      await client.query(
+        'insert into time_block (id, practitioner_id, starts_at, ends_at, created_at) values ($1, $2, $3, $4, $5)',
+        [randomUUID(), target.practitionerId, target.startsAt, target.endsAt, clock.now()],
+      );
+      const request = move
+        ? rescheduleBooking(deps(), { patientId: clinic.patient1.id, bookingId: original!.id, newSlotId: target.id })
+        : bookSlot(deps(), { patientId: clinic.patient1.id, slotId: target.id });
+      outcome = request.catch((error: unknown) => error);
+      await vi.waitFor(
+        async () => {
+          const waiting = await database.handle.pool.query(
+            "select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%practitioner%'",
+          );
+          expect(waiting.rowCount).toBeGreaterThan(0);
+        },
+        { timeout: 5000 },
+      );
+    } finally {
+      await client.query('commit');
+      await client.end();
+    }
+    expect(await outcome).toMatchObject({ code: 'slot_blocked' });
+    if (original)
+      expect((await database.db.select().from(bookings).where(eq(bookings.id, original.id)))[0]).toMatchObject({
+        slotId: original.slotId,
+        rescheduleCount: 0,
+      });
+  });
+
+  it('waits for an in-flight booking before saving a block and listing the affected booking', async () => {
+    const target = await slot('08:45');
+    const id = randomUUID();
+    const client = new Client(database.url);
+    await client.connect();
+    let creating: Promise<string> | undefined;
+    try {
+      await client.query('begin');
+      await client.query('select id from practitioner where id = $1 for update', [target.practitionerId]);
+      await client.query(
+        "insert into booking (id, patient_id, slot_id, status, late_cancellation, reschedule_count, created_at, updated_at) values ($1, $2, $3, 'confirmed', false, 0, $4, $4)",
+        [id, clinic.patient1.id, target.id, clock.now()],
+      );
+      creating = createTimeBlock(deps(), token, input(target.practitionerId));
+      await vi.waitFor(
+        async () => {
+          const waiting = await database.handle.pool.query(
+            "select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%practitioner%'",
+          );
+          expect(waiting.rowCount).toBeGreaterThan(0);
+        },
+        { timeout: 5000 },
+      );
+    } finally {
+      await client.query('commit');
+      await client.end();
+    }
+    await creating;
+    expect((await listTimeBlocks(deps(), token))[0]!.affectedBookings.map((row) => row.id)).toEqual([id]);
   });
 
   it('refuses absent, forged, expired, patient, former staff and another clinic’s sessions for reads and writes', async () => {

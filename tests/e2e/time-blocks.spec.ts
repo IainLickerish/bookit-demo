@@ -58,7 +58,9 @@ for (const tenant of ['acme', 'beacon']) {
       await signIn(page, server.url, clinic.admin.email);
       await page.goto(`${server.url}/admin`);
       await page.getByTestId('admin-time-blocks-link').click();
-      await expect(page.getByLabel(tenant === 'acme' ? 'Physiotherapist' : 'Clinician', { exact: true })).toBeVisible();
+      await expect(page.getByTestId('time-block-practitioner')).toHaveAccessibleName(
+        tenant === 'acme' ? 'Physiotherapist' : 'Clinician',
+      );
       await page.getByTestId('time-block-practitioner').selectOption(clinic.practitioners.weekdays);
       await page.getByTestId('time-block-start').fill('2026-10-22T09:30');
       await page.getByTestId('time-block-end').fill('2026-10-22T09:00');
