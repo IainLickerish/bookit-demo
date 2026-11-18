@@ -163,6 +163,8 @@ describe('day-before reminders', () => {
     const sending = sendDueReminders(deps());
     try {
       await claimed;
+      const [row] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+      expect(row!.reminderAttemptedAt).not.toBeNull();
       if (change === 'move') {
         await rescheduleBooking(deps(), { patientId: booking.patientId, bookingId: booking.id, newSlotId });
       } else {
