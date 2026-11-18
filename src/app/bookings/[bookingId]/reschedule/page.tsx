@@ -9,6 +9,7 @@ import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
 import { DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
+import { SlotList } from '../../../slot-list';
 import { rescheduleAction } from '../../actions';
 
 export default async function ReschedulePage({
@@ -67,29 +68,25 @@ export default async function ReschedulePage({
             You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
           </p>
           <DayPicker view={view} path={path} />
-          {choices.length === 0 ? (
-            <p data-testid="no-slots">No free times on this day. Try another day.</p>
-          ) : (
-            <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
-              {choices.map((slot) => (
-                <li key={slot.id}>
-                  <form action={rescheduleAction}>
-                    <input type="hidden" name="bookingId" value={booking.id} />
-                    <input type="hidden" name="newSlotId" value={slot.id} />
-                    <button
-                      type="submit"
-                      className="button-secondary w-full"
-                      data-testid="reschedule-to"
-                      data-slot-id={slot.id}
-                      data-starts-at={slot.startsAt.toISOString()}
-                    >
-                      {formatSlot(slot.startsAt, view.settings.timeZone)}
-                    </button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          )}
+          <SlotList
+            slots={choices}
+            timeZone={view.settings.timeZone}
+            renderChoice={(slot, label) => (
+              <form action={rescheduleAction}>
+                <input type="hidden" name="bookingId" value={booking.id} />
+                <input type="hidden" name="newSlotId" value={slot.id} />
+                <button
+                  type="submit"
+                  className="button-secondary w-full"
+                  data-testid="reschedule-to"
+                  data-slot-id={slot.id}
+                  data-starts-at={slot.startsAt.toISOString()}
+                >
+                  {label}
+                </button>
+              </form>
+            )}
+          />
         </>
       )}
       <p className="mt-6 text-sm">
