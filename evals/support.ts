@@ -69,17 +69,21 @@ export function dateInPeriod(summer: boolean, minDaysAhead: number): string {
   throw new Error('No date found in that clock period');
 }
 
-export async function showDay(page: Page, date: string): Promise<void> {
+export async function showDay(page: Page, date: string, practitioner = PRACTITIONER): Promise<void> {
   await page.getByTestId('nav-book').click();
-  await page.getByTestId('practitioner-select').selectOption({ label: PRACTITIONER });
+  await page.getByTestId('practitioner-select').selectOption({ label: practitioner });
   await page.getByTestId('date-input').fill(date);
   await page.getByTestId('show-slots').click();
   await expect(page.getByTestId('date-input')).toHaveValue(date);
 }
 
 /** Opens the first free slot on the date and returns its id and time (HH:MM). */
-export async function pickFreeSlot(page: Page, date: string): Promise<{ id: string; time: string }> {
-  await showDay(page, date);
+export async function pickFreeSlot(
+  page: Page,
+  date: string,
+  practitioner = PRACTITIONER,
+): Promise<{ id: string; time: string }> {
+  await showDay(page, date, practitioner);
   const slot = page.getByTestId('slot-link').first();
   await expect(slot).toBeVisible();
   const id = (await slot.getAttribute('data-slot-id')) ?? '';
