@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { expect, test, type Browser, type BrowserContext } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import {
   buildComposeImage,
   COMPOSE_CLOCK,
@@ -113,6 +113,27 @@ async function signIn(browser: Browser, clinic: ComposeTenant, localPart: string
   return context;
 }
 
+async function bookWithinLateWindow(page: Page, clinic: ComposeTenant) {
+  // Use tomorrow at Beacon so the time is late under its 48-hour rule but outside Acme's 24 hours.
+  const date = clinic.tenant.tenant === 'acme' ? '2026-10-20' : '2026-10-21';
+  const slotsUrl = `${clinic.url}/slots?date=${date}`;
+  await page.goto(slotsUrl);
+  const slot = page.getByTestId('slot-link').first();
+  const time = await slot.innerText();
+  const slotId = await slot.getAttribute('data-slot-id');
+  expect(slotId).toBeTruthy();
+  const hoursUntilStart =
+    (Date.parse((await slot.getAttribute('data-starts-at'))!) - Date.parse(COMPOSE_CLOCK)) / 3_600_000;
+  expect(hoursUntilStart).toBeGreaterThan(0);
+  expect(hoursUntilStart).toBeLessThan(clinic.tenant.settings.lateCancellationHours);
+  await slot.click();
+  await page.getByTestId('confirm-booking').click();
+  await expect(page).toHaveURL(`${clinic.url}/bookings?notice=booked`);
+  const upcoming = page.getByTestId('upcoming-bookings').getByTestId('booking-row').filter({ hasText: time });
+  await expect(upcoming.getByTestId('booking-status')).toHaveText('Confirmed');
+  return { slotsUrl, time, slotId, upcoming };
+}
+
 test('REQ-18.1-06 both local Compose tenants expose distinct identity, virtual time and local SDK receipt', async () => {
   for (const clinic of [acme, beacon]) {
     const publicOrigin = await clinic.command(['exec', '-T', 'bookit', 'node', '-p', 'process.env.BOOKIT_PUBLIC_URL']);
@@ -190,6 +211,64 @@ test('REQ-18.2-01 admin pages and downloaded exports contain only their own seed
   } finally {
     await a.close();
     await b.close();
+  }
+});
+
+test('A late cancellation moves the booking out of Upcoming in both clinics', async ({ browser }) => {
+  for (const clinic of [acme, beacon]) {
+    await test.step(clinic.tenant.settings.clinicName, async () => {
+      const client = await signIn(browser, clinic, 'patient2');
+      try {
+        const page = client.pages()[0]!;
+        const { time, upcoming } = await bookWithinLateWindow(page, clinic);
+        await upcoming.getByTestId('cancel-booking').click();
+        await expect(page.getByTestId('notice')).toHaveText('Booking cancelled. This was a late cancellation.');
+        await expect(upcoming).toHaveCount(0);
+        const cancelled = page.getByTestId('other-bookings').getByTestId('booking-row').filter({ hasText: time });
+        await expect(cancelled.getByTestId('booking-status')).toHaveText('Cancelled (late)');
+      } finally {
+        await client.close();
+      }
+    });
+  }
+});
+
+test('Clinic bookings shows the late cancellation and another client can book the time in both clinics', async ({
+  browser,
+}) => {
+  for (const clinic of [acme, beacon]) {
+    await test.step(clinic.tenant.settings.clinicName, async () => {
+      const client = await signIn(browser, clinic, 'patient3');
+      const staff = await signIn(browser, clinic, 'admin');
+      const replacement = await signIn(browser, clinic, 'patient2');
+      try {
+        const page = client.pages()[0]!;
+        const other = replacement.pages()[0]!;
+        const { slotsUrl, time, slotId, upcoming } = await bookWithinLateWindow(page, clinic);
+        const sameTime = other.getByTestId('slot-link').and(other.locator(`[data-slot-id="${slotId}"]`));
+        await other.goto(slotsUrl);
+        await expect(sameTime).toHaveCount(0);
+        await upcoming.getByTestId('cancel-booking').click();
+        await expect(page).toHaveURL(`${clinic.url}/bookings?notice=cancelled_late`);
+
+        const admin = staff.pages()[0]!;
+        await admin.goto(`${clinic.url}/admin`);
+        const name = clinic.tenant.accounts.find((account) => account.email.startsWith('patient3@'))!.name;
+        const staffRow = admin
+          .getByTestId('admin-booking-row')
+          .filter({ hasText: time, has: admin.getByRole('cell', { name, exact: true }) });
+        await expect(staffRow.getByRole('cell').last()).toHaveText('Cancelled (late)');
+
+        await other.reload();
+        await sameTime.click();
+        await other.getByTestId('confirm-booking').click();
+        await expect(other).toHaveURL(`${clinic.url}/bookings?notice=booked`);
+        const rebooked = other.getByTestId('upcoming-bookings').getByTestId('booking-row').filter({ hasText: time });
+        await expect(rebooked.getByTestId('booking-status')).toHaveText('Confirmed');
+      } finally {
+        await Promise.all([client.close(), staff.close(), replacement.close()]);
+      }
+    });
   }
 });
 
