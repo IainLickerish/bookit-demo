@@ -1,32 +1,337 @@
 @import 'tailwindcss';
 
+/* Latin subsets from @fontsource-variable/figtree and /fraunces 5.3.0. See the OFL files beside the fonts. */
+@font-face {
+  font-family: Figtree;
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('./fonts/figtree-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Figtree;
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('./fonts/figtree-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Fraunces;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/fraunces-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Fraunces;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  --font-sans: Figtree, system-ui, sans-serif;
+  --font-serif: Fraunces, Georgia, serif;
+  --color-ivory: #faf8f4;
+  --color-ink: #16241f;
+  --color-muted: #5a6862;
+  --color-line: #e6e1d8;
+  --color-field: #8c9792;
+  --color-stone: #f1eee8;
+  --color-pine: #1d5c4b;
+  --color-pine-hover: #164a3c;
+  --color-sage: #e9f1ec;
+  --color-clay: #b9603f;
+  --color-amber-ink: #92400e;
+  --color-amber-tint: #fdf3e2;
+  --color-brick: #a8261b;
+  --color-brick-tint: #fcebe8;
+}
+
 @layer base {
-  h1 {
-    @apply mb-4 text-2xl font-semibold;
+  body {
+    @apply min-h-screen bg-ivory font-sans text-ink;
+    font-size: 1rem;
+    line-height: 1.6;
   }
+
+  h1,
   h2 {
-    @apply mt-6 mb-2 text-lg font-semibold;
+    @apply font-serif font-medium;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
   }
+
+  h1 {
+    font-size: 1.75rem;
+  }
+
+  h2 {
+    font-size: 1.375rem;
+    margin-bottom: 0.75rem;
+  }
+
+  a,
+  .text-link {
+    @apply text-pine underline;
+    text-underline-offset: 0.2em;
+  }
+
+  a:hover,
+  .text-link:hover {
+    @apply text-pine-hover;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: 3px;
+  }
+
   label {
-    @apply block text-sm font-medium;
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 500;
   }
-  input,
+
+  input:not([type='hidden'], [type='checkbox']),
   select {
-    @apply mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2;
+    @apply block w-full min-w-0 rounded-xl border border-field bg-white px-3 py-2 text-ink;
+    min-height: 3rem;
+    margin-top: 0.5rem;
+    font-size: 1rem;
+  }
+
+  input[type='checkbox'] {
+    @apply size-5 shrink-0 accent-pine;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  @media (min-width: 40rem) {
+    h1 {
+      font-size: 2rem;
+    }
   }
 }
 
 @layer components {
-  .button {
-    @apply inline-block rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800;
+  .shell {
+    --gutter: 1.25rem;
+    --shell-width: 45rem;
+    width: min(100% - 2 * var(--gutter), var(--shell-width));
+    margin-inline: auto;
   }
+
+  .shell-wide {
+    --shell-width: 70rem;
+  }
+
+  .site-header {
+    @apply border-b border-line bg-white;
+  }
+
+  .site-header-inner {
+    @apply flex min-h-16 flex-wrap items-center justify-between gap-x-6 py-2;
+  }
+
+  .clinic-name {
+    @apply inline-flex min-h-11 items-center font-serif font-medium no-underline;
+    font-size: 1.375rem;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .site-nav {
+    @apply flex flex-wrap items-center gap-x-4;
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+
+  .site-nav :is(a, button),
+  .quiet-link {
+    @apply inline-flex min-h-11 items-center;
+  }
+
+  .page-main {
+    @apply py-8;
+  }
+
+  .page-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .page-header::before {
+    @apply mb-3 block h-1 w-6 rounded-full bg-clay;
+    content: '';
+  }
+
+  .page-header > p {
+    @apply mt-2 text-muted;
+  }
+
+  .narrow-page {
+    @apply mx-auto;
+    max-width: 27.5rem;
+  }
+
+  .card {
+    @apply min-w-0 border border-line bg-white p-6;
+    border-radius: 1.25rem;
+    box-shadow:
+      0 2px 4px rgb(22 36 31 / 3%),
+      0 8px 24px rgb(22 36 31 / 5%);
+  }
+
+  .button,
   .button-secondary {
-    @apply inline-block rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100;
+    @apply inline-flex min-h-12 items-center justify-center rounded-full border px-4 py-2 text-center font-medium no-underline;
+    font-size: 0.9375rem;
+    line-height: 1.25;
   }
-  .notice {
-    @apply mb-4 rounded border border-teal-200 bg-teal-50 px-4 py-3 text-sm;
+
+  .button {
+    @apply border-pine bg-pine text-white hover:border-pine-hover hover:bg-pine-hover hover:text-white;
   }
+
+  .button-secondary {
+    @apply border-field bg-white text-pine hover:border-pine hover:bg-stone;
+  }
+
+  .notice,
+  .attention,
   .alert {
-    @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
+    @apply relative mb-4 rounded-xl py-3 pr-4 pl-11;
+    overflow-wrap: anywhere;
+  }
+
+  .notice {
+    @apply bg-sage text-pine;
+  }
+
+  .attention {
+    @apply bg-amber-tint text-amber-ink;
+  }
+
+  .alert {
+    @apply bg-brick-tint text-brick;
+  }
+
+  .notice::before,
+  .attention::before,
+  .alert::before {
+    position: absolute;
+    top: 0.875rem;
+    left: 1rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    content: '';
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='8'/%3E%3Cpath d='M10 6v4m0 3.5h.01'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+
+  .notice::before {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='10' r='8'/%3E%3Cpath d='m6.5 10 2.25 2.25 4.75-4.75'/%3E%3C/svg%3E");
+  }
+
+  .day-strip {
+    @apply grid items-stretch gap-2 overflow-x-auto p-1 text-center;
+    grid-template-columns: minmax(5rem, 1fr) minmax(7rem, auto) minmax(5rem, 1fr);
+    margin-inline: -0.25rem;
+    font-size: 0.9375rem;
+  }
+
+  .day-strip > a,
+  .selected-day {
+    @apply flex min-h-12 items-center justify-center rounded-xl border px-2 py-1;
+  }
+
+  .day-strip > a {
+    @apply border-field bg-white hover:bg-stone;
+  }
+
+  .selected-day {
+    @apply flex-col border-pine bg-stone font-medium tabular-nums;
+    line-height: 1.25;
+  }
+
+  .selected-day[aria-current='date']::after {
+    @apply mt-1 size-1.5 shrink-0 rounded-full bg-clay;
+    content: '';
+  }
+
+  .time-grid {
+    @apply grid gap-2 sm:grid-cols-2;
+  }
+
+  .time-choice {
+    @apply w-full tabular-nums;
+  }
+
+  .status-pill {
+    @apply inline-block rounded-full bg-stone px-3 py-1 font-medium text-muted;
+    font-size: 0.8125rem;
+    line-height: 1.3;
+  }
+
+  .status-confirmed {
+    @apply bg-sage text-pine;
+  }
+
+  .booking-table :is(th, td) {
+    @apply px-4 py-3;
+  }
+
+  @media (min-width: 40rem) {
+    .shell {
+      --gutter: 2rem;
+    }
+
+    .page-main {
+      @apply py-12;
+    }
+
+    .page-header {
+      margin-bottom: 2rem;
+    }
+  }
+
+  @media (max-width: 39.999rem) {
+    .confirmation-page:has(.booking-action) {
+      padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    }
+
+    html:has(.booking-action) {
+      scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    }
+
+    .booking-action {
+      @apply fixed inset-x-0 bottom-0 z-10 flex justify-center border-t border-line bg-white px-5 pt-3;
+      padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    }
+
+    .booking-action .button {
+      @apply w-full;
+      max-width: 27.5rem;
+    }
   }
 }
