@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
+import { newId } from '@/lib/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client } from 'pg';
 import { bookings, timeBlocks, users } from '@/db/schema';
@@ -57,7 +58,7 @@ beforeEach(async () => {
 describe('staff time blocks', () => {
   it('saves clinic-local times and optional reasons, refusing invalid input without writes', async () => {
     const id = await createTimeBlock(deps(), token, { ...input(clinic.practitioners.weekdays), reason: '  ' });
-    expect(await listTimeBlocks(deps(), token)).toMatchObject([
+    expect((await listTimeBlocks(deps(), token)).blocks).toMatchObject([
       { id, startsAt: new Date('2026-10-22T08:30:00Z'), endsAt: new Date('2026-10-22T09:00:00Z'), reason: null },
     ]);
     for (const [values, code] of [
@@ -73,7 +74,7 @@ describe('staff time blocks', () => {
         createTimeBlock(deps(), token, { ...input(clinic.practitioners.weekdays), ...values }),
       ).rejects.toMatchObject({ code });
     }
-    expect(await listTimeBlocks(deps(), token)).toHaveLength(1);
+    expect((await listTimeBlocks(deps(), token)).blocks).toHaveLength(1);
   });
 
   it('hides overlapping slots including the block end, allows slots ending at its start and preserves other practitioners and future generation', async () => {
@@ -114,7 +115,7 @@ describe('staff time blocks', () => {
     const untouched = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: (await slot('10:15')).id });
     const before = await database.db.select().from(bookings).orderBy(bookings.id);
     await createTimeBlock(deps(), token, input(clinic.practitioners.weekdays, '2026-10-22T09:30', '2026-10-22T10:30'));
-    const [block] = await listTimeBlocks(deps(), token);
+    const [block] = (await listTimeBlocks(deps(), token)).blocks;
     expect(block!.affectedBookings).toMatchObject([
       {
         id: first.id,
@@ -151,7 +152,7 @@ describe('staff time blocks', () => {
     await runMigrations(database.url);
     expect(await database.db.select().from(bookings)).toEqual(before);
     await createTimeBlock(deps(), token, input(clinic.practitioners.weekdays));
-    expect((await listTimeBlocks(deps(), token))[0]!.affectedBookings.map((row) => row.id)).toEqual([saved.id]);
+    expect((await listTimeBlocks(deps(), token)).blocks[0]!.affectedBookings.map((row) => row.id)).toEqual([saved.id]);
   });
 
   it('refuses stale booking and move submissions and keeps the original booking; outside time still books, moves and cancels', async () => {
@@ -223,7 +224,7 @@ describe('staff time blocks', () => {
         ),
       ]);
       expect(block.status).toBe('fulfilled');
-      const warnings = (await listTimeBlocks(deps(), token)).flatMap((row) => row.affectedBookings);
+      const warnings = (await listTimeBlocks(deps(), token)).blocks.flatMap((row) => row.affectedBookings);
       if (result.status === 'fulfilled') expect(warnings.map((row) => row.id)).toContain(result.value.id);
       else expect(result.reason).toMatchObject({ code: 'slot_blocked' });
       expect(await isSlotFree(database.db, target.id)).toBe(false);
@@ -298,7 +299,65 @@ describe('staff time blocks', () => {
       await client.end();
     }
     await creating;
-    expect((await listTimeBlocks(deps(), token))[0]!.affectedBookings.map((row) => row.id)).toEqual([id]);
+    expect((await listTimeBlocks(deps(), token)).blocks[0]!.affectedBookings.map((row) => row.id)).toEqual([id]);
+  });
+
+  it('pages saved blocks without duplicates and fetches affected bookings only for each displayed page', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: (await slot('08:00')).id });
+    const rows = Array.from({ length: 45 }, (_, i) => ({
+      id: newId(clock),
+      practitionerId: clinic.practitioners.weekdays,
+      startsAt: new Date('2026-10-22T08:15:00Z'),
+      endsAt: new Date('2026-10-22T08:30:00Z'),
+      reason: `Block ${i}`,
+      createdAt: clock.now(),
+    }));
+    await database.db.insert(timeBlocks).values(rows);
+    const queries = vi.spyOn(database.handle.pool, 'query');
+    try {
+      const first = await listTimeBlocks(deps(), token);
+      expect(first.blocks).toHaveLength(20);
+      expect(first.nextCursor).toBe(first.blocks.at(-1)!.id);
+      const second = await listTimeBlocks(deps(), token, first.nextCursor);
+      expect(second.blocks).toHaveLength(20);
+      const third = await listTimeBlocks(deps(), token, second.nextCursor);
+      expect(third.blocks).toHaveLength(5);
+      expect(third.nextCursor).toBeUndefined();
+      expect([...first.blocks, ...second.blocks, ...third.blocks].map((block) => block.id)).toEqual(
+        rows
+          .map((row) => row.id)
+          .sort()
+          .reverse(),
+      );
+      for (const page of [first, second, third]) {
+        for (const block of page.blocks)
+          expect(block.affectedBookings.map((affected) => affected.id)).toEqual([booking.id]);
+      }
+      const blockQueries: number[] = [];
+      const affectedQueries = queries.mock.calls.flatMap((call, index) => {
+        const config: unknown = call[0];
+        const text =
+          typeof config === 'string'
+            ? config
+            : config && typeof config === 'object' && 'text' in config
+              ? String(config.text)
+              : '';
+        if (text.includes('from "time_block"') && !text.includes('inner join "booking"')) blockQueries.push(index);
+        return text.includes('inner join "booking"') ? [index] : [];
+      });
+      expect(blockQueries).toHaveLength(3);
+      for (const [page, index] of blockQueries.entries()) {
+        await expect(queries.mock.results[index]!.value).resolves.toMatchObject({ rowCount: page === 2 ? 5 : 21 });
+      }
+      expect(affectedQueries).toHaveLength(3);
+      for (const [page, index] of affectedQueries.entries()) {
+        // An unbounded affected-booking query would return 45 rows on every page.
+        await expect(queries.mock.results[index]!.value).resolves.toMatchObject({ rowCount: page === 2 ? 5 : 20 });
+      }
+      await expect(listTimeBlocks(deps(), token, 'invalid')).rejects.toThrow();
+    } finally {
+      queries.mockRestore();
+    }
   });
 
   it('refuses absent, forged, expired, patient, former staff and another clinic’s sessions for reads and writes', async () => {

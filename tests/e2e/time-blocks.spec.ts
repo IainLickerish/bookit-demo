@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { expect, test, type Page } from '@playwright/test';
-import { bookings } from '@/db/schema';
+import { bookings, timeBlocks } from '@/db/schema';
+import { newId } from '@/lib/ids';
 import { bookSlot } from '@/server/bookings/book';
 import { listAvailableSlots } from '@/server/slots/queries';
 import { launchServer, writeClockFile } from '../helpers/built-server';
@@ -61,6 +62,10 @@ for (const tenant of ['acme', 'beacon']) {
       await expect(page.getByTestId('time-block-practitioner')).toHaveAccessibleName(
         tenant === 'acme' ? 'Physiotherapist' : 'Clinician',
       );
+      await page.getByTestId('time-block-save').click();
+      await expect(page.getByTestId('time-block-error')).toHaveText(
+        `Choose a ${tenant === 'acme' ? 'physiotherapist' : 'clinician'} from this clinic.`,
+      );
       await page.getByTestId('time-block-practitioner').selectOption(clinic.practitioners.weekdays);
       await page.getByTestId('time-block-start').fill('2026-10-22T09:30');
       await page.getByTestId('time-block-end').fill('2026-10-22T09:00');
@@ -78,6 +83,60 @@ for (const tenant of ['acme', 'beacon']) {
       await page.reload();
       await expect(page.getByTestId('time-block-saved-reason')).toHaveText('Reason: Training');
       expect(await database.db.select().from(bookings).where(eq(bookings.id, saved.id))).toEqual(before);
+      // Historical blocks remain accessible without growing the first page.
+      const oldClock = manualClock('2026-10-19T07:00:00Z');
+      await database.db.insert(timeBlocks).values(
+        Array.from({ length: 22 }, (_, index) => ({
+          id: newId(oldClock),
+          practitionerId: clinic.practitioners.weekdays,
+          startsAt: new Date('2025-10-22T08:00:00Z'),
+          endsAt: new Date('2025-10-22T09:00:00Z'),
+          reason: `Historical block ${index}`,
+          createdAt: oldClock.now(),
+        })),
+      );
+      await page.goto(`${server.url}/admin?date=2026-10-22&status=confirmed`);
+      await expect(page.getByTestId('time-block')).toHaveCount(20);
+      const firstPage = await page.getByTestId('time-block-saved-reason').allTextContents();
+      await page.getByTestId('time-block-older').click();
+      await expect(page.getByTestId('time-block')).toHaveCount(3);
+      const secondPage = await page.getByTestId('time-block-saved-reason').allTextContents();
+      expect(secondPage.every((reason) => !firstPage.includes(reason))).toBe(true);
+      await expect(page.getByTestId('admin-date')).toHaveValue('2026-10-22');
+      await expect(page.getByTestId('admin-status')).toHaveValue('confirmed');
+      await expect(page.getByTestId('admin-filter-error')).toHaveCount(0);
+      await expect(page.getByTestId('admin-export')).toHaveAttribute(
+        'href',
+        '/api/admin/export?date=2026-10-22&status=confirmed',
+      );
+      await page.getByTestId('admin-status').selectOption('cancelled');
+      await page.getByTestId('admin-filter').click();
+      await expect(page.getByTestId('time-block')).toHaveCount(3);
+      await expect(page.getByTestId('admin-row-count')).toHaveText('0 bookings');
+      await page.getByTestId('time-block-practitioner').selectOption(clinic.practitioners.weekdays);
+      await page.getByTestId('time-block-start').fill('2026-10-22T09:30');
+      await page.getByTestId('time-block-end').fill('2026-10-22T10:30');
+      await page.getByTestId('time-block-reason').fill('New from older page');
+      await page.getByTestId('time-block-save').click();
+      await expect(page.getByTestId('time-block-saved')).toHaveText('Time block saved.');
+      await expect(page).not.toHaveURL(/blocksBefore=/);
+      await expect(page.getByTestId('admin-date')).toHaveValue('2026-10-22');
+      await expect(page.getByTestId('admin-status')).toHaveValue('cancelled');
+      await expect(page.getByTestId('time-block')).toHaveCount(20);
+      await expect(
+        page
+          .getByTestId('time-block')
+          .filter({ hasText: 'New from older page' })
+          .getByTestId('time-block-affected-booking'),
+      ).toContainText(clinic.patient1.email);
+      await page.getByTestId('time-block-older').click();
+      await page.getByTestId('time-block-newest').click();
+      await expect(page.getByTestId('time-block')).toHaveCount(20);
+      await expect(page.getByTestId('admin-status')).toHaveValue('cancelled');
+      await page.goto(`${server.url}/admin?blocksBefore=invalid`);
+      await expect(page.getByTestId('time-block-page-error')).toBeVisible();
+      await page.getByTestId('time-block-newest').click();
+      await expect(page.getByTestId('time-block-page-error')).toHaveCount(0);
       const client = await clientContext.newPage();
       await signIn(client, server.url, clinic.patient2.email);
       await client.goto(`${server.url}/slots?practitioner=${clinic.practitioners.weekdays}&date=2026-10-22`);

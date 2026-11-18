@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { TIME_BLOCK_ERRORS } from '@/server/admin/time-block-input';
+import { timeBlockErrorText } from '@/server/admin/time-block-input';
 import { noticeText } from '../messages';
 import { saveTimeBlockAction } from './time-block-actions';
 
@@ -9,10 +9,12 @@ export function TimeBlockForm({
   practitioners,
   timeZone,
   practitionerLabel,
+  returnQuery,
 }: {
   practitioners: { id: string; name: string }[];
   timeZone: string;
   practitionerLabel: string;
+  returnQuery?: string;
 }) {
   const [state, action, pending] = useActionState(saveTimeBlockAction, {});
   const [values, setValues] = useState({ practitionerId: '', start: '', end: '', reason: '' });
@@ -26,10 +28,11 @@ export function TimeBlockForm({
       ) : null}
       {state.error ? (
         <p role="alert" className="alert" id="time-block-error" data-testid="time-block-error">
-          {TIME_BLOCK_ERRORS[state.error]}
+          {timeBlockErrorText(state.error, practitionerLabel)}
         </p>
       ) : null}
       <form action={action} noValidate className="my-6 grid gap-4 sm:grid-cols-2" data-testid="time-block-form">
+        {returnQuery !== undefined ? <input type="hidden" name="returnQuery" value={returnQuery} /> : null}
         <label>
           {practitionerLabel}
           <select

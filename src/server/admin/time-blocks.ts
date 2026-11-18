@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, gt, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, lte } from 'drizzle-orm';
 import { bookings, practitioners, slots, timeBlocks, users } from '@/db/schema';
 import { newId } from '@/lib/ids';
+import { isUuid } from '../bookings/queries';
 import { findSessionUser } from '../auth/session';
 import { withoutQueryDetails } from '../errors';
 import { loadClinicSettings } from '../settings';
@@ -30,11 +31,14 @@ export async function createTimeBlock(deps: AdminReportDependencies, token: stri
   }
 }
 
+export const TIME_BLOCK_PAGE_SIZE = 20;
+
 /** Uses only the current clinic's session and database. No request selects a clinic. */
-export async function listTimeBlocks(deps: AdminReportDependencies, token: string | undefined) {
+export async function listTimeBlocks(deps: AdminReportDependencies, token: string | undefined, before?: string) {
   try {
     await authorise(deps, token);
-    const blocks = await deps.db
+    if (before !== undefined && !isUuid(before)) throw new Error('Invalid time block page');
+    const candidates = await deps.db
       .select({
         id: timeBlocks.id,
         practitionerName: practitioners.name,
@@ -44,7 +48,13 @@ export async function listTimeBlocks(deps: AdminReportDependencies, token: strin
       })
       .from(timeBlocks)
       .innerJoin(practitioners, eq(practitioners.id, timeBlocks.practitionerId))
-      .orderBy(desc(timeBlocks.createdAt), desc(timeBlocks.id));
+      // IDs are time-ordered UUIDv7 values. The primary key supports cursor paging.
+      .where(before ? lt(timeBlocks.id, before) : undefined)
+      .orderBy(desc(timeBlocks.id))
+      .limit(TIME_BLOCK_PAGE_SIZE + 1);
+    const blocks = candidates.slice(0, TIME_BLOCK_PAGE_SIZE);
+    const nextCursor = candidates.length > TIME_BLOCK_PAGE_SIZE ? blocks.at(-1)!.id : undefined;
+    if (!blocks.length) return { blocks: [], nextCursor };
     const affected = await deps.db
       .select({
         blockId: timeBlocks.id,
@@ -68,11 +78,20 @@ export async function listTimeBlocks(deps: AdminReportDependencies, token: strin
       .innerJoin(bookings, and(eq(bookings.slotId, slots.id), eq(bookings.status, 'confirmed')))
       .innerJoin(users, eq(users.id, bookings.patientId))
       .innerJoin(practitioners, eq(practitioners.id, slots.practitionerId))
+      .where(
+        inArray(
+          timeBlocks.id,
+          blocks.map((block) => block.id),
+        ),
+      )
       .orderBy(asc(slots.startsAt), asc(bookings.id));
-    return blocks.map((block) => ({
-      ...block,
-      affectedBookings: affected.filter((booking) => booking.blockId === block.id),
-    }));
+    const byBlock = new Map<string, typeof affected>();
+    for (const booking of affected) {
+      const group = byBlock.get(booking.blockId);
+      if (group) group.push(booking);
+      else byBlock.set(booking.blockId, [booking]);
+    }
+    return { blocks: blocks.map((block) => ({ ...block, affectedBookings: byBlock.get(block.id) ?? [] })), nextCursor };
   } catch (error) {
     throw withoutQueryDetails(error);
   }

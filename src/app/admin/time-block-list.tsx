@@ -5,7 +5,7 @@ export function TimeBlockList({
   blocks,
   timeZone,
 }: {
-  blocks: Awaited<ReturnType<typeof listTimeBlocks>>;
+  blocks: Awaited<ReturnType<typeof listTimeBlocks>>['blocks'];
   timeZone: string;
 }) {
   if (!blocks.length)

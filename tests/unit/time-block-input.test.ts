@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTimeBlock } from '@/server/admin/time-block-input';
+import { parseTimeBlock, timeBlockErrorText, TIME_BLOCK_ERRORS } from '@/server/admin/time-block-input';
 
 const input = {
   practitionerId: '019a0000-0000-7000-8000-000000000001',
@@ -23,5 +23,20 @@ describe('clinic-local time block input', () => {
     }
     expect(() => parseTimeBlock({ ...input, end: input.start }, 'Europe/London')).toThrow('end must be after');
     expect(() => parseTimeBlock({ ...input, reason: 'x'.repeat(501) }, 'Europe/London')).toThrow('500 characters');
+  });
+});
+
+describe('time block selection wording', () => {
+  it.each(['Physiotherapist', 'Clinician'])('uses the %s label for empty and invalid selections', (label) => {
+    for (const practitionerId of ['', 'invalid']) {
+      try {
+        parseTimeBlock({ ...input, practitionerId }, 'Europe/London');
+        throw new Error('Expected refusal');
+      } catch (error) {
+        expect(error).toMatchObject({ code: 'practitioner' });
+        expect(timeBlockErrorText('practitioner', label)).toBe(`Choose a ${label.toLowerCase()} from this clinic.`);
+      }
+    }
+    expect(timeBlockErrorText('range', label)).toBe(TIME_BLOCK_ERRORS.range);
   });
 });

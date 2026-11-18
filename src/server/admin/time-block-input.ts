@@ -9,6 +9,12 @@ export const TIME_BLOCK_ERRORS = {
   range: 'The end must be after the start. Please check both times.',
   reason: 'Keep the reason to 500 characters or fewer, or leave it empty.',
 } as const;
+export function timeBlockErrorText(code: TimeBlockErrorCode, practitionerLabel: string): string {
+  return code === 'practitioner'
+    ? `Choose a ${practitionerLabel.toLowerCase()} from this clinic.`
+    : TIME_BLOCK_ERRORS[code];
+}
+
 export type TimeBlockErrorCode = keyof typeof TIME_BLOCK_ERRORS;
 export class TimeBlockInputError extends Error {
   constructor(readonly code: TimeBlockErrorCode) {

@@ -36,3 +36,8 @@ time. Their bookings are not cancelled or changed automatically. Cancelled
 bookings are not included in the warning. Only your clinic's staff can see blocks,
 reasons and affected booking details. Saved blocks remain listed when you return;
 the warning updates if a booking is moved or cancelled.
+
+Saved blocks are shown 20 at a time, newest first. Choose **View older blocks**
+to see the next group, or **View newest blocks** to return to the start. Your
+booking filters stay selected when you browse blocks. Saving a block from an
+older page returns you to the newest blocks so you can see it and any warnings.

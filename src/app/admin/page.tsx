@@ -1,3 +1,4 @@
+import { isUuid } from '@/server/bookings/queries';
 import { cookies } from 'next/headers';
 import { SESSION_COOKIE } from '@/server/auth/session';
 import { adminDependencies } from '@/server/admin/context';
@@ -15,7 +16,7 @@ import {
   type BookingFilters,
 } from '@/server/admin/bookings';
 import { loadClinicSettings } from '@/server/settings';
-import type { SearchParams } from '../messages';
+import { noticeText, type SearchParams } from '../messages';
 
 export default async function AdminBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
@@ -24,6 +25,10 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   for (const [key, value] of Object.entries(params)) {
     for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item);
   }
+  const before = params.blocksBefore;
+  const invalidBlockPage = Array.isArray(before) || (before !== undefined && !isUuid(before));
+  query.delete('blocksBefore');
+  query.delete('blockSaved');
   let filters: BookingFilters = {};
   let invalid = false;
   try {
@@ -33,10 +38,19 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   }
   const db = getDatabase();
   const [settings, practitioners] = await Promise.all([loadClinicSettings(db), listAdminPractitioners(db)]);
-  const blocks = await listTimeBlocks(await adminDependencies(), (await cookies()).get(SESSION_COOKIE)?.value);
+  const blockPage = invalidBlockPage
+    ? null
+    : await listTimeBlocks(
+        await adminDependencies(),
+        (await cookies()).get(SESSION_COOKIE)?.value,
+        before as string | undefined,
+      );
   const practitionerLabel = process.env.BOOKIT_TENANT === 'beacon' ? 'Clinician' : 'Physiotherapist';
   const rows = invalid ? [] : await listAdminBookings(db, filters, settings.timeZone);
   const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
+  const newestBlocksPath = `/admin${exportQuery ? `?${exportQuery}` : ''}#time-blocks`;
+  const olderQuery = new URLSearchParams(Object.entries(filters));
+  if (blockPage?.nextCursor) olderQuery.set('blocksBefore', blockPage.nextCursor);
   return (
     <section>
       <h1>Clinic bookings</h1>
@@ -51,6 +65,9 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
         </a>
       </p>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
+        {typeof before === 'string' && !invalidBlockPage ? (
+          <input type="hidden" name="blocksBefore" value={before} />
+        ) : null}
         <label>
           Practitioner
           <select name="practitionerId" defaultValue={filters.practitionerId ?? ''} data-testid="admin-practitioner">
@@ -129,13 +146,42 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           Stop clients booking time when a {practitionerLabel.toLowerCase()} is away. Any slot that overlaps the block
           will be unavailable. Existing bookings stay confirmed.
         </p>
+        {params.blockSaved === '1' ? (
+          <p role="status" className="notice" data-testid="time-block-saved">
+            {noticeText('time_block_saved')}
+          </p>
+        ) : null}
         <TimeBlockForm
           practitioners={practitioners}
           timeZone={settings.timeZone}
           practitionerLabel={practitionerLabel}
+          returnQuery={before !== undefined ? exportQuery : undefined}
         />
         <h2>Saved time blocks</h2>
-        <TimeBlockList blocks={blocks} timeZone={settings.timeZone} />
+        {invalidBlockPage ? (
+          <p role="alert" className="alert" data-testid="time-block-page-error">
+            Choose a valid page of time blocks. View the newest blocks to continue.
+          </p>
+        ) : (
+          <TimeBlockList blocks={blockPage!.blocks} timeZone={settings.timeZone} />
+        )}
+        <nav aria-label="Time block pages" className="mt-4 flex gap-4">
+          {before !== undefined ? (
+            <Link href={newestBlocksPath} prefetch={false} className="underline" data-testid="time-block-newest">
+              View newest blocks
+            </Link>
+          ) : null}
+          {blockPage?.nextCursor ? (
+            <Link
+              href={`/admin?${olderQuery}#time-blocks`}
+              prefetch={false}
+              className="underline"
+              data-testid="time-block-older"
+            >
+              View older blocks
+            </Link>
+          ) : null}
+        </nav>
       </section>
     </section>
   );
