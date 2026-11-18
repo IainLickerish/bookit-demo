@@ -22,9 +22,12 @@ test('Staff at both clinics download filtered bookings with accented client name
         await page.getByTestId('admin-status').selectOption('confirmed');
         await page.getByTestId('admin-filter').click();
         await expect(page).toHaveURL(/[?&]status=confirmed(?:&|$)/);
-        await expect(page.getByTestId('admin-booking-row').filter({ hasText: clinic.client })).toContainText(
-          'Confirmed',
-        );
+        const confirmedBooking = page
+          .getByTestId('admin-booking-row')
+          .filter({ has: page.getByRole('cell', { name: clinic.client, exact: true }) })
+          .filter({ has: page.getByRole('cell', { name: 'Confirmed', exact: true }) })
+          .first();
+        await expect(confirmedBooking).toBeVisible();
       });
 
       await step(page, `Download the filtered bookings from ${clinic.name} and check the client's name`, async () => {

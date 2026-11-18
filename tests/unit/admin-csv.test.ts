@@ -33,6 +33,16 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
       expect(csvField(value)).toBe(`"'${value.replaceAll('"', '""')}"`);
     },
   );
+  it.each(['＝1+1', '＋1', '－1', '＠SUM(1,2)', '　＝1+1'])(
+    'exports full-width formula prefixes as inert quoted text: %j',
+    (value) => {
+      expect(csvField(value)).toBe(`"'${value}"`);
+    },
+  );
+  it('keeps the original Unicode spelling of a name', () => {
+    const name = 'Ｚoe\u0308 Brontë';
+    expect(csvField(name)).toBe(`"${name}"`);
+  });
   it('keeps normal commas, quotes and newlines inside one field', () => {
     expect(csvField('Ada, "Clinic"\nTest')).toBe('"Ada, ""Clinic""\nTest"');
   });
