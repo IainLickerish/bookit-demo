@@ -9,8 +9,8 @@ import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
 import { DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
-import { rescheduleAction } from '../../actions';
 import { PageHeader } from '../../../page-header';
+import { rescheduleAction } from '../../actions';
 
 export default async function ReschedulePage({
   params,

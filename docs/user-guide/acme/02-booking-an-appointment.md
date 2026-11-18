@@ -8,8 +8,9 @@ audience: patient
 # Booking a physiotherapy session
 
 Acme Physio sessions are **45 minutes**. Sign in, choose **Book** at `/slots`,
-select your physiotherapist and date, and choose a free time. Check the appointment
-details before confirming. You can provide a phone number, but it is optional.
+select your physiotherapist and date, and tap or click a time. Check the appointment
+details before confirming. On a phone, **Confirm booking** sits at the bottom of
+the screen. You can provide a phone number, but it is optional.
 
 Slots are offered up to 220 days ahead. All times use Europe/London. A slot can
 be booked by only one patient; if somebody books it first, choose another time.

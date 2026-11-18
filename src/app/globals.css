@@ -184,6 +184,10 @@
     content: '';
   }
 
+  section:has(.selected-day[aria-current='date']) > .page-header::before {
+    @apply bg-sage;
+  }
+
   .page-header > p {
     @apply mt-2 text-muted;
   }

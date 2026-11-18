@@ -10,6 +10,7 @@ import {
 } from '@/server/admin/bookings';
 import { loadClinicSettings } from '@/server/settings';
 import type { SearchParams } from '../messages';
+import { PageHeader } from '../page-header';
 
 export default async function AdminBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
@@ -31,13 +32,12 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
   return (
     <section>
-      <h1>Clinic bookings</h1>
-      <p>
-        <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
+      <PageHeader title="Clinic bookings">
+        <Link href="/admin/settings" prefetch={false} className="quiet-link" data-testid="admin-settings-link">
           Clinic settings
         </Link>
-      </p>
-      <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
+      </PageHeader>
+      <form method="get" action="/admin" className="card grid gap-4 sm:grid-cols-3 sm:items-end">
         <label>
           Practitioner
           <select name="practitionerId" defaultValue={filters.practitionerId ?? ''} data-testid="admin-practitioner">
@@ -61,27 +61,38 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
             <option value="cancelled">Cancelled</option>
           </select>
         </label>
-        <button className="button" type="submit" data-testid="admin-filter">
-          Filter bookings
-        </button>
-        <Link href="/admin" prefetch={false} className="button-secondary">
-          Clear filters
-        </Link>
+        <div className="flex flex-wrap gap-2 sm:col-span-3">
+          <button className="button" type="submit" data-testid="admin-filter">
+            Filter bookings
+          </button>
+          <Link href="/admin" prefetch={false} className="button-secondary">
+            Clear filters
+          </Link>
+        </div>
       </form>
       {invalid ? (
-        <p role="alert" className="alert" data-testid="admin-filter-error">
+        <p role="alert" className="alert mt-6" data-testid="admin-filter-error">
           Choose a valid practitioner, calendar date and booking status.
         </p>
       ) : (
-        <>
-          <p data-testid="admin-row-count">{rows.length} bookings</p>
-          <a href={`/api/admin/export?${exportQuery}`} className="button-secondary my-3" data-testid="admin-export">
-            Export filtered bookings (CSV)
-          </a>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+        <div className="card mt-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-semibold" data-testid="admin-row-count">
+              {rows.length} bookings
+            </p>
+            <a href={`/api/admin/export?${exportQuery}`} className="button-secondary" data-testid="admin-export">
+              Export filtered bookings (CSV)
+            </a>
+          </div>
+          <div
+            className="overflow-x-auto rounded-xl border border-line"
+            tabIndex={0}
+            role="region"
+            aria-label="Clinic bookings"
+          >
+            <table className="booking-table w-full text-left">
               <caption className="sr-only">Clinic bookings in {settings.timeZone}</caption>
-              <thead>
+              <thead className="bg-stone text-sm">
                 <tr>
                   <th scope="col">Patient</th>
                   <th scope="col">Practitioner</th>
@@ -91,16 +102,18 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="border-t" data-testid="admin-booking-row">
-                    <td className="py-3">{row.patientName}</td>
+                  <tr key={row.id} className="border-t border-line" data-testid="admin-booking-row">
+                    <td>{row.patientName}</td>
                     <td>{row.practitionerName}</td>
-                    <td>{formatSlot(row.startsAt, settings.timeZone)}</td>
+                    <td className="whitespace-nowrap tabular-nums">{formatSlot(row.startsAt, settings.timeZone)}</td>
                     <td>
-                      {row.status === 'confirmed'
-                        ? 'Confirmed'
-                        : row.lateCancellation
-                          ? 'Cancelled (late)'
-                          : 'Cancelled'}
+                      <span className={row.status === 'confirmed' ? 'status-pill status-confirmed' : 'status-pill'}>
+                        {row.status === 'confirmed'
+                          ? 'Confirmed'
+                          : row.lateCancellation
+                            ? 'Cancelled (late)'
+                            : 'Cancelled'}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -108,7 +121,7 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
             </table>
           </div>
           {rows.length === 0 ? <p>No bookings match these filters.</p> : null}
-        </>
+        </div>
       )}
     </section>
   );
