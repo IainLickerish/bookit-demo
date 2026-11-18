@@ -5,7 +5,13 @@ import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
 import type { BookingDependencies } from './book';
 import { BookingError } from './errors';
-import { findBookingForPatient, isUuid, ONE_CONFIRMED_BOOKING_PER_SLOT, type BookingView } from './queries';
+import {
+  findBookingForPatient,
+  isUuid,
+  lockBookingChanges,
+  ONE_CONFIRMED_BOOKING_PER_SLOT,
+  type BookingView,
+} from './queries';
 import { assertReschedulable, assertSlotBookable } from './rules';
 
 export interface RescheduleBookingRequest {
@@ -23,6 +29,7 @@ export async function rescheduleBooking(
   }
   const now = deps.clock.now();
   const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
+    await lockBookingChanges(tx, request.bookingId, request.patientId);
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
       .select({

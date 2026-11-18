@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -66,6 +67,23 @@ describe('start-up refusal of BOOKIT_TEST_CLOCK (security, plan 12.8)', () => {
     record('m0-24a', 'production-build-starts', outcome);
     expect(outcome.served).toBe(true);
     expect(outcome.output).not.toContain('startup.refused');
+  });
+
+  it('serves health checks with malformed reminder SMTP configuration and keeps its password out of logs', async () => {
+    const dummyPassword = randomUUID();
+    const server = await launchServer(PRODUCTION_DIST, {
+      ...LOCAL,
+      DATABASE_URL: 'postgresql://127.0.0.1:1/bookit',
+      BOOKIT_SMTP_URL: `smtp://bookit:${dummyPassword}@[invalid:1025`,
+    });
+    try {
+      const health = await fetch(`${server.url}/api/health`, { signal: AbortSignal.timeout(5_000) });
+      expect(health.status).toBe(200);
+      await expect.poll(() => server.output().includes('"event":"email.reminder.configuration_failed"')).toBe(true);
+    } finally {
+      await server.stop();
+      expect(server.output().includes(dummyPassword)).toBe(false);
+    }
   });
 
   it('a test-clock build starts with a readable clock file and refuses an unreadable one', async () => {

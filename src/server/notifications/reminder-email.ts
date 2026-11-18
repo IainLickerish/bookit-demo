@@ -20,9 +20,11 @@ function escapeHtml(value: string): string {
 
 export function composeReminderEmail(input: ReminderEmailInput): OutgoingEmail {
   const { bookingId, clinicName, timeZone, publicUrl } = input;
-  const appointment = input.tenant === 'acme' ? 'session' : 'appointment';
+  const acme = input.tenant === 'acme';
+  const appointment = acme ? 'session' : 'appointment';
+  const practitioner = acme ? 'physiotherapist' : 'clinician';
   const when = formatSlot(input.startsAt, timeZone);
-  const details = `Your ${appointment} is on ${when} (${timeZone}) with ${input.practitionerName}.`;
+  const details = `Your ${appointment} is on ${when} (${timeZone}) with your ${practitioner}, ${input.practitionerName}.`;
   const instructions = 'Sign in to reschedule or cancel your booking.';
   const links = [
     { label: `Reschedule your ${appointment}`, path: rescheduleBookingPath(bookingId) },

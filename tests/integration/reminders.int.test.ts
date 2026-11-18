@@ -1,7 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { bookings, clinicSettings, slots } from '@/db/schema';
 import { addHours, addMinutes } from '@/lib/time';
+import { updateAdminSettings } from '@/server/admin/settings';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
@@ -59,6 +60,36 @@ async function bookAt(instant: string, patientId = clinic.patient1.id) {
   return bookSlot(reminderDeps(disabledMailer), { patientId, slotId: await slotAt(instant) });
 }
 
+async function duringBookingDetailsRead(work: () => Promise<unknown>, whileWaiting: (pid: number) => Promise<void>) {
+  const blocker = await database.handle.pool.connect();
+  let pending: Promise<unknown> | undefined;
+  try {
+    await blocker.query('begin');
+    await blocker.query('lock table "practitioner" in access exclusive mode');
+    pending = work();
+    void pending.catch(() => undefined);
+    let pid: number | undefined;
+    await expect
+      .poll(
+        async () => {
+          const { rows } = await database.db.execute<{ pid: number }>(sql`
+            select pid from pg_stat_activity
+            where datname = current_database() and wait_event_type = 'Lock'
+              and query like '%inner join "practitioner"%'
+          `);
+          pid = rows[0]?.pid;
+          return pid;
+        },
+        { timeout: 5_000 },
+      )
+      .toBeTypeOf('number');
+    await whileWaiting(pid!);
+  } finally {
+    await blocker.query('rollback').finally(() => blocker.release());
+    await pending;
+  }
+}
+
 it('Sends a confirmed booking one reminder when due, even across concurrent checks and later checks', async () => {
   const booking = await bookAt('2026-10-22T13:15:00Z');
   await setReminders(true);
@@ -88,14 +119,16 @@ it('Shows the date, local 24-hour time and practitioner in the reminder on both 
   clock.set(addHours(summer.startsAt, -24));
   await sendDueBookingReminders(reminderDeps(inbox, 'acme'));
   expect(inbox.sent[0]?.text).toContain(
-    'Test Physio Clinic\n\nYour session is on Thu, 22 Oct 2026, 14:15 (Europe/London) with Pat Physio.',
+    'Test Physio Clinic\n\nYour session is on Thu, 22 Oct 2026, 14:15 (Europe/London) with your physiotherapist, Pat Physio.',
   );
+  expect(inbox.sent[0]?.html).toContain('with your physiotherapist, Pat Physio.');
 
   clock.set(addHours(winter.startsAt, -24));
   await sendDueBookingReminders(reminderDeps(inbox, 'beacon'));
   expect(inbox.sent[1]?.text).toContain(
-    'Test Physio Clinic\n\nYour appointment is on Mon, 26 Oct 2026, 13:30 (Europe/London) with Pat Physio.',
+    'Test Physio Clinic\n\nYour appointment is on Mon, 26 Oct 2026, 13:30 (Europe/London) with your clinician, Pat Physio.',
   );
+  expect(inbox.sent[1]?.html).toContain('with your clinician, Pat Physio.');
 });
 
 it('Omits cancelled, past and short-notice bookings from the reminder emails', async () => {
@@ -180,4 +213,49 @@ it('Does not resend if SMTP disconnects after taking the reminder email', async 
     .from(bookings)
     .where(eq(bookings.id, booking.id));
   expect(stored?.status).toBe('confirmed');
+});
+
+it('Honours a staff switch to off while the scheduler is reading the due booking', async () => {
+  const booking = await bookAt('2026-10-22T13:15:00Z');
+  clock.set(addHours(booking.startsAt, -24));
+  await setReminders(true);
+  const inbox = recordingMailer();
+
+  await duringBookingDetailsRead(
+    () => sendDueBookingReminders(reminderDeps(inbox)),
+    async () => {
+      const { clinicName, timeZone, lateCancellationHours, includeContactInConfirmation } = clinic.settings;
+      await updateAdminSettings(database.db, clock, {
+        clinicName,
+        timeZone,
+        lateCancellationHours,
+        includeContactInConfirmation,
+        remindersEnabled: false,
+      });
+    },
+  );
+  expect(inbox.sent).toEqual([]);
+  await setReminders(true);
+  await sendDueBookingReminders(reminderDeps(inbox));
+  expect(inbox.sent).toHaveLength(1);
+});
+
+it('Retries a due reminder after PostgreSQL interrupts the booking details read before SMTP', async () => {
+  const booking = await bookAt('2026-10-22T13:15:00Z');
+  clock.set(addHours(booking.startsAt, -24));
+  await setReminders(true);
+  const inbox = recordingMailer();
+
+  await duringBookingDetailsRead(
+    () => expect(sendDueBookingReminders(reminderDeps(inbox))).rejects.toMatchObject({ cause: { code: '57014' } }),
+    async (pid) => {
+      const [result] = (
+        await database.db.execute<{ cancelled: boolean }>(sql`select pg_cancel_backend(${pid}) as cancelled`)
+      ).rows;
+      expect(result?.cancelled).toBe(true);
+    },
+  );
+  expect(inbox.sent).toEqual([]);
+  await sendDueBookingReminders(reminderDeps(inbox));
+  expect(inbox.sent).toHaveLength(1);
 });

@@ -3,7 +3,7 @@ import { bookings, slots } from '@/db/schema';
 import { loadClinicSettings } from '../settings';
 import type { BookingDependencies } from './book';
 import { BookingError } from './errors';
-import { findBookingForPatient, isUuid, type BookingView } from './queries';
+import { findBookingForPatient, isUuid, lockBookingChanges, type BookingView } from './queries';
 import { isLateCancellation } from './rules';
 
 export interface CancelBookingRequest {
@@ -26,6 +26,7 @@ export async function cancelBooking(
   }
   const now = deps.clock.now();
   const result = await deps.db.transaction(async (tx) => {
+    await lockBookingChanges(tx, request.bookingId, request.patientId);
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
       .select({ status: bookings.status, startsAt: slots.startsAt })

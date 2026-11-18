@@ -1,6 +1,6 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Executor } from '@/db/client';
+import type { Executor, Transaction } from '@/db/client';
 import { bookings, practitioners, slots } from '@/db/schema';
 
 export interface BookingView {
@@ -41,6 +41,14 @@ export const ONE_CONFIRMED_BOOKING_PER_SLOT = 'booking_one_confirmed_per_slot';
 
 export function isUuid(value: unknown): value is string {
   return z.uuid().safeParse(value).success;
+}
+
+/** Serialises a move or cancellation with reminder submission for the same booking. */
+export async function lockBookingChanges(tx: Transaction, bookingId: string, patientId?: string): Promise<void> {
+  await tx
+    .select({ lock: sql`pg_advisory_xact_lock(hashtextextended(${bookings.id}::text, 240025))` })
+    .from(bookings)
+    .where(and(eq(bookings.id, bookingId), patientId === undefined ? undefined : eq(bookings.patientId, patientId)));
 }
 
 export async function listBookingsForPatient(db: Executor, patientId: string): Promise<BookingView[]> {
