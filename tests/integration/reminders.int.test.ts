@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm';
+import { createServer, type Socket } from 'node:net';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { bookings } from '@/db/schema';
 import { bookingReturnPath } from '@/lib/routes';
@@ -9,7 +10,7 @@ import { findBookingForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer, disabledMailer } from '@/server/notifications/mailer';
 import { sendDueReminders } from '@/server/notifications/reminders';
-import { saveClinicSettings } from '@/server/settings';
+import { loadClinicSettings, saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots } from '@/server/slots/queries';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
@@ -83,15 +84,17 @@ it('sends one reminder to the client when their session is 24 hours away', async
   );
 });
 
-it('shows the clinic time and the UK time when the clinic uses a different time zone', async () => {
+it('shows one time in the clinic’s configured time zone in both email formats', async () => {
   const booking = await bookAt(firstStart);
   await saveClinicSettings(database.db, clock, { ...clinic.settings, timeZone: 'Europe/Paris' });
   clock.set(addHours(booking.startsAt, -24));
   await checkReminders();
   expect(mailer.sent).toHaveLength(1);
   expect(mailer.sent[0]!.subject).toBe('Session reminder for Thu, 22 Oct 2026, 10:00');
-  expect(mailer.sent[0]!.text).toContain('Thu, 22 Oct 2026, 10:00 (Europe/Paris).');
-  expect(mailer.sent[0]!.text).toContain('UK time: Thu, 22 Oct 2026, 09:00.');
+  for (const body of [mailer.sent[0]!.text, mailer.sent[0]!.html]) {
+    expect(body).toContain('Thu, 22 Oct 2026, 10:00 (Europe/Paris).');
+    expect(body?.match(/\b\d{2}:\d{2}\b/g)).toEqual(['10:00']);
+  }
 });
 
 it('links the reminder to rescheduling and cancellation for the recipient’s booking', async () => {
@@ -196,6 +199,77 @@ it.each(['move', 'cancellation'] as const)(
   },
 );
 
+it.each(['move', 'cancellation', 'switch-off'] as const)(
+  'holds the %s until the mailer returns its acceptance',
+  async (change) => {
+    const booking = await bookAt(firstStart);
+    const newSlotId = await slotIdAt(movedStart);
+    clock.set(addHours(booking.startsAt, -24));
+    let startSubmission!: () => void;
+    let acceptMessage!: () => void;
+    const submitting = new Promise<void>((resolve) => {
+      startSubmission = resolve;
+    });
+    const acceptance = new Promise<void>((resolve) => {
+      acceptMessage = resolve;
+    });
+    const recording = mailer;
+    mailer = {
+      ...recording,
+      send: async (message) => {
+        startSubmission();
+        await acceptance;
+        return recording.send(message);
+      },
+    };
+
+    const reminder = checkReminders();
+    await Promise.race([
+      submitting,
+      reminder.then(() => {
+        throw new Error('No mail submission');
+      }),
+    ]);
+    const request = { patientId: clinic.patient1.id, bookingId: booking.id };
+    const attempted =
+      change === 'move'
+        ? rescheduleBooking(bookingDeps(), { ...request, newSlotId })
+        : change === 'cancellation'
+          ? cancelBooking(bookingDeps(), request)
+          : saveClinicSettings(database.db, clock, { ...clinic.settings, reminderEmailsEnabled: false });
+    try {
+      // Observe the actual database lock wait. A delayed application response
+      // alone would not prove that the new booking or setting is still private.
+      await expect
+        .poll(
+          async () => {
+            const { rows } = await database.db.execute<{ waiting: boolean }>(sql`
+          select exists (
+            select 1 from pg_stat_activity
+            where datname = current_database() and wait_event_type = 'Lock' and pid <> pg_backend_pid()
+          ) as waiting
+        `);
+            return rows[0]?.waiting;
+          },
+          { timeout: 3_000 },
+        )
+        .toBe(true);
+      expect(mailer.sent).toHaveLength(0);
+      const unchanged = await findBookingForPatient(database.db, clinic.patient1.id, booking.id);
+      expect(unchanged).toMatchObject({ slotId: booking.slotId, status: 'confirmed' });
+      expect((await loadClinicSettings(database.db)).reminderEmailsEnabled).toBe(true);
+    } finally {
+      acceptMessage();
+      await Promise.all([reminder, attempted]);
+    }
+    const current = await findBookingForPatient(database.db, clinic.patient1.id, booking.id);
+    expect(current?.slotId).toBe(change === 'move' ? newSlotId : booking.slotId);
+    expect(current?.status).toBe(change === 'cancellation' ? 'cancelled' : 'confirmed');
+    expect((await loadClinicSettings(database.db)).reminderEmailsEnabled).toBe(change !== 'switch-off');
+    expect(mailer.sent).toHaveLength(1);
+  },
+);
+
 it('does not send a second reminder when a reminded booking moves', async () => {
   const original = await bookAt(firstStart);
   clock.set(addHours(original.startsAt, -24));
@@ -232,6 +306,42 @@ it('retries within the reminder window when SMTP refused the connection', async 
   expect(logs.events()).toContain('email.reminder.failed');
   clock.advanceMinutes(1);
   await checkReminders();
+  await checkReminders();
+  expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient1.email]);
+});
+
+it('retries within the reminder window after a failure in the final database check', async () => {
+  const booking = await bookAt(firstStart);
+  clock.set(addHours(booking.startsAt, -24));
+  const finalCheck = vi.spyOn(database.db, 'transaction').mockRejectedValueOnce(new Error('Database unavailable'));
+  try {
+    await expect(checkReminders()).rejects.toThrow('Database unavailable');
+    expect(mailer.sent).toHaveLength(0);
+  } finally {
+    finalCheck.mockRestore();
+  }
+  clock.advanceMinutes(1);
+  await checkReminders();
+  expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient1.email]);
+});
+
+it('retries after timing out before the SMTP greeting', async () => {
+  const booking = await bookAt(firstStart);
+  clock.set(addHours(booking.startsAt, -24));
+  const sockets: Socket[] = [];
+  const silentServer = createServer((socket) => sockets.push(socket));
+  await new Promise<void>((resolve) => silentServer.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = silentServer.address();
+    if (!address || typeof address === 'string') throw new Error('Expected a local TCP server');
+    await checkReminders(testMail(createSmtpMailer(`smtp://127.0.0.1:${address.port}?greetingTimeout=50`)));
+    expect(sockets).toHaveLength(1);
+    expect(logs.events()).toContain('email.reminder.failed');
+  } finally {
+    sockets.forEach((socket) => socket.destroy());
+    await new Promise<void>((resolve) => silentServer.close(() => resolve()));
+  }
+  clock.advanceMinutes(1);
   await checkReminders();
   expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient1.email]);
 });

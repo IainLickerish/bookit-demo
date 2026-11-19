@@ -50,10 +50,8 @@ function composeReminder(
   publicUrl: URL,
 ): OutgoingEmail {
   const when = formatSlot(session.startsAt, session.timeZone);
-  const isUkTime = session.timeZone === UK_TIME_ZONE;
-  const timeZone = isUkTime ? 'UK time' : session.timeZone;
+  const timeZone = session.timeZone === UK_TIME_ZONE ? 'UK time' : session.timeZone;
   const details = `Your session with ${session.practitioner} is on ${when} (${timeZone}).`;
-  const ukTime = isUkTime ? '' : `UK time: ${formatSlot(session.startsAt, UK_TIME_ZONE)}.`;
   const reschedule = new URL(bookingReschedulePath(id), publicUrl);
   const cancel = new URL(bookingCancellationPath(id), publicUrl);
   const signIn = 'Sign in to manage your session.';
@@ -67,7 +65,6 @@ function composeReminder(
       session.clinicName,
       '',
       details,
-      ...(ukTime ? [ukTime] : []),
       '',
       signIn,
       `${rescheduleLabel}: ${reschedule}`,
@@ -77,7 +74,6 @@ function composeReminder(
     html: [
       `<h1 style="font-family: Fraunces, Georgia, serif; font-weight: 500">${escapeHtml(session.clinicName)}</h1>`,
       `<p>${escapeHtml(details)}</p>`,
-      ...(ukTime ? [`<p>${escapeHtml(ukTime)}</p>`] : []),
       `<p>${signIn}</p>`,
       `<p><a style="color: #1D5C4B" href="${escapeHtml(reschedule.href)}">${rescheduleLabel}</a></p>`,
       `<p><a style="color: #1D5C4B" href="${escapeHtml(cancel.href)}">${cancelLabel}</a></p>`,
@@ -112,33 +108,35 @@ export async function sendDueReminders({ db, clock, log, mail, publicUrl }: Remi
     if (!claim) continue;
 
     const claimedBooking = and(eq(bookings.id, id), eq(bookings.reminderClaimedAt, now));
-    const { delivery } = await db.transaction(async (tx) => {
-      // Moves and cancellations take the same row lock. The final check sees
-      // changes that won the lock first, and the mailer starts under the lock.
-      const [locked] = await tx.select({ id: bookings.id }).from(bookings).where(claimedBooking).for('update');
-      if (!locked) return {};
+    let keepClaim = false;
+    try {
+      await db.transaction(async (tx) => {
+        // The same locks protect the final check and SMTP submission, so a
+        // move, cancellation or switch-off cannot commit during submission.
+        const [locked] = await tx.select({ id: bookings.id }).from(bookings).where(claimedBooking).for('update');
+        if (!locked) return;
 
-      const [session] = await tx
-        .select(reminderDetails)
-        .from(bookings)
-        .innerJoin(slots, eq(slots.id, bookings.slotId))
-        .innerJoin(practitioners, eq(practitioners.id, slots.practitionerId))
-        .innerJoin(users, and(eq(users.id, bookings.patientId), eq(users.role, 'patient')))
-        .innerJoin(clinicSettings, eq(clinicSettings.reminderEmailsEnabled, true))
-        .where(and(eq(bookings.id, id), eq(bookings.slotId, claim.slotId), dueReminder(clock.now())))
-        .for('share', { of: clinicSettings });
-      if (!session) {
-        await tx.update(bookings).set({ reminderClaimedAt: null }).where(claimedBooking);
-        return {};
-      }
-
-      const email = composeReminder(id, session, mail.from, publicUrl);
-      // Return the delivery promise in an object so the booking lock does not
-      // stay held while waiting for the network.
-      return { delivery: deliverEmailWithOutcome(mail, log, email, 'reminder', { booking_id: id }) };
-    });
-    if (delivery && (await delivery) === 'retryable') {
-      await db.update(bookings).set({ reminderClaimedAt: null }).where(claimedBooking);
+        const [session] = await tx
+          .select(reminderDetails)
+          .from(bookings)
+          .innerJoin(slots, eq(slots.id, bookings.slotId))
+          .innerJoin(practitioners, eq(practitioners.id, slots.practitionerId))
+          .innerJoin(users, and(eq(users.id, bookings.patientId), eq(users.role, 'patient')))
+          .innerJoin(clinicSettings, eq(clinicSettings.reminderEmailsEnabled, true))
+          .where(and(eq(bookings.id, id), eq(bookings.slotId, claim.slotId), dueReminder(clock.now())))
+          .for('share', { of: clinicSettings });
+        if (session) {
+          const email = composeReminder(id, session, mail.from, publicUrl);
+          keepClaim = true;
+          const outcome = await deliverEmailWithOutcome(mail, log, email, 'reminder', { booking_id: id });
+          keepClaim = outcome !== 'retryable';
+        }
+      });
+    } finally {
+      // Even a failed final check can be retried if SMTP could not have
+      // accepted a message. Release outside the final transaction so a
+      // rollback there cannot undo the release.
+      if (!keepClaim) await db.update(bookings).set({ reminderClaimedAt: null }).where(claimedBooking);
     }
   }
 }

@@ -23,11 +23,18 @@ export class EmailAddressRefusedError extends Error {
   override readonly name = 'EmailAddressRefusedError';
 }
 
+const REMINDER_SMTP_TIMEOUT_MS = 5_000;
+
 /** True only for transient errors that establish the message was never accepted. */
 export function canRetryEmail(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const { code, command, syscall, responseCode } = error as NodemailerError;
   if (code === 'EDNS' || (command === 'CONN' && syscall === 'connect')) return true;
+  // Nodemailer also uses ETIMEDOUT after DATA. Only these two errors are
+  // issued before the SMTP greeting.
+  if (command === 'CONN' && code === 'ETIMEDOUT') {
+    return error.message === 'Connection timeout' || error.message === 'Greeting never received';
+  }
   // A completed SMTP rejection is different from a timeout or a lost reply after DATA.
   return (
     (code === 'EENVELOPE' || code === 'EMESSAGE') &&
@@ -72,6 +79,15 @@ export function createSmtpMailer(url: string): Mailer {
           const smtp = new URL(url);
           // A pooled transport can requeue a message when its connection drops.
           smtp.searchParams.set('pool', 'false');
+          // Let Nodemailer close the connection on timeout before the caller
+          // releases its locks. Honour any shorter configured timeouts.
+          for (const key of ['dnsTimeout', 'connectionTimeout', 'greetingTimeout', 'socketTimeout']) {
+            const timeout = Number(smtp.searchParams.get(key));
+            smtp.searchParams.set(
+              key,
+              String(timeout > 0 ? Math.min(timeout, REMINDER_SMTP_TIMEOUT_MS) : REMINDER_SMTP_TIMEOUT_MS),
+            );
+          }
           singleAttemptTransport = nodemailer.createTransport(smtp.href);
         }
         selected = singleAttemptTransport;
