@@ -54,13 +54,19 @@ export async function startSmtpReceiver(beforeAccept?: () => Promise<void>): Pro
       let raw = '';
       stream.setEncoding('utf8');
       stream.on('data', (chunk: string) => (raw += chunk));
-      stream.on('end', async () => {
-        if (beforeAccept) await beforeAccept();
-        const from = session.envelope.mailFrom === false ? '' : session.envelope.mailFrom.address;
-        const message = { from, to: session.envelope.rcptTo.map((r) => r.address), raw };
-        messages.push(message);
-        listeners.forEach((listener) => listener(message));
-        callback();
+      stream.on('end', () => {
+        const accept = () => {
+          const from = session.envelope.mailFrom === false ? '' : session.envelope.mailFrom.address;
+          const message = { from, to: session.envelope.rcptTo.map((r) => r.address), raw };
+          messages.push(message);
+          listeners.forEach((listener) => listener(message));
+          callback();
+        };
+        if (beforeAccept) {
+          void beforeAccept().then(accept, (error: Error) => callback(error));
+        } else {
+          accept();
+        }
       });
     },
   });

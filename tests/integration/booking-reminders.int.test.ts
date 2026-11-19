@@ -77,6 +77,14 @@ function setReminders(db: Executor, sendBookingReminders: boolean) {
   });
 }
 
+function deferredSignal() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((ready) => {
+    resolve = ready;
+  });
+  return { promise, resolve };
+}
+
 async function updateBeforeHandoff(bookingId: string, mailer: Mailer, update: (tx: Transaction) => Promise<unknown>) {
   let poll: Promise<void> | undefined;
   try {
@@ -207,8 +215,8 @@ describe('booking reminders', () => {
   it.each(Object.entries(changesDuringDelivery))('waits for SMTP acceptance before %s', async (_name, change) => {
     const booking = await bookAt('2026-10-22T08:00:00Z');
     clock.set(addHours(booking.startsAt, -24));
-    const received = Promise.withResolvers<void>();
-    const accept = Promise.withResolvers<void>();
+    const received = deferredSignal();
+    const accept = deferredSignal();
     const receiver = await startSmtpReceiver(() => {
       received.resolve();
       return accept.promise;
@@ -237,8 +245,8 @@ describe('booking reminders', () => {
   it('releases the booking lock after an SMTP receiver takes too long to accept', async () => {
     const booking = await bookAt('2026-10-22T08:00:00Z');
     clock.set(addHours(booking.startsAt, -24));
-    const received = Promise.withResolvers<void>();
-    const accept = Promise.withResolvers<void>();
+    const received = deferredSignal();
+    const accept = deferredSignal();
     const receiver = await startSmtpReceiver(() => {
       received.resolve();
       return accept.promise;
