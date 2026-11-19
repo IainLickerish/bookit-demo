@@ -166,10 +166,14 @@ describe('BookIt page presentation', () => {
     const html = renderToStaticMarkup(await AdminBookingsPage({ searchParams: Promise.resolve(filters) }));
     expect(requireAdmin).toHaveBeenCalledOnce();
     expect(listAdminBookings).toHaveBeenCalledWith(undefined, filters, settings.timeZone);
-    expect(html).toMatch(/<div class="[^"]*overflow-x-auto[^"]*" role="region"[^>]+tabindex="0"/i);
-    expect(html).toContain('<th scope="col">Appointment</th>');
-    expect(html).toContain('<td>Test Patient</td>');
-    expect(html).toContain('status-pill--cancelled">Cancelled (late)');
+    const scrollArea = html.match(
+      /<div class="[^"]*\boverflow-x-auto\b[^"]*" role="region"[^>]+tabindex="0"[^>]*>(.*?)<\/div>/is,
+    )?.[1];
+    const table = scrollArea?.match(/<table\b[^>]*>(.*?)<\/table>/s)?.[1];
+    const row = table?.match(/<tr[^>]*data-testid="admin-booking-row"[^>]*>(.*?)<\/tr>/s)?.[1];
+    expect(table).toContain('<th scope="col">Appointment</th>');
+    expect(row).toContain('<td>Test Patient</td>');
+    expect(row).toContain('status-pill--cancelled">Cancelled (late)');
     expect(html).toContain(
       `href="/api/admin/export?practitionerId=${practitioner.id}&amp;date=2026-11-19&amp;status=cancelled"`,
     );
