@@ -8,6 +8,7 @@ import ReschedulePage from '@/app/bookings/[bookingId]/reschedule/page';
 import MyBookingsPage from '@/app/bookings/page';
 import { DayPicker } from '@/app/day-picker';
 import ErrorPage from '@/app/error';
+import RootLayout from '@/app/layout';
 import NotFound from '@/app/not-found';
 import SlotsPage from '@/app/slots/page';
 import { listAdminBookings, listAdminPractitioners } from '@/server/admin/bookings';
@@ -83,6 +84,7 @@ const booking: BookingView = {
   updatedAt: new Date('2026-10-20T09:30:00Z'),
   cancelledAt: null,
 };
+const stylesheet = readFileSync(new URL('../../src/app/globals.css', import.meta.url), 'utf8');
 
 describe('BookIt page presentation', () => {
   it('declares Figtree and Fraunces using local WOFF2 files', () => {
@@ -96,6 +98,29 @@ describe('BookIt page presentation', () => {
       );
     }
     expect(css.match(/url\(/g)).toHaveLength(5);
+  });
+
+  it('renders the shared clinic link and sign-in heading in the themed page shell', async () => {
+    vi.mocked(currentUser).mockResolvedValue(null);
+    vi.mocked(loadClinicSettings).mockResolvedValue(settings);
+    const signIn = await SignInPage({ searchParams: Promise.resolve({}) });
+    const html = renderToStaticMarkup(await RootLayout({ children: signIn }));
+    const body = html.match(/<body class="site-shell">(.*?)<\/body>/s)?.[1];
+    const header = body?.match(/<header class="site-header">(.*?)<\/header>/s)?.[1];
+    const main = body?.match(/<main class="site-main">(.*?)<\/main>/s)?.[1];
+    expect(header).toMatch(/class="clinic-name"[^>]*href="\/">Test Physio<\/a>/);
+    expect(main).toContain('<h1 class="page-heading">Sign in</h1>');
+    expect(stylesheet).toContain("@import './fonts/faces.css'");
+    expect(stylesheet).toContain("--font-sans: 'Figtree'");
+    expect(stylesheet).toContain("--font-serif: 'Fraunces'");
+    expect(stylesheet).toContain('--color-ivory: #faf8f4;');
+    expect(stylesheet).toContain('--color-pine: #1d5c4b;');
+    expect(stylesheet).toContain('--color-clay: #b9603f;');
+    expect(stylesheet).toMatch(/body\s*{[^}]*background: var\(--color-ivory\);/s);
+    expect(stylesheet).toMatch(/h1,\s*h2\s*{[^}]*font-family: var\(--font-serif\);/s);
+    expect(stylesheet).toMatch(
+      /\.clinic-name\s*{[^}]*color: var\(--color-pine\);[^}]*font-family: var\(--font-serif\);/s,
+    );
   });
 
   it('marks today and keeps the previous and next day links within the booking window', () => {
@@ -136,7 +161,7 @@ describe('BookIt page presentation', () => {
     expect(choice).toContain('Thu, 19 Nov 2026, 09:30</button>');
   });
 
-  it('assigns right alignment to the status pills in upcoming and cancelled booking cards', async () => {
+  it('puts time and status in the booking details grid in both sections', async () => {
     vi.mocked(requirePatient).mockResolvedValue(patient);
     vi.mocked(loadClinicSettings).mockResolvedValue(settings);
     vi.mocked(listBookingsForPatient).mockResolvedValue([
@@ -144,11 +169,17 @@ describe('BookIt page presentation', () => {
       { ...booking, id: 'booking-2', status: 'cancelled', lateCancellation: true, cancelledAt: booking.updatedAt },
     ]);
     const html = renderToStaticMarkup(await MyBookingsPage({ searchParams: Promise.resolve({}) }));
-    const [upcoming, cancelled] = html.match(/<li[^>]*data-testid="booking-row"[^>]*>.*?<\/li>/gs) ?? [];
-    expect(upcoming).toMatch(/class="status-pill justify-self-end [^"]*" data-testid="booking-status">Confirmed</);
-    expect(cancelled).toMatch(
-      /class="status-pill justify-self-end [^"]* status-pill--cancelled" data-testid="booking-status">Cancelled \(late\)</,
+    const upcoming = html.match(/<ul[^>]*data-testid="upcoming-bookings"[^>]*>(.*?)<\/ul>/s)?.[1];
+    const cancelled = html.match(/<ul[^>]*data-testid="other-bookings"[^>]*>(.*?)<\/ul>/s)?.[1];
+    const upcomingDetails = upcoming?.match(/<div class="booking-details">(.*?)<\/div>/s)?.[1];
+    const cancelledDetails = cancelled?.match(/<div class="booking-details">(.*?)<\/div>/s)?.[1];
+    expect(upcomingDetails).toContain('data-testid="booking-when"');
+    expect(upcomingDetails).toContain('class="status-pill" data-testid="booking-status">Confirmed</span>');
+    expect(cancelledDetails).toContain('data-testid="booking-when"');
+    expect(cancelledDetails).toContain(
+      'class="status-pill status-pill--cancelled" data-testid="booking-status">Cancelled (late)</span>',
     );
+    expect(stylesheet).toMatch(/\.booking-details > \.status-pill\s*{\s*grid-row: 1;\s*grid-column: 2;\s*}/);
   });
 
   it('shows sign-in notices inside the card with the same fields and reset link', async () => {

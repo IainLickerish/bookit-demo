@@ -222,6 +222,34 @@
     color: var(--color-pine);
   }
 
+  .booking-details {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    align-items: start;
+    gap: 0.5rem;
+  }
+
+  .booking-details > .status-pill {
+    justify-self: end;
+  }
+
+  @media (min-width: 24rem) {
+    .booking-details {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .booking-practitioner {
+      grid-row: 2;
+      grid-column: 1 / -1;
+    }
+
+    .booking-details > .status-pill {
+      grid-row: 1;
+      grid-column: 2;
+    }
+  }
+
   .status-pill {
     display: inline-block;
     padding: 0.25rem 0.75rem;
