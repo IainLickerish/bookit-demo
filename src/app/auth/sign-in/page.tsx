@@ -1,15 +1,17 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { FORGOT_PASSWORD_PATH } from '@/lib/routes';
+import { bookingReturnPath, FORGOT_PASSWORD_PATH } from '@/lib/routes';
 import { currentUser } from '@/server/request-context';
 import { single, type SearchParams } from '../../messages';
 import { signIn } from '../actions';
 
 export default async function SignInPage({ searchParams }: { searchParams: SearchParams }) {
-  if (await currentUser()) {
-    redirect('/');
-  }
   const query = await searchParams;
+  const returnTo = bookingReturnPath(single(query.returnTo));
+  const user = await currentUser();
+  if (user) {
+    redirect(user.role === 'patient' ? (returnTo ?? '/') : '/');
+  }
   const error = single(query.error);
   const passwordReset = single(query.notice) === 'password_reset';
   return (
@@ -26,6 +28,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
         </p>
       ) : null}
       <form action={signIn} className="space-y-4">
+        {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
         <label>
           Email address
           <input name="email" type="email" autoComplete="username" required data-testid="sign-in-email" />

@@ -1,8 +1,38 @@
+import { z } from 'zod';
+
 export const FORGOT_PASSWORD_PATH = '/auth/forgot-password';
 export const RESET_PASSWORD_PREFIX = '/auth/reset-password/';
 
 export function resetPasswordPath(token: string): string {
   return `${RESET_PASSWORD_PREFIX}${encodeURIComponent(token)}`;
+}
+
+export function bookingReschedulePath(bookingId: string): string {
+  return `/bookings/${bookingId}/reschedule`;
+}
+
+export function bookingCancelTarget(bookingId: string): string {
+  return `cancel-${bookingId}`;
+}
+
+export function bookingCancellationPath(bookingId: string): string {
+  return `/bookings?booking=${bookingId}#${bookingCancelTarget(bookingId)}`;
+}
+
+/** Only the two booking destinations can be supplied as sign-in return paths. */
+export function bookingReturnPath(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const id = /^\/bookings[/?](?:booking=)?([a-f0-9-]+)/i.exec(value)?.[1];
+  if (!id || !z.uuid().safeParse(id).success) return undefined;
+  if (value === bookingReschedulePath(id) || value === bookingCancellationPath(id)) return value;
+  return undefined;
+}
+
+export function signInPath(returnTo?: string, invalid = false): string {
+  const query = new URLSearchParams();
+  if (invalid) query.set('error', 'invalid');
+  if (returnTo) query.set('returnTo', returnTo);
+  return query.size ? `/auth/sign-in?${query}` : '/auth/sign-in';
 }
 
 /**

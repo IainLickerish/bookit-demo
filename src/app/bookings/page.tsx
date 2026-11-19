@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
+import { bookingCancellationPath, bookingCancelTarget, bookingReschedulePath } from '@/lib/routes';
 import { formatSlot } from '@/lib/time';
-import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
+import { isUuid, listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
@@ -16,8 +17,9 @@ function statusText(booking: BookingView): string {
 }
 
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
-  const patient = await requirePatient();
   const params = await searchParams;
+  const bookingId = single(params.booking);
+  const patient = await requirePatient(isUuid(bookingId) ? bookingCancellationPath(bookingId) : undefined);
   const notice = noticeText(single(params.notice));
   const error = errorText(single(params.error));
   const db = getDatabase();
@@ -45,7 +47,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       {changeable ? (
         <div className="flex gap-2">
           <Link
-            href={`/bookings/${booking.id}/reschedule`}
+            href={bookingReschedulePath(booking.id)}
             prefetch={false}
             className="button-secondary"
             data-testid="reschedule-link"
@@ -54,7 +56,12 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           </Link>
           <form action={cancelAction}>
             <input type="hidden" name="bookingId" value={booking.id} />
-            <button type="submit" className="button-secondary" data-testid="cancel-booking">
+            <button
+              id={bookingCancelTarget(booking.id)}
+              type="submit"
+              className="button-secondary"
+              data-testid="cancel-booking"
+            >
               Cancel
             </button>
           </form>

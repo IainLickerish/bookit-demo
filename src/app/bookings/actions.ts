@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import type { Logger } from '@/lib/logger';
+import { bookingReschedulePath } from '@/lib/routes';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { BookingError, type BookingErrorCode } from '@/server/bookings/errors';
@@ -76,7 +77,7 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
     destination = '/bookings?notice=rescheduled';
   } catch (error) {
     const code = refusalCode(error, deps.log, 'reschedule');
-    destination = isUuid(bookingId) ? `/bookings/${bookingId}/reschedule?error=${code}` : `/bookings?error=${code}`;
+    destination = isUuid(bookingId) ? `${bookingReschedulePath(bookingId)}?error=${code}` : `/bookings?error=${code}`;
   }
   redirect(destination);
 }
