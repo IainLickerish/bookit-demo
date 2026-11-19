@@ -1,32 +1,206 @@
 @import 'tailwindcss';
+@import './fonts/faces.css';
+
+@theme {
+  --color-ivory: #faf8f4;
+  --color-ink: #16241f;
+  --color-muted: #5a6862;
+  --color-line: #e6e1d8;
+  --color-field: #8c9792;
+  --color-stone: #f1eee8;
+  --color-pine: #1d5c4b;
+  --color-pine-hover: #164a3c;
+  --color-sage: #e9f1ec;
+  --color-clay: #b9603f;
+  --color-brick: #a8261b;
+  --color-brick-tint: #fcebe8;
+  --font-sans: 'Figtree', system-ui, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+}
 
 @layer base {
-  h1 {
-    @apply mb-4 text-2xl font-semibold;
+  html {
+    scroll-padding: 0.75rem;
   }
+
+  body {
+    @apply min-h-screen bg-ivory font-sans text-ink;
+    --page-inset: 1.25rem;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  @media (min-width: 40rem) {
+    body {
+      --page-inset: 2rem;
+    }
+  }
+
+  h1,
   h2 {
-    @apply mt-6 mb-2 text-lg font-semibold;
+    @apply font-serif font-medium tracking-tight;
+    line-height: 1.15;
   }
+
+  h1 {
+    @apply text-[1.75rem] sm:text-[2rem];
+  }
+
+  h2 {
+    @apply text-[1.375rem];
+  }
+
+  a,
+  button {
+    @apply inline-flex min-h-11 items-center;
+  }
+
+  a {
+    @apply font-medium text-pine underline underline-offset-4;
+  }
+
+  a:hover {
+    @apply text-pine-hover;
+  }
+
+  button {
+    @apply cursor-pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: 3px;
+  }
+
   label {
-    @apply block text-sm font-medium;
+    @apply block min-w-0 text-[0.9375rem] font-medium;
   }
-  input,
+
+  input:not([type='hidden'], [type='checkbox']),
   select {
-    @apply mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2;
+    @apply mt-2 block min-h-12 w-full min-w-0 rounded-xl border border-field bg-white px-3 py-2 text-base text-ink;
+  }
+
+  input[type='checkbox'] {
+    @apply size-5 shrink-0 accent-pine;
   }
 }
 
 @layer components {
-  .button {
-    @apply inline-block rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800;
+  .site-header {
+    @apply border-b border-line bg-white;
   }
+
+  .site-bar,
+  .page-shell {
+    width: calc(100% - 2 * var(--page-inset));
+    margin-inline: auto;
+  }
+
+  .site-bar {
+    @apply flex max-w-[70rem] flex-wrap items-center justify-between gap-x-8 gap-y-0 py-2;
+  }
+
+  .clinic-name {
+    @apply max-w-full font-serif text-[1.375rem] leading-tight font-medium tracking-tight text-ink no-underline;
+    overflow-wrap: anywhere;
+  }
+
+  .site-nav {
+    @apply flex flex-wrap items-center gap-x-4 text-[0.9375rem];
+  }
+
+  .page-shell {
+    @apply max-w-[45rem] py-8 sm:py-12;
+  }
+
+  .page-shell:has(.page-wide) {
+    @apply max-w-[70rem];
+  }
+
+  .page-narrow {
+    @apply mx-auto max-w-[27.5rem];
+  }
+
+  .page-header {
+    @apply mb-6;
+  }
+
+  .page-header::before {
+    @apply mb-3 block h-[3px] w-6 rounded-full bg-clay;
+    content: '';
+  }
+
+  :where(.page-header) p {
+    @apply mt-2 text-muted;
+  }
+
+  .card {
+    @apply min-w-0 rounded-[1.25rem] border border-line bg-white p-6;
+    box-shadow:
+      0 2px 4px rgb(22 36 31 / 3%),
+      0 12px 28px rgb(22 36 31 / 5%);
+  }
+
+  .button,
   .button-secondary {
-    @apply inline-block rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100;
+    @apply inline-flex min-h-12 items-center justify-center rounded-full border px-5 py-2 text-center text-[0.9375rem] font-medium no-underline;
+    line-height: 1.3;
+    transition:
+      background-color 150ms ease-out,
+      border-color 150ms ease-out;
   }
-  .notice {
-    @apply mb-4 rounded border border-teal-200 bg-teal-50 px-4 py-3 text-sm;
+
+  .button {
+    @apply border-pine bg-pine text-white;
   }
+
+  .button:hover {
+    @apply border-pine-hover bg-pine-hover text-white;
+  }
+
+  .button-secondary {
+    @apply border-field bg-white text-pine;
+  }
+
+  .button-secondary:hover {
+    @apply border-pine bg-stone text-pine-hover;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .button,
+    .button-secondary {
+      transition: none;
+    }
+  }
+
+  .notice,
   .alert {
-    @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
+    @apply mb-4 flex items-start gap-3 rounded-xl px-4 py-3 text-[0.9375rem];
+  }
+
+  .notice {
+    @apply bg-sage text-pine;
+  }
+
+  .alert {
+    @apply bg-brick-tint text-brick;
+  }
+
+  .notice::before,
+  .alert::before {
+    @apply mt-0.5 size-5 shrink-0;
+    content: '';
+    background: currentColor;
+  }
+
+  .notice::before {
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='10' r='8'/%3E%3Cpath d='m6.5 10 2.5 2.5 4.5-5'/%3E%3C/svg%3E")
+      center / contain;
+  }
+
+  .alert::before {
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='8'/%3E%3Cpath d='M10 6v4m0 3v.1'/%3E%3C/svg%3E")
+      center / contain;
   }
 }
