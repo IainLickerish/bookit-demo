@@ -32,6 +32,9 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
       expect(csvField(value)).toBe(`"'${value.replaceAll('"', '""')}"`);
     },
   );
+  it.each(['＝', '＋', '－', '＠'])('treats client names starting with %s as spreadsheet text', (marker) => {
+    expect(csvField(`${marker}Zoë Brontë`)).toBe(`"'${marker}Zoë Brontë"`);
+  });
   it('keeps normal commas, quotes and newlines inside one field', () => {
     expect(csvField('Ada, "Clinic"\nTest')).toBe('"Ada, ""Clinic""\nTest"');
   });

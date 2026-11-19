@@ -2,7 +2,8 @@ import type { AdminBooking } from '@/server/admin/bookings';
 
 /** RFC 4180 quoting plus spreadsheet-formula neutralisation for untrusted text. */
 export function csvField(value: string): string {
-  const safe = /^[\s\u0000-\u001f]*[=+\-@]/u.test(value) || /^[\t\r\n]/u.test(value) ? `'${value}` : value;
+  const startsWithFormulaMarker = /^[\s\u0000-\u001f]*[=+\-@＝＋－＠]/u.test(value);
+  const safe = startsWithFormulaMarker || /^[\t\r\n]/u.test(value) ? `'${value}` : value;
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
