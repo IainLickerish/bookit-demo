@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
@@ -49,6 +50,15 @@ function bodyOf(raw: string): string {
     .replace(/=([0-9A-F]{2})/g, (_match, hex: string) => String.fromCharCode(parseInt(hex, 16)));
 }
 
+function calendarOf(raw: string): string {
+  const parts = raw.split(/\r?\n--[^\r\n]+\r?\n/);
+  const attachment = parts.find((part) => part.startsWith('Content-Type: text/calendar;'));
+  expect(attachment).toMatch(/Content-Disposition: attachment; filename=physio-session\.ics/);
+  expect(attachment).toMatch(/Content-Transfer-Encoding: base64/);
+  const encoded = attachment!.split(/\r?\n\r?\n/, 2)[1]!;
+  return Buffer.from(encoded.replace(/\r?\n--[^\r\n]+--\s*$/, ''), 'base64').toString('utf8');
+}
+
 function recordEvidence(name: string, data: unknown): void {
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   writeFileSync(path.join(EVIDENCE_DIR, `${name}.json`), `${JSON.stringify(data, null, 2)}\n`);
@@ -74,6 +84,24 @@ beforeEach(async () => {
 });
 
 describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stand-in, no real email)', () => {
+  it('attaches the booked and moved session calendars to separate confirmation emails', async () => {
+    const firstSlot = await freeSlotId(0);
+    const newSlot = await freeSlotId(2);
+    const patientId = clinic.patient1.id;
+    const booking = await bookSlot(deps(), { patientId, slotId: firstSlot });
+    await rescheduleBooking(deps(), { patientId, bookingId: booking.id, newSlotId: newSlot });
+
+    expect(smtp.messages.map((message) => message.to)).toEqual([[clinic.patient1.email], [clinic.patient1.email]]);
+    const [booked, moved] = smtp.messages.map((message) => calendarOf(message.raw).replaceAll('\r\n ', ''));
+    expect(booked).toContain(`\r\nUID:${booking.id}@bookit.test\r\n`);
+    expect(moved).toContain(`\r\nUID:${booking.id}@bookit.test\r\n`);
+    expect(booked).toContain('\r\nDTSTART:20261022T080000Z\r\nDTEND:20261022T084500Z\r\nSEQUENCE:0\r\n');
+    expect(moved).toContain('\r\nDTSTART:20261022T093000Z\r\nDTEND:20261022T101500Z\r\nSEQUENCE:1\r\n');
+    expect(moved).toContain('SUMMARY:Test Physio Clinic session with Pat Physio');
+    expect(moved).not.toMatch(/Patient One|patients\.example\.test|7700/);
+    expect(bodyOf(smtp.messages[1]!.raw)).toContain('Your session has been moved.');
+  });
+
   it('sends one confirmation with the contact phone when the clinic includes contact details', async () => {
     await saveClinicSettings(database.db, clock, { ...clinic.settings, includeContactInConfirmation: true });
     const booking = await bookSlot(deps(), {

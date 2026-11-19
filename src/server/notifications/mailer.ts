@@ -5,6 +5,7 @@ export interface OutgoingEmail {
   to: string;
   subject: string;
   text: string;
+  attachments?: { filename: string; contentType: string; content: string }[];
 }
 
 export interface SentEmail {

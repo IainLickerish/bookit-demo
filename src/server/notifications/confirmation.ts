@@ -1,4 +1,5 @@
 import { formatSlot } from '@/lib/time';
+import { bookingCalendar, CALENDAR_CONTENT_TYPE, CALENDAR_FILENAME } from '../bookings/calendar';
 import { reportError } from '../error-reporting';
 import type { BookingView } from '../bookings/queries';
 import type { ClinicSettings } from '../settings';
@@ -9,6 +10,7 @@ export interface ConfirmationInput {
   patient: { email: string; name: string };
   settings: ClinicSettings;
   from: string;
+  rescheduled?: boolean;
 }
 
 /** A stored phone number as it appears in an email. */
@@ -27,12 +29,13 @@ export function formatPhone(phone: string): string {
  * so the line is left out when there is none.
  */
 export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
-  const { booking, patient, settings } = input;
+  const { booking, patient, settings, rescheduled } = input;
   const when = formatSlot(booking.startsAt, settings.timeZone);
   const lines = [
+    ...(rescheduled ? [settings.clinicName, ''] : []),
     `Dear ${patient.name},`,
     '',
-    `Your appointment at ${settings.clinicName} is confirmed.`,
+    rescheduled ? 'Your session has been moved.' : `Your appointment at ${settings.clinicName} is confirmed.`,
     '',
     `When: ${when} (${settings.timeZone})`,
     `With: ${booking.practitionerName}`,
@@ -41,11 +44,25 @@ export function composeConfirmation(input: ConfirmationInput): OutgoingEmail {
   if (settings.includeContactInConfirmation && booking.phone) {
     lines.push(`Contact phone: ${formatPhone(booking.phone)}`);
   }
-  lines.push('', 'To cancel or reschedule, sign in to BookIt and open My bookings.', '', settings.clinicName);
+  lines.push(
+    '',
+    'To add your session to your calendar, open or import the attached calendar file.',
+    '',
+    'To cancel or reschedule, sign in to BookIt and open My bookings.',
+    '',
+    settings.clinicName,
+  );
   return {
     from: input.from,
     to: patient.email,
-    subject: `Booking confirmed: ${when}`,
+    subject: `${rescheduled ? 'Booking rescheduled' : 'Booking confirmed'}: ${when}`,
     text: `${lines.join('\n')}\n`,
+    attachments: [
+      {
+        filename: CALENDAR_FILENAME,
+        contentType: CALENDAR_CONTENT_TYPE,
+        content: bookingCalendar(booking, settings),
+      },
+    ],
   };
 }
