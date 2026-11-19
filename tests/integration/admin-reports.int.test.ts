@@ -51,6 +51,38 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     for (const value of [...ADMIN_PATIENT_NAMES, TEST_PASSWORD, adminToken, patientToken])
       expect(text).not.toContain(value);
   });
+  it('downloads filtered UTF-8 CSVs only for staff and preserves client names', async () => {
+    const database = await startTestDatabase();
+    try {
+      const { admin, patient1 } = await seedClinic(database.db, clock);
+      const names = ['Zoë Brontë', 'Siobhán Ó Briain', 'Excluded Client', '陳小梅'];
+      const { practitionerId, bookingIds } = await seedAdminBookings(database.db, clock, names);
+      const deps = { db: database.db, clock, log: logs.log };
+      const filters = new URLSearchParams({ practitionerId, status: 'confirmed' });
+      const staffSession = await createSession(database.db, clock, admin.id);
+
+      const response = await adminReportResponse(deps, staffSession.token, filters, 'csv');
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+      expect(response.headers.get('content-disposition')).toBe('attachment; filename="bookings.csv"');
+      const bytes = await response.arrayBuffer();
+      const csv = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      const records = csv.trimEnd().split('\r\n').slice(1);
+      expect(records.map((record) => record.split(',').slice(0, 2).join(','))).toEqual(
+        [0, 1, 3].map((index) => `"${bookingIds[index]}","${names[index]}"`),
+      );
+
+      const clientSession = await createSession(database.db, clock, patient1.id);
+      const clientResponse = await adminReportResponse(deps, clientSession.token, filters, 'csv');
+      expect(clientResponse.status).toBe(403);
+      expect(await clientResponse.text()).toBe('Admin access required');
+      const signedOutResponse = await adminReportResponse(deps, undefined, filters, 'csv');
+      expect(signedOutResponse.status).toBe(401);
+      expect(await signedOutResponse.text()).toBe('Sign-in required');
+    } finally {
+      await database.stop();
+    }
+  });
   it('applies clinic-local date boundaries across the 25-hour clock-change day, with practitioner and status filters', async () => {
     const response = await report(
       `type=bookings&practitionerId=${fixture.practitionerId}&date=2026-10-25`,

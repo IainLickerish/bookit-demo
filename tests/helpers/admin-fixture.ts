@@ -9,7 +9,7 @@ import { TEST_PASSWORD } from './clinic';
 export const ADMIN_PATIENT_NAMES = ['Zoe Bronte', 'Lukasz Wisniewski', 'Siobhan O Briain', 'Ada, "Clinic"\nTest'];
 
 /** Fictional records on both sides of the London clock-change day's boundaries. */
-export async function seedAdminBookings(db: Database, clock: Clock, prefix = 'admin-fixture') {
+export async function seedAdminBookings(db: Database, clock: Clock, patientNames = ADMIN_PATIENT_NAMES) {
   const practitioner = await createPractitioner(db, clock, {
     name: 'Report Practitioner',
     workingDays: [1, 2, 3, 4, 5, 6, 7],
@@ -18,9 +18,9 @@ export async function seedAdminBookings(db: Database, clock: Clock, prefix = 'ad
   });
   const starts = ['2026-10-24T22:30:00Z', '2026-10-24T23:15:00Z', '2026-10-25T23:30:00Z', '2026-10-26T00:00:00Z'];
   const ids: string[] = [];
-  for (const [index, name] of ADMIN_PATIENT_NAMES.entries()) {
+  for (const [index, name] of patientNames.entries()) {
     const patient = await createUser(db, clock, {
-      email: `${prefix}-${index}@patients.example.test`,
+      email: `admin-fixture-${index}@patients.example.test`,
       name,
       role: 'patient',
       password: TEST_PASSWORD,
