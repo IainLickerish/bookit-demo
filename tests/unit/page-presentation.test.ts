@@ -235,6 +235,10 @@ describe('BookIt page presentation', () => {
     );
   });
 
+  it('declares non-wrapping text for booking status pills', () => {
+    expect(stylesheet).toMatch(/\.status-pill\s*{[^}]*white-space: nowrap;/);
+  });
+
   it('presents both recovery pages in cards with the existing next steps', () => {
     const reset = vi.fn();
     const errorPage = ErrorPage({ error: new Error('Test error'), reset });
