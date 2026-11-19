@@ -179,7 +179,14 @@ describe('BookIt page presentation', () => {
     expect(cancelledDetails).toContain(
       'class="status-pill status-pill--cancelled" data-testid="booking-status">Cancelled (late)</span>',
     );
-    expect(stylesheet).toMatch(/\.booking-details > \.status-pill\s*{\s*grid-row: 1;\s*grid-column: 2;\s*}/);
+
+    expect(stylesheet).toMatch(/\.booking-details\s*{[^}]*display: grid;/);
+    const [, breakpoint, phoneLayout] =
+      stylesheet.match(/@media \(min-width: ([\d.]+)rem\) {(\s*\.booking-details\s*{[^}]*}(?:[^{}]+{[^}]*})*)\s*}/) ??
+      [];
+    expect(Number(breakpoint) * 16).toBeLessThanOrEqual(390);
+    expect(phoneLayout).toMatch(/\.booking-details\s*{[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/);
+    expect(phoneLayout).toMatch(/\.booking-details > \.status-pill\s*{\s*grid-row: 1;\s*grid-column: 2;\s*}/);
   });
 
   it('shows sign-in notices inside the card with the same fields and reset link', async () => {
