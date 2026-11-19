@@ -145,9 +145,9 @@ describe('BookIt page presentation', () => {
     ]);
     const html = renderToStaticMarkup(await MyBookingsPage({ searchParams: Promise.resolve({}) }));
     const [upcoming, cancelled] = html.match(/<li[^>]*data-testid="booking-row"[^>]*>.*?<\/li>/gs) ?? [];
-    expect(upcoming).toMatch(/class="status-pill justify-self-end" data-testid="booking-status">Confirmed</);
+    expect(upcoming).toMatch(/class="status-pill justify-self-end [^"]*" data-testid="booking-status">Confirmed</);
     expect(cancelled).toMatch(
-      /class="status-pill justify-self-end status-pill--cancelled" data-testid="booking-status">Cancelled \(late\)</,
+      /class="status-pill justify-self-end [^"]* status-pill--cancelled" data-testid="booking-status">Cancelled \(late\)</,
     );
   });
 

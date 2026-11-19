@@ -46,14 +46,12 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           )}
         </div>
         <div className="grid min-w-0 grow items-start gap-2 min-[24rem]:grid-cols-[minmax(0,1fr)_auto]">
-          <div>
-            <p className="text-lg leading-tight font-semibold tabular-nums" data-testid="booking-when">
-              {formatSlot(booking.startsAt, settings.timeZone)}
-            </p>
-            <p className="text-muted">With {booking.practitionerName}</p>
-          </div>
+          <p className="text-lg leading-tight font-semibold tabular-nums" data-testid="booking-when">
+            {formatSlot(booking.startsAt, settings.timeZone)}
+          </p>
+          <p className="text-muted min-[24rem]:col-span-2">With {booking.practitionerName}</p>
           <span
-            className={`status-pill justify-self-end${booking.status === 'confirmed' ? '' : ' status-pill--cancelled'}`}
+            className={`status-pill justify-self-end min-[24rem]:col-start-2 min-[24rem]:row-start-1${booking.status === 'confirmed' ? '' : ' status-pill--cancelled'}`}
             data-testid="booking-status"
           >
             {statusText(booking)}
