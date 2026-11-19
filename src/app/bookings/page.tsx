@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
+import { bookingManagementPath, cancelBookingAnchor } from '@/lib/routes';
 import { formatSlot } from '@/lib/time';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
@@ -45,7 +46,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       {changeable ? (
         <div className="flex gap-2">
           <Link
-            href={`/bookings/${booking.id}/reschedule`}
+            href={bookingManagementPath({ bookingId: booking.id, intent: 'reschedule' })}
             prefetch={false}
             className="button-secondary"
             data-testid="reschedule-link"
@@ -54,7 +55,12 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           </Link>
           <form action={cancelAction}>
             <input type="hidden" name="bookingId" value={booking.id} />
-            <button type="submit" className="button-secondary" data-testid="cancel-booking">
+            <button
+              id={cancelBookingAnchor(booking.id)}
+              type="submit"
+              className="button-secondary"
+              data-testid="cancel-booking"
+            >
               Cancel
             </button>
           </form>

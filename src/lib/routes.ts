@@ -1,8 +1,35 @@
+import { z } from 'zod';
+
 export const FORGOT_PASSWORD_PATH = '/auth/forgot-password';
 export const RESET_PASSWORD_PREFIX = '/auth/reset-password/';
 
 export function resetPasswordPath(token: string): string {
   return `${RESET_PASSWORD_PREFIX}${encodeURIComponent(token)}`;
+}
+
+const bookingLinkInput = z.object({
+  bookingId: z.uuid(),
+  intent: z.enum(['reschedule', 'cancel']),
+});
+
+type BookingLink = z.infer<typeof bookingLinkInput>;
+
+export function parseBookingLink(bookingId: unknown, intent: unknown): BookingLink | null {
+  const result = bookingLinkInput.safeParse({ bookingId, intent });
+  return result.success ? result.data : null;
+}
+
+export function bookingSignInPath(bookingLink: BookingLink | null): string {
+  if (!bookingLink) return '/auth/sign-in';
+  return `/auth/sign-in?${new URLSearchParams(bookingLink)}`;
+}
+
+export function cancelBookingAnchor(bookingId: string): string {
+  return `cancel-${bookingId}`;
+}
+
+export function bookingManagementPath({ bookingId, intent }: BookingLink): string {
+  return intent === 'reschedule' ? `/bookings/${bookingId}/reschedule` : `/bookings#${cancelBookingAnchor(bookingId)}`;
 }
 
 /**
