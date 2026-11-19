@@ -1,18 +1,26 @@
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq, sql } from 'drizzle-orm';
+import { redirect } from 'next/navigation';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cancelAction } from '@/app/bookings/actions';
+import { errorText } from '@/app/messages';
 import { bookings, practitioners } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
+import { listAdminBookings } from '@/server/admin/bookings';
 import { bookSlot, type BookingDependencies } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { BookingError } from '@/server/bookings/errors';
 import { findBookingForPatient, listBookingsForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
+import { bookingDependencies, requirePatient } from '@/server/request-context';
 import { listAvailableSlots, type SlotView } from '@/server/slots/queries';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/database';
 import { captureLogs, type CapturedLogs } from '../helpers/logs';
 import { recordingMailer, testMail, type RecordingMailer } from '../helpers/mail';
+
+vi.mock('next/navigation', () => ({ redirect: vi.fn() }));
+vi.mock('@/server/request-context', () => ({ bookingDependencies: vi.fn(), requirePatient: vi.fn() }));
 
 let database: TestDatabase;
 let clinic: SeededClinic;
@@ -59,6 +67,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  vi.clearAllMocks();
   clock.set('2026-10-20T07:00:00Z');
   await emptyDatabase(database.db);
   clinic = await seedClinic(database.db, clock);
@@ -172,6 +181,54 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
     expect(stored).toMatchObject({ status: 'cancelled', lateCancellation: false });
     expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.sent', 'booking.cancelled']);
+  });
+
+  it('shows a late cancellation in My bookings and Clinic bookings and frees the time', async () => {
+    const slot = await slotAt('2026-10-21', '09:00');
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
+    clock.set('2026-10-20T12:00:00Z');
+    vi.mocked(requirePatient).mockResolvedValue(clinic.patient1);
+    vi.mocked(bookingDependencies).mockResolvedValue(deps);
+    const form = new FormData();
+    form.set('bookingId', booking.id);
+
+    await cancelAction(form);
+
+    expect(redirect).toHaveBeenLastCalledWith('/bookings?notice=cancelled_late');
+    expect(await listBookingsForPatient(database.db, clinic.patient1.id)).toMatchObject([
+      { id: booking.id, status: 'cancelled', lateCancellation: true, cancelledAt: clock.now() },
+    ]);
+    expect(await listAdminBookings(database.db, { status: 'cancelled' }, 'Europe/London')).toMatchObject([
+      { id: booking.id, status: 'cancelled', lateCancellation: true },
+    ]);
+    expect((await slotsOn('2026-10-21')).map((available) => available.id)).toContain(slot.id);
+    const replacement = await bookSlot(deps, { patientId: clinic.patient2.id, slotId: slot.id });
+    expect(replacement).toMatchObject({ status: 'confirmed', slotId: slot.id });
+  });
+
+  it('shows a problem and leaves the booking confirmed when a late cancellation cannot be saved', async () => {
+    const slot = await slotAt('2026-10-21', '09:00');
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
+    clock.set('2026-10-20T12:00:00Z');
+    vi.mocked(requirePatient).mockResolvedValue(clinic.patient1);
+    vi.mocked(bookingDependencies).mockResolvedValue(deps);
+    const form = new FormData();
+    form.set('bookingId', booking.id);
+    await database.db.execute(
+      sql`alter table "booking" add constraint test_refuse_cancellation check (status = 'confirmed')`,
+    );
+    try {
+      await cancelAction(form);
+    } finally {
+      await database.db.execute(sql`alter table "booking" drop constraint test_refuse_cancellation`);
+    }
+
+    expect(redirect).toHaveBeenLastCalledWith('/bookings?error=cancellation_failed');
+    expect(errorText('cancellation_failed')).toBe('Sorry, we could not cancel your session. Please try again.');
+    expect(await listBookingsForPatient(database.db, clinic.patient1.id)).toMatchObject([
+      { id: booking.id, status: 'confirmed', lateCancellation: false, cancelledAt: null },
+    ]);
+    expect((await slotsOn('2026-10-21')).map((available) => available.id)).not.toContain(slot.id);
   });
 
   it('refuses to cancel after the start, twice, or for another patient', async () => {

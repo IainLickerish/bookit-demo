@@ -7,7 +7,7 @@ import { cancelBooking } from '@/server/bookings/cancel';
 import { BookingError, type BookingErrorCode } from '@/server/bookings/errors';
 import { isUuid } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
-import { withoutQueryDetails } from '@/server/errors';
+import { DatabaseError, withoutQueryDetails } from '@/server/errors';
 import { bookingDependencies, requirePatient } from '@/server/request-context';
 
 function formText(formData: FormData, name: string): string {
@@ -57,7 +57,14 @@ export async function cancelAction(formData: FormData): Promise<void> {
     });
     destination = result.late ? '/bookings?notice=cancelled_late' : '/bookings?notice=cancelled';
   } catch (error) {
-    destination = `/bookings?error=${refusalCode(error, deps.log, 'cancel')}`;
+    if (error instanceof BookingError) {
+      destination = `/bookings?error=${refusalCode(error, deps.log, 'cancel')}`;
+    } else {
+      const failure = withoutQueryDetails(error);
+      if (!(failure instanceof DatabaseError)) throw failure;
+      deps.log.error({ event: 'booking.cancel.failed', err: failure }, 'Could not cancel booking');
+      destination = '/bookings?error=cancellation_failed';
+    }
   }
   redirect(destination);
 }

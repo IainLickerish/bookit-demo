@@ -31,6 +31,10 @@ export const BOOKING_ERRORS = {
     status: 409,
     message: 'That booking is already cancelled.',
   },
+  cancellation_failed: {
+    status: 500,
+    message: 'Sorry, we could not cancel your session. Please try again.',
+  },
   booking_already_started: {
     status: 409,
     message: 'That appointment has already started, so it cannot be changed online.',

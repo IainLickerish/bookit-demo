@@ -12,5 +12,9 @@ Check that it moves to the past and cancelled list. A cancelled time becomes
 available for another patient.
 
 Acme Physio treats cancellations made less than **24 hours** before the start as
-late cancellations. At exactly 24 hours the cancellation is not late. A session
-that has already started cannot be cancelled in BookIt; contact the clinic.
+late cancellations. These appear as **Cancelled (late)**. At exactly 24 hours the
+cancellation is not late. A session that has already started cannot be cancelled
+in BookIt; contact the clinic.
+
+If BookIt cannot save your cancellation, the session stays **Confirmed**. You can
+try again from **My bookings**.
