@@ -4,25 +4,32 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import AdminBookingsPage from '@/app/admin/page';
 import SignInPage from '@/app/auth/sign-in/page';
+import ReschedulePage from '@/app/bookings/[bookingId]/reschedule/page';
 import { DayPicker } from '@/app/day-picker';
 import ErrorPage from '@/app/error';
 import NotFound from '@/app/not-found';
-import { SlotList } from '@/app/slot-list';
+import SlotsPage from '@/app/slots/page';
 import { listAdminBookings, listAdminPractitioners } from '@/server/admin/bookings';
 import { requireAdmin } from '@/server/admin/context';
-import { currentUser } from '@/server/request-context';
+import { findBookingForPatient } from '@/server/bookings/queries';
+import { currentUser, requirePatient } from '@/server/request-context';
 import { loadClinicSettings, type ClinicSettings } from '@/server/settings';
-import type { DayView } from '@/server/slots/day-view';
+import { loadDayView, type DayView } from '@/server/slots/day-view';
 
 vi.mock('@/db/client', () => ({ getDatabase: vi.fn() }));
-vi.mock('@/server/request-context', () => ({ currentUser: vi.fn() }));
+vi.mock('@/server/request-context', () => ({ currentUser: vi.fn(), requirePatient: vi.fn() }));
 vi.mock('@/server/admin/context', () => ({ requireAdmin: vi.fn() }));
 vi.mock('@/server/admin/bookings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/server/admin/bookings')>()),
   listAdminBookings: vi.fn(),
   listAdminPractitioners: vi.fn(),
 }));
+vi.mock('@/server/bookings/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/bookings/queries')>()),
+  findBookingForPatient: vi.fn(),
+}));
 vi.mock('@/server/settings', () => ({ loadClinicSettings: vi.fn() }));
+vi.mock('@/server/slots/day-view', () => ({ loadDayView: vi.fn() }));
 
 const settings: ClinicSettings = {
   clinicName: 'Test Physio',
@@ -34,9 +41,25 @@ const settings: ClinicSettings = {
   maxReschedulesPerBooking: 3,
 };
 const practitioner = { id: '019a0000-0000-7000-8000-00000000a001', name: 'Pat Physio', bio: '' };
+const slot = {
+  id: 'slot-1',
+  practitionerId: practitioner.id,
+  practitionerName: practitioner.name,
+  startsAt: new Date('2026-11-19T09:30:00Z'),
+  endsAt: new Date('2026-11-19T10:15:00Z'),
+};
+const view: DayView = {
+  settings,
+  date: '2026-11-19',
+  today: '2026-11-19',
+  lastDate: '2026-11-20',
+  practitioner,
+  practitioners: [practitioner],
+  slots: [slot],
+};
 
 describe('BookIt page presentation', () => {
-  it('serves both typefaces from bundled webfont files', () => {
+  it('declares Figtree and Fraunces using local WOFF2 files', () => {
     const css = readFileSync(new URL('../../src/app/fonts/faces.css', import.meta.url), 'utf8');
     expect(css).toContain("font-family: 'Figtree'");
     expect(css).toContain("font-family: 'Fraunces'");
@@ -49,26 +72,9 @@ describe('BookIt page presentation', () => {
     expect(css.match(/url\(/g)).toHaveLength(5);
   });
 
-  it('marks today and keeps the day picker and time choices on their existing destinations', () => {
-    const slot = {
-      id: 'slot-1',
-      practitionerId: practitioner.id,
-      practitionerName: practitioner.name,
-      startsAt: new Date('2026-11-19T09:30:00Z'),
-      endsAt: new Date('2026-11-19T10:15:00Z'),
-    };
-    const view: DayView = {
-      settings,
-      date: '2026-11-19',
-      today: '2026-11-19',
-      lastDate: '2026-11-20',
-      practitioner,
-      practitioners: [practitioner],
-      slots: [slot],
-    };
+  it('marks today and keeps the previous and next day links within the booking window', () => {
     const picker = renderToStaticMarkup(createElement(DayPicker, { view, path: '/slots' }));
     expect(picker).toContain('class="day-tile day-tile--today"');
-    expect(picker).toContain('action="/slots"');
     expect(picker).toContain(`href="/slots?practitioner=${practitioner.id}&amp;date=2026-11-20"`);
     expect(picker).not.toContain('data-testid="previous-day"');
 
@@ -78,16 +84,53 @@ describe('BookIt page presentation', () => {
     expect(lastDay).toContain(`href="/slots?practitioner=${practitioner.id}&amp;date=2026-11-19"`);
     expect(lastDay).not.toContain('day-tile--today');
     expect(lastDay).not.toContain('data-testid="next-day"');
+  });
 
-    const times = renderToStaticMarkup(
-      createElement(SlotList, {
-        slots: view.slots,
-        timeZone: settings.timeZone,
-        renderChoice: (choice, label) => createElement('a', { href: `/book/${choice.id}` }, label),
-      }),
+  it('renders the slot link and reschedule fields alongside their own day filter action bars', async () => {
+    const patientId = 'patient-1';
+    const bookingId = 'booking-1';
+    vi.mocked(requirePatient).mockResolvedValue({
+      id: patientId,
+      email: 'patient@example.test',
+      name: 'Test Patient',
+      role: 'patient',
+      phone: null,
+    });
+    vi.mocked(loadDayView).mockResolvedValue(view);
+    vi.mocked(loadClinicSettings).mockResolvedValue(settings);
+    vi.mocked(findBookingForPatient).mockResolvedValue({
+      id: bookingId,
+      patientId,
+      slotId: 'old-slot',
+      startsAt: new Date('2026-11-19T11:00:00Z'),
+      endsAt: new Date('2026-11-19T11:45:00Z'),
+      practitionerId: practitioner.id,
+      practitionerName: practitioner.name,
+      status: 'confirmed',
+      lateCancellation: false,
+      rescheduleCount: 0,
+      phone: null,
+      createdAt: new Date('2026-10-20T09:30:00Z'),
+      updatedAt: new Date('2026-10-20T09:30:00Z'),
+      cancelledAt: null,
+    });
+    const searchParams = Promise.resolve({});
+    const slots = renderToStaticMarkup(await SlotsPage({ searchParams }));
+    expect(slots).toMatch(/data-testid="slot-link"[^>]*href="\/book\/slot-1">Thu, 19 Nov 2026, 09:30<\/a>/);
+    const [slotFilters] = slots.match(/<form[^>]*>.*?<\/form>/gs) ?? [];
+    expect(slotFilters).toContain('action="/slots" method="get"');
+    expect(slotFilters).toMatch(/<div class="booking-action"><button type="submit"[^>]*>Show times<\/button>/);
+
+    const reschedule = renderToStaticMarkup(
+      await ReschedulePage({ params: Promise.resolve({ bookingId }), searchParams }),
     );
-    expect(times).toContain('tabular-nums');
-    expect(times).toContain('<a href="/book/slot-1">Thu, 19 Nov 2026, 09:30</a>');
+    const [moveFilters, choice] = reschedule.match(/<form[^>]*>.*?<\/form>/gs) ?? [];
+    expect(moveFilters).toContain('action="/bookings/booking-1/reschedule" method="get"');
+    expect(moveFilters).toMatch(/<div class="booking-action"><button type="submit"[^>]*>Show times<\/button>/);
+    expect(choice).toContain('data-testid="reschedule-to"');
+    expect(choice).toContain('name="bookingId" value="booking-1"');
+    expect(choice).toContain('name="newSlotId" value="slot-1"');
+    expect(choice).toContain('Thu, 19 Nov 2026, 09:30</button>');
   });
 
   it('shows sign-in notices inside the card with the same fields and reset link', async () => {
@@ -95,17 +138,15 @@ describe('BookIt page presentation', () => {
     const html = renderToStaticMarkup(
       await SignInPage({ searchParams: Promise.resolve({ error: 'invalid', notice: 'password_reset' }) }),
     );
-    expect(html).toContain('class="narrow-page card"');
-    expect(html).toContain('role="status"');
-    expect(html).toContain('Your password has been changed. Sign in with your new password.');
-    expect(html).toContain('role="alert"');
-    expect(html).toContain('The email address or password is not correct.');
-    expect(html).toMatch(/<input[^>]+type="email"[^>]+name="email"/);
-    expect(html).toMatch(/<input[^>]+type="password"[^>]+name="password"/);
-    expect(html).toContain('href="/auth/forgot-password"');
+    const card = html.match(/<section class="narrow-page card">(.*?)<\/section>/s)?.[1];
+    expect(card).toMatch(/role="status"[^>]*>Your password has been changed\. Sign in with your new password\./);
+    expect(card).toMatch(/role="alert"[^>]*>The email address or password is not correct\./);
+    expect(card).toMatch(/<input[^>]+type="email"[^>]+name="email"/);
+    expect(card).toMatch(/<input[^>]+type="password"[^>]+name="password"/);
+    expect(card).toContain('href="/auth/forgot-password"');
   });
 
-  it('keeps filtered staff rows and the matching export in a keyboard-scrollable layout', async () => {
+  it('renders staff rows in a focusable scroll region and links to the filtered export', async () => {
     vi.mocked(loadClinicSettings).mockResolvedValue(settings);
     vi.mocked(listAdminPractitioners).mockResolvedValue([practitioner]);
     vi.mocked(listAdminBookings).mockResolvedValue([

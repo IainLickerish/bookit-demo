@@ -10,6 +10,7 @@ audience: patient
 In **My bookings** at `/bookings`, select **Reschedule** beside an upcoming session.
 Choose an available date and time, then confirm the move. Check the new time in
 your bookings list. Your old slot is released only when the move succeeds.
+On a phone, **Show times** stays at the bottom of the screen.
 
 Acme Physio allows up to **3 reschedules per booking**. The new time must be in
 the future and within the booking horizon. If a time is taken while you are

@@ -33,9 +33,11 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
             data-testid="date-input"
           />
         </label>
-        <button type="submit" className="button-secondary" data-testid="show-slots">
-          Show times
-        </button>
+        <div className="booking-action">
+          <button type="submit" className="button w-full" data-testid="show-slots">
+            Show times
+          </button>
+        </div>
       </form>
       <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
         {view.date > view.today ? (
