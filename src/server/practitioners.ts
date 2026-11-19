@@ -1,5 +1,6 @@
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Executor } from '@/db/client';
+import type { Executor, Transaction } from '@/db/client';
 import { practitioners } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
@@ -22,6 +23,16 @@ export const newPractitionerInput = z
   );
 
 export type NewPractitioner = z.input<typeof newPractitionerInput>;
+
+/** Booking writes can run together, but each must see block-outs before using this schedule. */
+export async function lockPractitionerSchedule(tx: Transaction, id: string, mode: 'share' | 'no key update') {
+  const [practitioner] = await tx
+    .select({ id: practitioners.id, name: practitioners.name })
+    .from(practitioners)
+    .where(and(eq(practitioners.id, id), eq(practitioners.active, true)))
+    .for(mode);
+  return practitioner ?? null;
+}
 
 export async function createPractitioner(db: Executor, clock: Clock, input: NewPractitioner): Promise<{ id: string }> {
   const practitioner = newPractitionerInput.parse(input);
