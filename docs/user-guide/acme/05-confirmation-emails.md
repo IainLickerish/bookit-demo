@@ -12,8 +12,8 @@ They describe the physiotherapist, session date and local time. Acme includes
 contact details when available; providing a phone number is optional.
 
 Use the attached `physio-session.ics` file to add your session to your calendar.
-The entry shows Acme Physio, your physiotherapist, the date, the time and how
-long your session lasts. You can use the file you download from **My bookings**
+The entry shows Acme Physio, your physiotherapist, the UK date and time and
+how long your session lasts. You can use the file you download from **My bookings**
 in the same way.
 
 - In Google Calendar on a computer, open **Settings**, then **Import & export**, and import the file. [Google Calendar help](https://support.google.com/calendar/answer/37118)

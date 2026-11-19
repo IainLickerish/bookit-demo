@@ -4,6 +4,7 @@ import { getClock } from '@/lib/clock';
 import { createSession, SESSION_COOKIE } from '@/server/auth/session';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
+import { saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots } from '@/server/slots/queries';
 import { seedClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
@@ -43,7 +44,7 @@ it('only downloads the calendar file for the signed-in client’s own upcoming c
   const { db } = database;
   const clock = getClock();
   const earlier = manualClock('2026-10-19T07:00:00Z');
-  const clinic = await seedClinic(db, earlier, { settings: { clinicName: 'Acme Physio' } });
+  const clinic = await seedClinic(db, earlier, { settings: { clinicName: 'Acme Physio', sessionMinutes: 30 } });
   const deps = { db, clock, log: captureLogs(clock).log, mail: testMail() };
   const [pastSlot] = await listAvailableSlots(db, {
     practitionerId: clinic.practitioners.weekdays,
@@ -57,6 +58,7 @@ it('only downloads the calendar file for the signed-in client’s own upcoming c
     until: new Date('2026-10-22T09:00:00Z'),
   });
   const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: upcomingSlot!.id });
+  await saveClinicSettings(db, clock, { ...clinic.settings, timeZone: 'Pacific/Honolulu', sessionMinutes: 60 });
 
   await expect(download(booking.id)).rejects.toMatchObject({ digest: expect.stringContaining('/auth/sign-in') });
   sessionToken = (await createSession(db, clock, clinic.admin.id)).token;
@@ -74,7 +76,8 @@ it('only downloads the calendar file for the signed-in client’s own upcoming c
   expect(response.headers.get('Content-Type')).toBe('text/calendar; charset=utf-8');
   const calendar = await response.text();
   expect(calendar).toContain('SUMMARY:Acme Physio session with Pat Physio\r\n');
-  expect(calendar).toContain('DTSTART:20261022T080000Z\r\nDTEND:20261022T084500Z\r\n');
+  expect(calendar).toContain('DTSTART:20261022T080000Z\r\nDTEND:20261022T083000Z\r\n');
+  expect(calendar.replace(/\r\n /g, '')).toContain('Thu\\, 22 Oct 2026\\, 09:00 (Europe/London)\\n30 minutes');
   expect(calendar).not.toMatch(/Patient One|patients\.example\.test|7700/);
 
   await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });

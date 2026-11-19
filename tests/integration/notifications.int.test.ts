@@ -90,7 +90,11 @@ beforeEach(async () => {
 
 describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stand-in, no real email)', () => {
   it('attaches a calendar file to both confirmations with the correct session details after a move', async () => {
-    await saveClinicSettings(database.db, clock, { ...clinic.settings, clinicName: 'Acme Physio' });
+    await saveClinicSettings(database.db, clock, {
+      ...clinic.settings,
+      clinicName: 'Acme Physio',
+      timeZone: 'Pacific/Honolulu',
+    });
     const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
     const target = await freeSlotId(0, '2026-10-29', clinic.practitioners.saturdays);
     await rescheduleBooking(deps(), { patientId: clinic.patient1.id, bookingId: booking.id, newSlotId: target });

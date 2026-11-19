@@ -4,6 +4,7 @@ import type { BookingView } from './queries';
 
 export const BOOKING_CALENDAR_FILENAME = 'physio-session.ics';
 export const BOOKING_CALENDAR_CONTENT_TYPE = 'text/calendar; charset=utf-8';
+const UK_TIME_ZONE = 'Europe/London';
 
 type CalendarBooking = Pick<
   BookingView,
@@ -38,12 +39,8 @@ function foldLine(line: string): string {
   return folded;
 }
 
-export function bookingCalendar(
-  booking: CalendarBooking,
-  settings: Pick<ClinicSettings, 'clinicName' | 'timeZone'>,
-): string {
-  const { clinicName, timeZone } = settings;
-  const when = formatSlot(booking.startsAt, timeZone);
+export function bookingCalendar(booking: CalendarBooking, { clinicName }: Pick<ClinicSettings, 'clinicName'>): string {
+  const when = formatSlot(booking.startsAt, UK_TIME_ZONE);
   const minutes = (booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000;
   const lines = [
     'BEGIN:VCALENDAR',
@@ -57,7 +54,7 @@ export function bookingCalendar(
     `DTEND:${calendarDate(booking.endsAt)}`,
     `SUMMARY:${calendarText(`${clinicName} session with ${booking.practitionerName}`)}`,
     `LOCATION:${calendarText(clinicName)}`,
-    `DESCRIPTION:${calendarText(`${when} (${timeZone})\n${minutes} minutes`)}`,
+    `DESCRIPTION:${calendarText(`${when} (${UK_TIME_ZONE})\n${minutes} minutes`)}`,
     'END:VEVENT',
     'END:VCALENDAR',
   ];
