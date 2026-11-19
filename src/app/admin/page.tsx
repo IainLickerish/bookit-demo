@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { formatSlot } from '@/lib/time';
 import { requireAdmin } from '@/server/admin/context';
+import { BLOCK_REASON_LIMIT } from '@/server/admin/blocked-periods';
 import {
   listAdminBookings,
   listAdminPractitioners,
@@ -10,6 +11,7 @@ import {
 } from '@/server/admin/bookings';
 import { loadClinicSettings } from '@/server/settings';
 import type { SearchParams } from '../messages';
+import { BlockTime } from './block-time';
 
 export default async function AdminBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
@@ -37,6 +39,10 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           Clinic settings
         </Link>
       </p>
+      <details className="mt-3" data-testid="admin-block-time">
+        <summary className="w-fit cursor-pointer py-3 font-medium underline">Block out time</summary>
+        <BlockTime practitioners={practitioners} timeZone={settings.timeZone} reasonLimit={BLOCK_REASON_LIMIT} />
+      </details>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
         <label>
           Practitioner
