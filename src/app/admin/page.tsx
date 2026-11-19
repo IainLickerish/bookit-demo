@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { formatSlot } from '@/lib/time';
+import { BLOCK_OUT_REASON_LIMIT } from '@/server/admin/block-outs';
 import { requireAdmin } from '@/server/admin/context';
 import {
   listAdminBookings,
@@ -10,6 +11,7 @@ import {
 } from '@/server/admin/bookings';
 import { loadClinicSettings } from '@/server/settings';
 import type { SearchParams } from '../messages';
+import { BlockOutForm } from './block-out-form';
 
 export default async function AdminBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
@@ -32,11 +34,14 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   return (
     <section>
       <h1>Clinic bookings</h1>
-      <p>
+      <div className="flex flex-wrap items-center gap-x-4">
         <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
           Clinic settings
         </Link>
-      </p>
+        <a href="#block-out-time" className="inline-flex min-h-11 items-center underline" data-testid="block-out-link">
+          Block out time
+        </a>
+      </div>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
         <label>
           Practitioner
@@ -110,6 +115,11 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           {rows.length === 0 ? <p>No bookings match these filters.</p> : null}
         </>
       )}
+      <BlockOutForm
+        practitioners={practitioners.filter((person) => person.active)}
+        timeZone={settings.timeZone}
+        reasonLimit={BLOCK_OUT_REASON_LIMIT}
+      />
     </section>
   );
 }

@@ -9,11 +9,7 @@ import { isUuid } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { withoutQueryDetails } from '@/server/errors';
 import { bookingDependencies, requirePatient } from '@/server/request-context';
-
-function formText(formData: FormData, name: string): string {
-  const value = formData.get(name);
-  return typeof value === 'string' ? value : '';
-}
+import { formText } from '../form-data';
 
 /** The code of a refused booking operation; anything else is rethrown. */
 function refusalCode(error: unknown, log: Logger, operation: string): BookingErrorCode {
