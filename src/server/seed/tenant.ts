@@ -27,7 +27,8 @@ export const tenantSchema = z
     allowedSenderDomains: z.array(text).length(1),
     mailFrom: fictionalEmail,
     branding: z.strictObject({ practitionerLabel: text, welcome: text }),
-    settings: clinicSettingsInput.strict(),
+    // The database supplies the initial reminder setting. Keep it out of the seed fingerprint.
+    settings: clinicSettingsInput.omit({ sendBookingReminders: true }).strict(),
     supportHours: text,
     tone: text,
     contacts: z

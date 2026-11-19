@@ -14,3 +14,8 @@ the view; an empty list means no appointments match the current selection.
 
 The table includes patient names and booking status. Only authorised Acme clinic
 staff should use this page. Patients see their own appointments through **My bookings**.
+
+## Session reminders
+
+Open **Clinic settings** to change whether Acme Physio sends session reminders.
+Tick or untick **Send session reminders by email**, then choose **Save settings**.
