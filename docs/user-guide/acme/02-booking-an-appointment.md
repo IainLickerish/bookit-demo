@@ -14,3 +14,7 @@ details before confirming. You can provide a phone number, but it is optional.
 Slots are offered up to 220 days ahead. All times use Europe/London. A slot can
 be booked by only one patient; if somebody books it first, choose another time.
 Your confirmed session appears under **My bookings** at `/bookings`.
+
+Choose **Add to calendar** on the confirmation or beside any upcoming session in
+**My bookings**. Open the downloaded file in Apple Calendar, or import it into
+Google Calendar or Outlook.

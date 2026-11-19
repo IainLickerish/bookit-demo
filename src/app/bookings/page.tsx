@@ -3,10 +3,12 @@ import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
+import { isUpcomingBooking } from '@/server/bookings/rules';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
+import { AddToCalendarLink } from './add-to-calendar-link';
 
 function statusText(booking: BookingView): string {
   if (booking.status === 'confirmed') {
@@ -18,13 +20,19 @@ function statusText(booking: BookingView): string {
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   const patient = await requirePatient();
   const params = await searchParams;
-  const notice = noticeText(single(params.notice));
+  const noticeCode = single(params.notice);
+  const notice = noticeText(noticeCode);
   const error = errorText(single(params.error));
   const db = getDatabase();
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
   const now = getClock().now();
-  const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
+  const upcoming = bookings.filter((booking) => isUpcomingBooking(booking, now));
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
+  const confirmedBookingId = single(params.booking);
+  const confirmedBooking =
+    noticeCode === 'booked' || noticeCode === 'rescheduled'
+      ? upcoming.find((booking) => booking.id === confirmedBookingId)
+      : undefined;
 
   const row = (booking: BookingView, changeable: boolean) => (
     <li
@@ -43,7 +51,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -58,6 +66,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
               Cancel
             </button>
           </form>
+          <AddToCalendarLink bookingId={booking.id} />
         </div>
       ) : null}
     </li>
@@ -70,6 +79,14 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         <p role="status" className="notice" data-testid="notice">
           {notice}
         </p>
+      ) : null}
+      {confirmedBooking ? (
+        <div className="flex flex-wrap items-center gap-2" data-testid="confirmation-calendar">
+          <p>
+            {formatSlot(confirmedBooking.startsAt, settings.timeZone)} with {confirmedBooking.practitionerName}
+          </p>
+          <AddToCalendarLink bookingId={confirmedBooking.id} />
+        </div>
       ) : null}
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
