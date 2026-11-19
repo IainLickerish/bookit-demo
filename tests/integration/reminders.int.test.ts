@@ -1,11 +1,13 @@
-import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { bookings } from '@/db/schema';
 import { bookingReturnPath } from '@/lib/routes';
 import { addDays, addHours } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { findBookingForPatient } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
-import { disabledMailer } from '@/server/notifications/mailer';
+import { createSmtpMailer, disabledMailer } from '@/server/notifications/mailer';
 import { sendDueReminders } from '@/server/notifications/reminders';
 import { saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots } from '@/server/slots/queries';
@@ -42,8 +44,8 @@ function bookingDeps() {
   return { db: database.db, clock, log: logs.log, mail: testMail(disabledMailer) };
 }
 
-function checkReminders() {
-  return sendDueReminders({ ...bookingDeps(), mail: testMail(mailer), publicUrl });
+function checkReminders(mail = testMail(mailer)) {
+  return sendDueReminders({ ...bookingDeps(), mail, publicUrl });
 }
 
 async function slotIdAt(start: string) {
@@ -81,6 +83,17 @@ it('sends one reminder to the client when their session is 24 hours away', async
   );
 });
 
+it('shows the clinic time and the UK time when the clinic uses a different time zone', async () => {
+  const booking = await bookAt(firstStart);
+  await saveClinicSettings(database.db, clock, { ...clinic.settings, timeZone: 'Europe/Paris' });
+  clock.set(addHours(booking.startsAt, -24));
+  await checkReminders();
+  expect(mailer.sent).toHaveLength(1);
+  expect(mailer.sent[0]!.subject).toBe('Session reminder for Thu, 22 Oct 2026, 10:00');
+  expect(mailer.sent[0]!.text).toContain('Thu, 22 Oct 2026, 10:00 (Europe/Paris).');
+  expect(mailer.sent[0]!.text).toContain('UK time: Thu, 22 Oct 2026, 09:00.');
+});
+
 it('links the reminder to rescheduling and cancellation for the recipient’s booking', async () => {
   const booking = await bookAt(firstStart, clinic.patient2.id);
   clock.set(addHours(booking.startsAt, -24));
@@ -111,6 +124,9 @@ it('uses the moved time and leaves out cancelled sessions', async () => {
     bookingId: original.id,
     newSlotId: await slotIdAt(movedStart),
   });
+  clock.set(addHours(original.startsAt, -24));
+  await checkReminders();
+  expect(mailer.sent).toHaveLength(0);
   clock.set(addHours(cancelled.startsAt, -24));
   await checkReminders();
   expect(mailer.sent).toHaveLength(0);
@@ -120,6 +136,65 @@ it('uses the moved time and leaves out cancelled sessions', async () => {
   expect(mailer.sent).toHaveLength(1);
   expect(mailer.sent[0]!.text).toContain('Tue, 27 Oct 2026, 09:00 (UK time)');
 });
+
+it('skips bookings and moves made after the reminder was due', async () => {
+  const original = await bookAt(movedStart, clinic.patient2.id);
+  clock.set(addHours(new Date(firstStart), -24));
+  clock.advanceMinutes(1);
+  await bookAt(firstStart);
+  await checkReminders();
+  expect(mailer.sent).toHaveLength(0);
+
+  clock.set(addHours(new Date(nextStart), -24));
+  clock.advanceMinutes(1);
+  await rescheduleBooking(bookingDeps(), {
+    patientId: clinic.patient2.id,
+    bookingId: original.id,
+    newSlotId: await slotIdAt(nextStart),
+  });
+  await checkReminders();
+  expect(mailer.sent).toHaveLength(0);
+});
+
+it.each(['move', 'cancellation'] as const)(
+  'discards a claimed reminder when a %s wins before mail handoff',
+  async (change) => {
+    const booking = await bookAt(firstStart);
+    clock.set(addHours(booking.startsAt, -24));
+    const request = { patientId: clinic.patient1.id, bookingId: booking.id };
+    const claim = async () => {
+      const [row] = await database.db
+        .select({ at: bookings.reminderClaimedAt })
+        .from(bookings)
+        .where(eq(bookings.id, booking.id));
+      return row!.at;
+    };
+    const transaction = database.db.transaction.bind(database.db);
+    const beforeHandoff = vi.spyOn(database.db, 'transaction').mockImplementationOnce(async (work, config) => {
+      expect(await claim()).toEqual(clock.now());
+      if (change === 'move') {
+        await rescheduleBooking(bookingDeps(), { ...request, newSlotId: await slotIdAt(movedStart) });
+      } else {
+        await cancelBooking(bookingDeps(), request);
+      }
+      return transaction(work, config);
+    });
+    try {
+      await checkReminders();
+      expect(beforeHandoff).toHaveBeenCalled();
+      expect(mailer.sent).toHaveLength(0);
+      expect(await claim()).toBeNull();
+    } finally {
+      beforeHandoff.mockRestore();
+    }
+    if (change === 'move') {
+      clock.set(addHours(new Date(movedStart), -24));
+      await checkReminders();
+      expect(mailer.sent).toHaveLength(1);
+      expect(mailer.sent[0]!.text).toContain('Tue, 27 Oct 2026, 09:00 (UK time)');
+    }
+  },
+);
 
 it('does not send a second reminder when a reminded booking moves', async () => {
   const original = await bookAt(firstStart);
@@ -136,18 +211,29 @@ it('does not send a second reminder when a reminded booking moves', async () => 
   expect(mailer.sent[0]!.text).toContain('Thu, 22 Oct 2026, 09:00 (UK time)');
 });
 
-it('observes the clinic setting and does not remind a client once a session starts', async () => {
-  const past = await bookAt(firstStart);
+it('observes the clinic setting and does not catch up reminders once their window has closed', async () => {
+  const missed = await bookAt(firstStart);
   const upcoming = await bookAt(nextStart, clinic.patient2.id);
   await saveClinicSettings(database.db, clock, { ...clinic.settings, reminderEmailsEnabled: false });
-  clock.set(addHours(upcoming.startsAt, -24));
+  clock.set(addHours(missed.startsAt, -24));
   await checkReminders();
   expect(mailer.sent).toHaveLength(0);
 
-  clock.set(past.startsAt);
+  clock.set(addHours(upcoming.startsAt, -24));
   await saveClinicSettings(database.db, clock, { ...clinic.settings, reminderEmailsEnabled: true });
   await checkReminders();
   expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient2.email]);
+});
+
+it('retries within the reminder window when SMTP refused the connection', async () => {
+  const booking = await bookAt(firstStart);
+  clock.set(addHours(booking.startsAt, -24));
+  await checkReminders(testMail(createSmtpMailer('smtp://127.0.0.1:9')));
+  expect(logs.events()).toContain('email.reminder.failed');
+  clock.advanceMinutes(1);
+  await checkReminders();
+  await checkReminders();
+  expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient1.email]);
 });
 
 it('does not retry when the mail server may already have accepted a reminder', async () => {
@@ -158,7 +244,11 @@ it('does not retry when the mail server may already have accepted a reminder', a
     ...acceptingMailer,
     send: async (email) => {
       await acceptingMailer.send(email);
-      throw new Error('Connection lost after accepting the message');
+      throw Object.assign(new Error('Connection lost after accepting the message'), {
+        code: 'ESOCKET',
+        command: 'CONN',
+        syscall: 'read',
+      });
     },
   };
   await checkReminders();

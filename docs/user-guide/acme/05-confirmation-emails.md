@@ -18,7 +18,9 @@ your current appointment status if an email is missing. Ask Alice Archer at
 
 ## Session reminders
 
-When reminders are on, Acme Physio sends one reminder per confirmed session,
-usually about 24 hours before it starts. The email gives the date, UK time and
-physiotherapist. Follow **Reschedule your session** or **Cancel your session** and
-sign in if asked. Opening either link leaves your booking in place until you act.
+When reminders are on, Acme Physio sends a reminder about 24 hours before a
+confirmed session. Book or move the session at least 24 hours ahead to receive a
+reminder. Each booking can receive one reminder. The email gives the date,
+UK time and physiotherapist. Follow **Reschedule your session** or
+**Cancel your session** and sign in if asked. Opening either link leaves your
+booking in place until you act.

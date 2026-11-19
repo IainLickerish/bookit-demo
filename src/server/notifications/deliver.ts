@@ -1,6 +1,6 @@
 import { emailHash, type Logger } from '@/lib/logger';
 import { reportError } from '../error-reporting';
-import { getMailer, type Mailer, type OutgoingEmail } from './mailer';
+import { canRetryEmail, getMailer, type Mailer, type OutgoingEmail } from './mailer';
 
 export interface MailSettings {
   mailer: Mailer;
@@ -27,14 +27,26 @@ export async function deliverEmail(
   kind: EmailKind,
   refs: Record<string, string> = {},
 ): Promise<boolean> {
+  return (await deliverEmailWithOutcome(mail, log, email, kind, refs)) === 'sent';
+}
+
+export async function deliverEmailWithOutcome(
+  mail: MailSettings,
+  log: Logger,
+  email: OutgoingEmail,
+  kind: EmailKind,
+  refs: Record<string, string>,
+): Promise<'sent' | 'retryable' | 'failed'> {
   const fields = { ...refs, recipient_hash: emailHash(email.to), mailer: mail.mailer.kind };
   try {
-    const sent = await mail.mailer.send(email);
+    const sent = await (kind === 'reminder'
+      ? mail.mailer.send(email, { singleAttempt: true })
+      : mail.mailer.send(email));
     log.info(
       { event: `email.${kind}.sent`, ...fields, message_id: sent.messageId },
       mail.mailer.kind === 'disabled' ? 'Email not sent: no SMTP server configured' : 'Email sent',
     );
-    return true;
+    return 'sent';
   } catch (error) {
     log.error(
       { event: `email.${kind}.failed`, ...fields, error_name: error instanceof Error ? error.name : 'unknown' },
@@ -42,6 +54,6 @@ export async function deliverEmail(
     );
     // SMTP failures can include the recipient or message in the transport's response.
     reportError(kind === 'reminder' ? new Error('Reminder email failed') : error, { operation: `${kind}_email` });
-    return false;
+    return canRetryEmail(error) ? 'retryable' : 'failed';
   }
 }

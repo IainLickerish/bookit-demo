@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type NodemailerError } from 'nodemailer';
 
 export interface OutgoingEmail {
   from: string;
@@ -16,11 +16,25 @@ export interface SentEmail {
 export interface Mailer {
   /** `smtp` sends through BOOKIT_SMTP_URL; `disabled` sends nothing; `recording` is for tests. */
   readonly kind: 'smtp' | 'disabled' | 'recording';
-  send(email: OutgoingEmail): Promise<SentEmail>;
+  send(email: OutgoingEmail, options?: { singleAttempt: true }): Promise<SentEmail>;
 }
 
 export class EmailAddressRefusedError extends Error {
   override readonly name = 'EmailAddressRefusedError';
+}
+
+/** True only for transient errors that establish the message was never accepted. */
+export function canRetryEmail(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const { code, command, syscall, responseCode } = error as NodemailerError;
+  if (code === 'EDNS' || (command === 'CONN' && syscall === 'connect')) return true;
+  // A completed SMTP rejection is different from a timeout or a lost reply after DATA.
+  return (
+    (code === 'EENVELOPE' || code === 'EMESSAGE') &&
+    responseCode !== undefined &&
+    responseCode >= 400 &&
+    responseCode < 500
+  );
 }
 
 // BookIt is fictional (brief 18): every address it sends from or to is on a
@@ -46,12 +60,23 @@ export const disabledMailer: Mailer = {
 /** Sends through an SMTP server such as Mailpit (`smtp://mailpit:1025`). */
 export function createSmtpMailer(url: string): Mailer {
   const transport = nodemailer.createTransport(url);
+  let singleAttemptTransport: typeof transport | undefined;
   return {
     kind: 'smtp',
-    async send(email) {
+    async send(email, options) {
       assertTestAddress(email.from, 'sender');
       assertTestAddress(email.to, 'recipient');
-      const info = await transport.sendMail(email);
+      let selected = transport;
+      if (options?.singleAttempt) {
+        if (!singleAttemptTransport) {
+          const smtp = new URL(url);
+          // A pooled transport can requeue a message when its connection drops.
+          smtp.searchParams.set('pool', 'false');
+          singleAttemptTransport = nodemailer.createTransport(smtp.href);
+        }
+        selected = singleAttemptTransport;
+      }
+      const info = await selected.sendMail(email);
       return { messageId: info.messageId };
     },
   };
