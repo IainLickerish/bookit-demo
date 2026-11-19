@@ -32,6 +32,12 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
       expect(csvField(value)).toBe(`"'${value.replaceAll('"', '""')}"`);
     },
   );
+  it.each(['＝1+1', '\u3000＋1+1', '－1+2', '＠SUM(1,2)'])(
+    'exports full-width formula-leading text as inert quoted text: %j',
+    (value) => {
+      expect(csvField(value)).toBe(`"'${value}"`);
+    },
+  );
   it('keeps normal commas, quotes and newlines inside one field', () => {
     expect(csvField('Ada, "Clinic"\nTest')).toBe('"Ada, ""Clinic""\nTest"');
   });
