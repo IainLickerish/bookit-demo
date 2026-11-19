@@ -236,7 +236,7 @@ describe('BookIt page presentation', () => {
   });
 
   it('declares non-wrapping text for booking status pills', () => {
-    expect(stylesheet).toMatch(/\.status-pill\s*{[^}]*white-space: nowrap;/);
+    expect(stylesheet).toMatch(/^\s*\.status-pill\s*{[^}]*white-space: nowrap;/m);
   });
 
   it('presents both recovery pages in cards with the existing next steps', () => {
