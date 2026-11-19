@@ -183,7 +183,7 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.sent', 'booking.cancelled']);
   });
 
-  it('saves a late cancellation, shows its notice and frees the slot for another client', async () => {
+  it('saves a late cancellation, redirects to its notice and frees the slot for another client', async () => {
     const day = '2026-10-21';
     const slot = await slotAt(day, '09:00');
     const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
