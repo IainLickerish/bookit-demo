@@ -22,14 +22,14 @@ export function createDatabase(
 
 const DATABASE_KEY = Symbol.for('bookit.database');
 
+export function databaseUrl(): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL is not set.');
+  return url;
+}
+
 export function getDatabase(): Database {
   const holder = globalThis as { [DATABASE_KEY]?: DatabaseHandle };
-  if (!holder[DATABASE_KEY]) {
-    const url = process.env.DATABASE_URL;
-    if (!url) {
-      throw new Error('DATABASE_URL is not set.');
-    }
-    holder[DATABASE_KEY] = createDatabase(url);
-  }
+  holder[DATABASE_KEY] ??= createDatabase(databaseUrl());
   return holder[DATABASE_KEY].db;
 }
