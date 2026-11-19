@@ -126,7 +126,14 @@ describe('page presentation', () => {
     expect(pageTitle(bookings)).toBe('My bookings');
     expect(renderToStaticMarkup(bookings)).toContain(`href="/bookings/${bookingId}/reschedule"`);
     const reschedule = { params: Promise.resolve({ bookingId }), searchParams: day };
-    expect(pageTitle(await ReschedulePage(reschedule))).toBe('Reschedule your appointment');
+    const movePage = await ReschedulePage(reschedule);
+    expect(pageTitle(movePage)).toBe('Reschedule your appointment');
+    const moveMarkup = renderToStaticMarkup(movePage);
+    const freeChoice = moveMarkup
+      .match(/<button\b[^>]*>/g)
+      ?.find((tag) => tag.includes('data-testid="reschedule-to"') && tag.includes(`data-slot-id="${freeSlotId}"`));
+    expect(freeChoice).toContain('type="submit"');
+    expect(freeChoice).not.toMatch(/\sdisabled\b/);
 
     session = otherPatientSession;
     expect(renderToStaticMarkup(await MyBookingsPage({ searchParams }))).not.toContain(bookingId);

@@ -137,6 +137,7 @@
 
   .card {
     @apply min-w-0 rounded-[1.25rem] border border-line bg-white p-6;
+    overflow-wrap: anywhere;
     box-shadow:
       0 2px 4px rgb(22 36 31 / 3%),
       0 12px 28px rgb(22 36 31 / 5%);
@@ -316,6 +317,5 @@
   .bookings-table th,
   .bookings-table td {
     @apply border-t border-line px-6 py-3;
-    overflow-wrap: anywhere;
   }
 }
