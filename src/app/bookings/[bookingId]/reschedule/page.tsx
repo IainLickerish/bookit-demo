@@ -41,30 +41,30 @@ export default async function ReschedulePage({
 
   return (
     <section>
-      <h1>Reschedule your appointment</h1>
+      <h1 className="page-heading">Reschedule your appointment</h1>
       {error ? (
-        <p role="alert" className="alert" data-testid="booking-error">
+        <p role="alert" className="alert mb-4" data-testid="booking-error">
           {error}
         </p>
       ) : null}
-      <p className="mb-2">
+      <p className="card mb-4">
         Currently booked:{' '}
-        <span className="font-medium" data-testid="current-when">
+        <span className="font-medium tabular-nums" data-testid="current-when">
           {formatSlot(booking.startsAt, view.settings.timeZone)}
         </span>{' '}
         with {booking.practitionerName}.
       </p>
       {!changeable ? (
-        <p className="alert" data-testid="not-reschedulable">
+        <p className="alert" role="alert" data-testid="not-reschedulable">
           This booking can no longer be rescheduled online.
         </p>
       ) : remaining === 0 ? (
-        <p className="alert" data-testid="reschedule-limit">
+        <p className="alert" role="alert" data-testid="reschedule-limit">
           This booking has been rescheduled as many times as the clinic allows. Please contact the clinic.
         </p>
       ) : (
-        <>
-          <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
+        <div className="space-y-8">
+          <p className="text-muted" data-testid="reschedules-remaining">
             You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
           </p>
           <DayPicker view={view} path={path} />
@@ -87,10 +87,10 @@ export default async function ReschedulePage({
               </form>
             )}
           />
-        </>
+        </div>
       )}
-      <p className="mt-6 text-sm">
-        <Link href="/bookings" prefetch={false} className="underline">
+      <p className="mt-6">
+        <Link href="/bookings" prefetch={false} className="text-link">
           Back to my bookings
         </Link>
       </p>

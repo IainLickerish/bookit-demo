@@ -189,6 +189,72 @@
     box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, var(--color-ink) 5%, transparent);
   }
 
+  .day-tile,
+  .booking-date {
+    position: relative;
+    display: grid;
+    align-content: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.35;
+  }
+
+  .day-tile {
+    border: 1px solid var(--color-pine);
+    background: var(--color-stone);
+    font-weight: 500;
+  }
+
+  .day-tile--today::before {
+    position: absolute;
+    inset: 0.375rem 0.375rem auto auto;
+  }
+
+  .booking-date {
+    min-width: 3.5rem;
+    min-height: 3.5rem;
+    background: var(--color-sage);
+    color: var(--color-pine);
+  }
+
+  .status-pill {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    background: var(--color-sage);
+    color: var(--color-pine);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .status-pill--cancelled {
+    background: var(--color-stone);
+    color: var(--color-muted);
+  }
+
+  .staff-table {
+    width: 100%;
+    min-width: 40rem;
+    text-align: left;
+  }
+
+  .staff-table thead {
+    background: var(--color-stone);
+    font-size: 0.9375rem;
+  }
+
+  .staff-table th,
+  .staff-table td {
+    padding: 0.75rem 1rem;
+  }
+
+  .staff-table tbody tr {
+    border-top: 1px solid var(--color-line);
+  }
+
   .button,
   .button-secondary,
   .text-link {
@@ -277,6 +343,25 @@
     height: 0.75rem;
     background: linear-gradient(currentColor 56%, transparent 56% 79%, currentColor 79%);
     content: '';
+  }
+
+  @media (max-width: 39.999rem) {
+    html:has(.booking-action) {
+      scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+
+    .site-main:has(.booking-action) {
+      padding-bottom: calc(8rem + env(safe-area-inset-bottom));
+    }
+
+    .booking-action {
+      position: fixed;
+      z-index: 1;
+      inset: auto 0 0;
+      padding: 0.75rem var(--gutter) calc(0.75rem + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--color-line);
+      background: var(--color-white);
+    }
   }
 
   @media (min-width: 40rem) {

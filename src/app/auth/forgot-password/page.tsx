@@ -6,15 +6,15 @@ import { requestPasswordResetAction } from '../password-reset-actions';
 export default async function ForgotPasswordPage({ searchParams }: { searchParams: SearchParams }) {
   const sent = single((await searchParams).sent) === '1';
   return (
-    <section className="max-w-sm">
-      <h1>Reset your password</h1>
+    <section className="narrow-page card">
+      <h1 className="page-heading">Reset your password</h1>
       {sent ? (
-        <p role="status" className="notice" data-testid="forgot-password-sent">
+        <p role="status" className="notice mb-4" data-testid="forgot-password-sent">
           If an account uses that email address, we have sent it a link to reset the password. The link works for{' '}
           {RESET_TOKEN_TTL_MINUTES} minutes.
         </p>
       ) : (
-        <p className="mb-4">
+        <p className="mb-4 text-muted">
           Enter the email address you sign in with and we will email you a link to reset your password.
         </p>
       )}
@@ -23,12 +23,14 @@ export default async function ForgotPasswordPage({ searchParams }: { searchParam
           Email address
           <input name="email" type="email" autoComplete="username" required data-testid="forgot-password-email" />
         </label>
-        <button type="submit" className="button" data-testid="forgot-password-submit">
+        <button type="submit" className="button mt-2 w-full" data-testid="forgot-password-submit">
           Email me a reset link
         </button>
       </form>
-      <p className="mt-4">
-        <Link href="/auth/sign-in">Back to sign in</Link>
+      <p className="mt-2 text-center">
+        <Link href="/auth/sign-in" className="text-link">
+          Back to sign in
+        </Link>
       </p>
     </section>
   );

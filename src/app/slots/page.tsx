@@ -16,24 +16,26 @@ export default async function SlotsPage({ searchParams }: { searchParams: Search
   });
   return (
     <section>
-      <h1>Book an appointment</h1>
-      <DayPicker view={view} path="/slots" />
-      <SlotList
-        slots={view.slots}
-        timeZone={view.settings.timeZone}
-        renderChoice={(slot, label) => (
-          <Link
-            href={`/book/${slot.id}`}
-            prefetch={false}
-            className="button-secondary block text-center"
-            data-testid="slot-link"
-            data-slot-id={slot.id}
-            data-starts-at={slot.startsAt.toISOString()}
-          >
-            {label}
-          </Link>
-        )}
-      />
+      <h1 className="page-heading">Book an appointment</h1>
+      <div className="space-y-8">
+        <DayPicker view={view} path="/slots" />
+        <SlotList
+          slots={view.slots}
+          timeZone={view.settings.timeZone}
+          renderChoice={(slot, label) => (
+            <Link
+              href={`/book/${slot.id}`}
+              prefetch={false}
+              className="button-secondary w-full"
+              data-testid="slot-link"
+              data-slot-id={slot.id}
+              data-starts-at={slot.startsAt.toISOString()}
+            >
+              {label}
+            </Link>
+          )}
+        />
+      </div>
     </section>
   );
 }

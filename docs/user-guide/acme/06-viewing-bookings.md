@@ -12,5 +12,6 @@ Filter by **physiotherapist**, date or booking status, then apply the filters.
 Dates refer to the clinic's Europe/London calendar day. Clear a filter to widen
 the view; an empty list means no appointments match the current selection.
 
-The table includes patient names and booking status. Only authorised Acme clinic
+On a phone, swipe across the table to see all columns. The table includes patient
+names and booking status. Only authorised Acme clinic
 staff should use this page. Patients see their own appointments through **My bookings**.

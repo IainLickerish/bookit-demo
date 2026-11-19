@@ -25,25 +25,43 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
+  const tileDate = new Intl.DateTimeFormat('en-GB', { timeZone: settings.timeZone, day: 'numeric', month: 'short' });
 
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+      className="card space-y-4"
       data-testid="booking-row"
       data-booking-id={booking.id}
       data-status={booking.status}
     >
-      <div>
-        <p className="font-medium" data-testid="booking-when">
-          {formatSlot(booking.startsAt, settings.timeZone)}
-        </p>
-        <p className="text-sm text-slate-600">
-          With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
-        </p>
+      <div className="flex items-start gap-4">
+        <div className="booking-date" aria-hidden="true">
+          {tileDate.formatToParts(booking.startsAt).map(({ type, value }) =>
+            type === 'day' || type === 'month' ? (
+              <span key={type} className={type === 'day' ? 'text-lg font-semibold' : 'text-[0.8125rem]'}>
+                {value}
+              </span>
+            ) : null,
+          )}
+        </div>
+        <div className="flex min-w-0 grow flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div>
+            <p className="text-lg leading-tight font-semibold tabular-nums" data-testid="booking-when">
+              {formatSlot(booking.startsAt, settings.timeZone)}
+            </p>
+            <p className="text-muted">With {booking.practitionerName}</p>
+          </div>
+          <span
+            className={booking.status === 'confirmed' ? 'status-pill' : 'status-pill status-pill--cancelled'}
+            data-testid="booking-status"
+          >
+            {statusText(booking)}
+          </span>
+        </div>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -65,35 +83,35 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
 
   return (
     <section>
-      <h1>My bookings</h1>
+      <h1 className="page-heading">My bookings</h1>
       {notice ? (
-        <p role="status" className="notice" data-testid="notice">
+        <p role="status" className="notice mb-4" data-testid="notice">
           {notice}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="alert" data-testid="booking-error">
+        <p role="alert" className="alert mb-4" data-testid="booking-error">
           {error}
         </p>
       ) : null}
-      <h2>Upcoming</h2>
+      <h2 className="mb-4">Upcoming</h2>
       {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">
+        <p className="card" data-testid="no-upcoming">
           You have no upcoming appointments.{' '}
-          <Link href="/slots" prefetch={false} className="underline">
+          <Link href="/slots" prefetch={false} className="text-link">
             Book one
           </Link>
           .
         </p>
       ) : (
-        <ul className="space-y-2" data-testid="upcoming-bookings">
+        <ul className="space-y-4" data-testid="upcoming-bookings">
           {upcoming.map((b) => row(b, true))}
         </ul>
       )}
       {others.length > 0 ? (
         <>
-          <h2>Past and cancelled</h2>
-          <ul className="space-y-2" data-testid="other-bookings">
+          <h2 className="mt-8 mb-4">Past and cancelled</h2>
+          <ul className="space-y-4" data-testid="other-bookings">
             {others.map((b) => row(b, false))}
           </ul>
         </>

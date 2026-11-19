@@ -32,13 +32,15 @@ export default async function ResetPasswordPage({
   );
   if (!usable) {
     return (
-      <section className="max-w-sm">
-        <h1>Reset your password</h1>
-        <p role="alert" className="alert" data-testid="reset-password-invalid">
+      <section className="narrow-page card">
+        <h1 className="page-heading">Reset your password</h1>
+        <p role="alert" className="alert mb-4" data-testid="reset-password-invalid">
           This reset link has expired or has already been used.
         </p>
         <p>
-          <Link href={FORGOT_PASSWORD_PATH}>Request a new link</Link>
+          <Link href={FORGOT_PASSWORD_PATH} className="button">
+            Request a new link
+          </Link>
         </p>
       </section>
     );
@@ -46,10 +48,10 @@ export default async function ResetPasswordPage({
   const error = single((await searchParams).error);
   const message = error !== undefined && Object.hasOwn(ERRORS, error) ? ERRORS[error] : null;
   return (
-    <section className="max-w-sm">
-      <h1>Choose a new password</h1>
+    <section className="narrow-page card">
+      <h1 className="page-heading">Choose a new password</h1>
       {message ? (
-        <p role="alert" className="alert" data-testid="reset-password-error">
+        <p role="alert" className="alert mb-4" data-testid="reset-password-error">
           {message}
         </p>
       ) : null}
@@ -77,7 +79,7 @@ export default async function ResetPasswordPage({
             data-testid="reset-password-confirm"
           />
         </label>
-        <button type="submit" className="button" data-testid="reset-password-submit">
+        <button type="submit" className="button mt-2 w-full" data-testid="reset-password-submit">
           Set new password
         </button>
       </form>
