@@ -1,5 +1,8 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { redirect } from 'next/navigation';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cancelAction } from '@/app/bookings/actions';
+import { noticeText } from '@/app/messages';
 import { bookings, practitioners } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot, type BookingDependencies } from '@/server/bookings/book';
@@ -20,6 +23,12 @@ let logs: CapturedLogs;
 let deps: BookingDependencies;
 let mailer: RecordingMailer;
 const clock = manualClock('2026-10-20T07:00:00Z');
+
+vi.mock('next/navigation', () => ({ redirect: vi.fn() }));
+vi.mock('@/server/request-context', () => ({
+  requirePatient: async () => clinic.patient1,
+  bookingDependencies: async () => deps,
+}));
 
 async function slotsOn(localDate: string, practitionerId = clinic.practitioners.weekdays): Promise<SlotView[]> {
   const slots = await listAvailableSlots(database.db, {
@@ -172,6 +181,27 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
     expect(stored).toMatchObject({ status: 'cancelled', lateCancellation: false });
     expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.sent', 'booking.cancelled']);
+  });
+
+  it('saves a late cancellation, shows its notice and frees the slot for another client', async () => {
+    const day = '2026-10-21';
+    const slot = await slotAt(day, '09:00');
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
+    clock.set('2026-10-20T09:00:00Z');
+    expect((await slotsOn(day)).map((available) => available.id)).not.toContain(slot.id);
+
+    const formData = new FormData();
+    formData.set('bookingId', booking.id);
+    await cancelAction(formData);
+
+    expect(redirect).toHaveBeenCalledExactlyOnceWith('/bookings?notice=cancelled_late');
+    expect(noticeText('cancelled_late')).toBe('Booking cancelled. This was a late cancellation.');
+    expect(await listBookingsForPatient(database.db, clinic.patient1.id)).toMatchObject([
+      { id: booking.id, status: 'cancelled', lateCancellation: true, cancelledAt: clock.now() },
+    ]);
+    expect((await slotAt(day, '09:00')).id).toBe(slot.id);
+    const rebooked = await bookSlot(deps, { patientId: clinic.patient2.id, slotId: slot.id });
+    expect(rebooked).toMatchObject({ patientId: clinic.patient2.id, slotId: slot.id, status: 'confirmed' });
   });
 
   it('refuses to cancel after the start, twice, or for another patient', async () => {
