@@ -3,6 +3,7 @@ import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
+import { isUpcomingBooking } from '@/server/bookings/rules';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
@@ -15,16 +16,33 @@ function statusText(booking: BookingView): string {
   return booking.lateCancellation ? 'Cancelled (late)' : 'Cancelled';
 }
 
+function CalendarLink({ bookingId, testId }: { bookingId: string; testId: string }) {
+  return (
+    <a
+      href={`/bookings/${bookingId}/calendar`}
+      className="inline-flex min-h-11 items-center px-2 text-sm font-medium underline focus-visible:outline-2 focus-visible:outline-offset-2"
+      data-testid={testId}
+    >
+      Add to calendar
+    </a>
+  );
+}
+
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   const patient = await requirePatient();
   const params = await searchParams;
-  const notice = noticeText(single(params.notice));
+  const noticeCode = single(params.notice);
+  const notice = noticeText(noticeCode);
   const error = errorText(single(params.error));
   const db = getDatabase();
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
   const now = getClock().now();
-  const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
+  const upcoming = bookings.filter((b) => isUpcomingBooking(b, now));
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
+  const confirmedBooking =
+    noticeCode === 'booked' || noticeCode === 'rescheduled'
+      ? upcoming.find((booking) => booking.id === single(params.booking))
+      : undefined;
 
   const row = (booking: BookingView, changeable: boolean) => (
     <li
@@ -43,7 +61,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
         </p>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -58,6 +76,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
               Cancel
             </button>
           </form>
+          <CalendarLink bookingId={booking.id} testId="booking-calendar" />
         </div>
       ) : null}
     </li>
@@ -67,9 +86,12 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
     <section>
       <h1>My bookings</h1>
       {notice ? (
-        <p role="status" className="notice" data-testid="notice">
-          {notice}
-        </p>
+        <div className="notice">
+          <p role="status" data-testid="notice">
+            {notice}
+          </p>
+          {confirmedBooking ? <CalendarLink bookingId={confirmedBooking.id} testId="confirmation-calendar" /> : null}
+        </div>
       ) : null}
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">

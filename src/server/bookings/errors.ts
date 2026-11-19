@@ -27,6 +27,10 @@ export const BOOKING_ERRORS = {
     status: 404,
     message: 'We could not find that booking.',
   },
+  calendar_unavailable: {
+    status: 404,
+    message: 'Sorry, that calendar file is unavailable. You can download files for your upcoming sessions below.',
+  },
   booking_not_active: {
     status: 409,
     message: 'That booking is already cancelled.',

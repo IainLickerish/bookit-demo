@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { addDays } from '@/lib/time';
 import type { ClinicSettings } from '../settings';
 import { BookingError } from './errors';
+import type { BookingView } from './queries';
 
 const PHONE_PATTERN = /^\+?[0-9(][0-9 ()-]{5,24}$/;
 const MIN_PHONE_DIGITS = 6;
@@ -32,6 +33,10 @@ type HorizonSettings = Pick<ClinicSettings, 'slotHorizonDays'>;
 /** The latest start time a patient may book: now plus the booking horizon. */
 export function bookingHorizonEnd(now: Date, settings: HorizonSettings): Date {
   return addDays(now, settings.slotHorizonDays);
+}
+
+export function isUpcomingBooking(booking: Pick<BookingView, 'status' | 'startsAt'>, now: Date): boolean {
+  return booking.status === 'confirmed' && booking.startsAt > now;
 }
 
 export function assertSlotBookable(slotStartsAt: Date, now: Date, settings: HorizonSettings): void {
