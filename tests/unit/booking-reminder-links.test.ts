@@ -5,7 +5,7 @@ import { composeReminderEmail } from '@/server/notifications/reminder-email';
 const bookingId = '0199fb89-4dc0-729d-a478-6e159cd86546';
 
 describe('session reminder links', () => {
-  it('links through sign-in to the reschedule page and the booking’s cancel button', () => {
+  it('builds sign-in URLs with the booking ID and the intended management actions', () => {
     const email = composeReminderEmail({
       bookingId,
       startsAt: new Date('2026-10-22T08:00:00Z'),

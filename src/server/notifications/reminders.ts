@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, lte } from 'drizzle-orm';
 import type { Database } from '@/db/client';
 import { bookings, practitioners, slots, users } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
@@ -20,7 +20,7 @@ interface ReminderDependencies {
 const awaitingReminder = and(eq(bookings.status, 'confirmed'), isNull(bookings.reminderAttemptedAt));
 
 function startsWithinReminderWindow(now: Date) {
-  return and(gt(slots.startsAt, now), lte(slots.startsAt, addHours(now, 24)));
+  return and(gte(slots.startsAt, addHours(now, 23)), lte(slots.startsAt, addHours(now, 24)));
 }
 
 export async function sendDueBookingReminders(deps: ReminderDependencies): Promise<void> {
@@ -37,33 +37,42 @@ export async function sendDueBookingReminders(deps: ReminderDependencies): Promi
       .orderBy(asc(slots.startsAt), asc(bookings.id));
 
     for (const { id } of candidates) {
-      const email = await db.transaction(async (tx) => {
-        const settings = await loadClinicSettings(tx, 'share');
-        if (!settings.sendBookingReminders) return null;
+      // Reserve the attempt durably before contacting SMTP. A mail server can accept it and still report a failure.
+      const [reserved] = await db
+        .update(bookings)
+        .set({ reminderAttemptedAt: clock.now() })
+        .where(and(eq(bookings.id, id), awaitingReminder))
+        .returning({ id: bookings.id });
+      if (!reserved) continue;
 
+      const handoff = await db.transaction(async (tx) => {
+        const settings = await loadClinicSettings(tx, 'share');
         const [locked] = await tx
-          .select({ slotId: bookings.slotId, patientId: bookings.patientId })
+          .select({ slotId: bookings.slotId, patientId: bookings.patientId, status: bookings.status })
           .from(bookings)
-          .where(and(eq(bookings.id, id), awaitingReminder))
-          .for('update', { skipLocked: true });
+          .where(eq(bookings.id, id))
+          .for('update');
         if (!locked) return null;
 
-        // Recheck the current slot under the same booking lock used by moves and cancellations.
-        const now = clock.now();
-        const [details] = await tx
-          .select({ startsAt: slots.startsAt, practitionerName: practitioners.name, to: users.email })
-          .from(slots)
-          .innerJoin(practitioners, eq(practitioners.id, slots.practitionerId))
-          .innerJoin(users, and(eq(users.id, locked.patientId), eq(users.role, 'patient')))
-          .where(and(eq(slots.id, locked.slotId), startsWithinReminderWindow(now)));
-        if (!details) return null;
+        if (settings.sendBookingReminders && locked.status === 'confirmed') {
+          const [details] = await tx
+            .select({ startsAt: slots.startsAt, practitionerName: practitioners.name, to: users.email })
+            .from(slots)
+            .innerJoin(practitioners, eq(practitioners.id, slots.practitionerId))
+            .innerJoin(users, and(eq(users.id, locked.patientId), eq(users.role, 'patient')))
+            .where(and(eq(slots.id, locked.slotId), startsWithinReminderWindow(clock.now())));
+          if (details) {
+            const email = composeReminderEmail({ bookingId: id, publicUrl, from: mail.from, ...settings, ...details });
+            // Start sending under the locks, then release them while SMTP finishes.
+            return { delivery: deliverEmail(mail, log, email, 'reminder', { booking_id: id }) };
+          }
+        }
 
-        const message = composeReminderEmail({ bookingId: id, publicUrl, from: mail.from, ...settings, ...details });
-        // Commit the attempt before handing off to SMTP. SMTP can accept a message and still report a failure.
-        await tx.update(bookings).set({ reminderAttemptedAt: now }).where(eq(bookings.id, id));
-        return message;
+        // A move or settings change can make the booking eligible on a later poll.
+        await tx.update(bookings).set({ reminderAttemptedAt: null }).where(eq(bookings.id, id));
+        return null;
       });
-      if (email) await deliverEmail(mail, log, email, 'reminder', { booking_id: id });
+      await handoff?.delivery;
     }
   } catch (error) {
     throw withoutQueryDetails(error);

@@ -1,4 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Transaction } from '@/db/client';
+import { bookings, clinicSettings } from '@/db/schema';
 import { addHours, addMinutes } from '@/lib/time';
 import { updateAdminSettings } from '@/server/admin/settings';
 import { bookSlot } from '@/server/bookings/book';
@@ -62,6 +65,27 @@ async function bookAt(instant: string, patientId = clinic.patient1.id) {
   return bookSlot(deps(), { patientId, slotId: await slotAt(instant) });
 }
 
+async function updateBeforeHandoff(bookingId: string, mailer: Mailer, update: (tx: Transaction) => Promise<unknown>) {
+  let poll: Promise<void> | undefined;
+  try {
+    await database.db.transaction(async (tx) => {
+      // The worker can reserve the attempt, but must wait for this lock before handing off the email.
+      await tx.select({ id: clinicSettings.id }).from(clinicSettings).for('update');
+      poll = sendDueBookingReminders(deps(mailer));
+      await vi.waitFor(async () => {
+        const [booking] = await tx
+          .select({ attempt: bookings.reminderAttemptedAt })
+          .from(bookings)
+          .where(eq(bookings.id, bookingId));
+        expect(booking?.attempt).toEqual(clock.now());
+      });
+      await update(tx);
+    });
+  } finally {
+    await poll;
+  }
+}
+
 describe('booking reminders', () => {
   it('sends only one reminder at 24 hours, with the UK date, time and physiotherapist', async () => {
     const { startsAt } = await bookAt('2026-10-22T08:00:00Z');
@@ -81,6 +105,14 @@ describe('booking reminders', () => {
     expect(unfolded).toMatch(/\r?\n\r?\nTest Physio Clinic\r?\n/);
     expect(unfolded).toContain('Thu, 22 Oct 2026, 09:00 (Europe/London)');
     expect(unfolded).toContain('With Pat Physio, your physiotherapist');
+  });
+
+  it('skips a session booked after the reminder window', async () => {
+    clock.set('2026-10-21T09:01:00Z');
+    await bookAt('2026-10-22T08:00:00Z');
+    const mailer = recordingMailer();
+    await sendDueBookingReminders(deps(mailer));
+    expect(mailer.sent).toHaveLength(0);
   });
 
   it('skips cancelled and started sessions and sends the moved session at its new time', async () => {
@@ -118,7 +150,9 @@ describe('booking reminders', () => {
     const mailer = recordingMailer();
     clock.set(addHours(booking.startsAt, -24));
 
-    await updateAdminSettings(database.db, clock, { ...editable, sendBookingReminders: false });
+    await updateBeforeHandoff(booking.id, mailer, (tx) =>
+      updateAdminSettings(tx, clock, { ...editable, sendBookingReminders: false }),
+    );
     await sendDueBookingReminders(deps(mailer));
     expect(mailer.sent).toHaveLength(0);
 
@@ -126,6 +160,33 @@ describe('booking reminders', () => {
     await sendDueBookingReminders(deps(mailer));
     expect(mailer.sent).toHaveLength(1);
     expect(mailer.sent[0]?.to).toBe(clinic.patient1.email);
+  });
+
+  it('uses the new session time when a move commits after reservation and before hand-off', async () => {
+    const booking = await bookAt('2026-10-22T08:00:00Z');
+    const newSlotId = await slotAt('2026-10-23T08:45:00Z');
+    const mailer = recordingMailer();
+    clock.set(addHours(booking.startsAt, -24));
+    await updateBeforeHandoff(booking.id, mailer, () =>
+      rescheduleBooking(deps(), { bookingId: booking.id, patientId: booking.patientId, newSlotId }),
+    );
+    expect(mailer.sent).toHaveLength(0);
+
+    clock.set('2026-10-22T08:45:00Z');
+    await sendDueBookingReminders(deps(mailer));
+    expect(mailer.sent).toHaveLength(1);
+    expect(mailer.sent[0]?.text).toContain('Fri, 23 Oct 2026, 09:45 (Europe/London)');
+  });
+
+  it('skips the email when cancellation commits after reservation and before hand-off', async () => {
+    const booking = await bookAt('2026-10-22T08:00:00Z');
+    const mailer = recordingMailer();
+    clock.set(addHours(booking.startsAt, -24));
+    await updateBeforeHandoff(booking.id, mailer, async () => {
+      const cancellation = await cancelBooking(deps(), { bookingId: booking.id, patientId: booking.patientId });
+      expect(cancellation.booking.status).toBe('cancelled');
+    });
+    expect(mailer.sent).toHaveLength(0);
   });
 
   it('does not retry when delivery may have succeeded before reporting a failure', async () => {
