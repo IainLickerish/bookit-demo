@@ -15,6 +15,7 @@ export const BLOCK_OUT_MESSAGES = {
   invalid_end: 'Enter an end date and time that exists in the clinic’s time zone.',
   invalid_range: 'Choose an end time after the start time.',
   invalid_reason: 'Enter a reason of 500 characters or fewer, or leave it empty.',
+  time_zone_changed: 'The clinic’s time zone changed. Check both times in the new time zone before saving.',
 } as const satisfies Record<BlockOutErrorCode, string>;
 
 export type NoticeCode = keyof typeof NOTICES;

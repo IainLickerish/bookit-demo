@@ -25,7 +25,7 @@ function parseLocalDateTime(input: unknown, timeZone: string): Date | null {
 }
 
 export type BlockOutErrorCode =
-  'invalid_practitioner' | 'invalid_start' | 'invalid_end' | 'invalid_range' | 'invalid_reason';
+  'invalid_practitioner' | 'invalid_start' | 'invalid_end' | 'invalid_range' | 'invalid_reason' | 'time_zone_changed';
 
 export interface SavedBlockOut {
   id: string;
@@ -41,6 +41,7 @@ interface BlockOutInput {
   practitionerId: unknown;
   startsAt: unknown;
   endsAt: unknown;
+  timeZone: unknown;
   reason?: unknown;
 }
 
@@ -49,23 +50,25 @@ export async function saveBlockOut(
   db: Database,
   clock: Clock,
   input: BlockOutInput,
-): Promise<{ saved: SavedBlockOut } | { error: BlockOutErrorCode }> {
-  const practitionerId = practitionerIdInput.safeParse(input.practitionerId);
-  if (!practitionerId.success) return { error: 'invalid_practitioner' };
-  const reasonInputResult = reasonInput.safeParse(input.reason);
-  if (!reasonInputResult.success) return { error: 'invalid_reason' };
-  const { timeZone } = await loadClinicSettings(db);
-  const startsAt = parseLocalDateTime(input.startsAt, timeZone);
-  if (!startsAt) return { error: 'invalid_start' };
-  const endsAt = parseLocalDateTime(input.endsAt, timeZone);
-  if (!endsAt) return { error: 'invalid_end' };
-  if (endsAt <= startsAt) return { error: 'invalid_range' };
-
-  const id = newId(clock);
-  const reason = reasonInputResult.data || null;
+): Promise<{ saved: SavedBlockOut } | { error: BlockOutErrorCode; timeZone: string }> {
   return db.transaction(async (tx) => {
+    // Keep the displayed time zone current until the period is saved.
+    const { timeZone } = await loadClinicSettings(tx, 'share');
+    if (input.timeZone !== timeZone) return { error: 'time_zone_changed', timeZone };
+    const practitionerId = practitionerIdInput.safeParse(input.practitionerId);
+    if (!practitionerId.success) return { error: 'invalid_practitioner', timeZone };
+    const reasonInputResult = reasonInput.safeParse(input.reason);
+    if (!reasonInputResult.success) return { error: 'invalid_reason', timeZone };
+    const startsAt = parseLocalDateTime(input.startsAt, timeZone);
+    if (!startsAt) return { error: 'invalid_start', timeZone };
+    const endsAt = parseLocalDateTime(input.endsAt, timeZone);
+    if (!endsAt) return { error: 'invalid_end', timeZone };
+    if (endsAt <= startsAt) return { error: 'invalid_range', timeZone };
+
     const practitioner = await lockPractitionerSchedule(tx, practitionerId.data, 'no key update');
-    if (!practitioner) return { error: 'invalid_practitioner' };
+    if (!practitioner) return { error: 'invalid_practitioner', timeZone };
+    const id = newId(clock);
+    const reason = reasonInputResult.data || null;
     await tx
       .insert(blockOuts)
       .values({ id, practitionerId: practitioner.id, startsAt, endsAt, reason, createdAt: clock.now() });

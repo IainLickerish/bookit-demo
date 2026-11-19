@@ -1,8 +1,9 @@
-import { asc } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { asc, sql } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockOuts, bookings } from '@/db/schema';
 import { newId } from '@/lib/ids';
 import { saveBlockOut } from '@/server/admin/block-outs';
+import { updateAdminSettings } from '@/server/admin/settings';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
@@ -37,6 +38,7 @@ function blockInput() {
     practitionerId: clinic.practitioners.weekdays,
     startsAt: `${date}T09:45`,
     endsAt: `${date}T10:15`,
+    timeZone: clinic.settings.timeZone,
   };
 }
 
@@ -46,6 +48,51 @@ async function slotsFor(practitionerId = clinic.practitioners.weekdays) {
 
 function bookingDeps() {
   return { db: database.db, clock, log: captureLogs(clock).log, mail: testMail() };
+}
+
+async function waitForBlockedBackend(blockingPid: number): Promise<number> {
+  return vi.waitFor(
+    async () => {
+      const result = await database.db.execute<{ pid: number }>(
+        sql`select pid from pg_stat_activity
+            where datname = current_database() and ${blockingPid} = any(pg_blocking_pids(pid))`,
+      );
+      const [blocked] = result.rows;
+      if (!blocked) throw new Error(`No transaction is waiting for backend ${blockingPid}.`);
+      return blocked.pid;
+    },
+    { timeout: 5000, interval: 50 },
+  );
+}
+
+/** Stop the first write at its INSERT, when it should already hold the practitioner lock. */
+async function runContendingWrites<First, Second>(
+  pausedTable: 'block_out' | 'booking',
+  first: () => Promise<First>,
+  second: () => Promise<Second>,
+): Promise<[PromiseSettledResult<First>, PromiseSettledResult<Second>]> {
+  const controller = await database.handle.pool.connect();
+  const pending: Promise<unknown>[] = [];
+  try {
+    await controller.query('begin');
+    // A SHARE table lock allows both services to read, but pauses inserts into this table.
+    await controller.query(`lock table "${pausedTable}" in share mode`);
+    const { rows } = await controller.query<{ pid: number }>('select pg_backend_pid() as pid');
+    const firstResult = Promise.allSettled([first()]).then(([result]) => result);
+    pending.push(firstResult);
+    const firstPid = await waitForBlockedBackend(rows[0]!.pid);
+    const secondResult = Promise.allSettled([second()]).then(([result]) => result);
+    pending.push(secondResult);
+    await waitForBlockedBackend(firstPid);
+    await controller.query('commit');
+    return await Promise.all([firstResult, secondResult]);
+  } catch (error) {
+    await controller.query('rollback');
+    await Promise.all(pending);
+    throw error;
+  } finally {
+    controller.release();
+  }
 }
 
 describe('physiotherapist block-outs', () => {
@@ -75,22 +122,53 @@ describe('physiotherapist block-outs', () => {
 
   it('refuses invalid periods and unknown physiotherapists without saving', async () => {
     const input = blockInput();
+    const { timeZone } = input;
     await expect(saveBlockOut(database.db, clock, { ...input, practitionerId: newId(clock) })).resolves.toEqual({
       error: 'invalid_practitioner',
+      timeZone,
     });
     await expect(saveBlockOut(database.db, clock, { ...input, startsAt: '2026-02-30T09:45' })).resolves.toEqual({
       error: 'invalid_start',
+      timeZone,
     });
     await expect(saveBlockOut(database.db, clock, { ...input, endsAt: '2027-03-28T01:30' })).resolves.toEqual({
       error: 'invalid_end',
+      timeZone,
     });
     for (const endsAt of [input.startsAt, `${date}T09:00`]) {
-      await expect(saveBlockOut(database.db, clock, { ...input, endsAt })).resolves.toEqual({ error: 'invalid_range' });
+      await expect(saveBlockOut(database.db, clock, { ...input, endsAt })).resolves.toEqual({
+        error: 'invalid_range',
+        timeZone,
+      });
     }
     await expect(saveBlockOut(database.db, clock, { ...input, reason: 'x'.repeat(501) })).resolves.toEqual({
       error: 'invalid_reason',
+      timeZone,
     });
     expect(await database.db.select().from(blockOuts)).toEqual([]);
+  });
+
+  it('refuses a stale form time zone and saves after staff review the times in the new zone', async () => {
+    const input = { ...blockInput(), reason: 'Training' };
+    const timeZone = 'Europe/Paris';
+    const { clinicName, lateCancellationHours, includeContactInConfirmation } = clinic.settings;
+    await updateAdminSettings(database.db, clock, {
+      clinicName,
+      lateCancellationHours,
+      includeContactInConfirmation,
+      timeZone,
+    });
+
+    await expect(saveBlockOut(database.db, clock, input)).resolves.toEqual({ error: 'time_zone_changed', timeZone });
+    expect(await database.db.select().from(blockOuts)).toEqual([]);
+    await expect(saveBlockOut(database.db, clock, { ...input, timeZone })).resolves.toMatchObject({
+      saved: {
+        startsAt: new Date('2026-10-20T07:45:00Z'),
+        endsAt: new Date('2026-10-20T08:15:00Z'),
+        reason: 'Training',
+        timeZone,
+      },
+    });
   });
 
   it('hides overlapping slots while leaving adjacent slots and other physiotherapists available', async () => {
@@ -155,20 +233,31 @@ describe('physiotherapist block-outs', () => {
     ).resolves.toMatchObject({ slotId: next!.id, status: 'confirmed' });
   });
 
-  it('either warns about a simultaneous booking or refuses it', async () => {
+  it('makes a booking wait for an overlapping block-out and refuses it after the block-out commits', async () => {
     const [, target] = await slotsFor();
     const deps = bookingDeps();
-    const [block, booking] = await Promise.all([
-      saveBlockOut(database.db, clock, blockInput()),
-      bookSlot(deps, { patientId: clinic.patient1.id, slotId: target!.id }).catch((error: unknown) => error),
-    ]);
-    if (booking instanceof Error) {
-      expect(booking).toMatchObject({ code: 'slot_blocked' });
-      expect(block).toMatchObject({ saved: { conflicts: [] } });
-    } else {
-      expect(block).toMatchObject({
-        saved: { conflicts: [expect.objectContaining({ patientName: clinic.patient1.name })] },
-      });
-    }
+    const [block, booking] = await runContendingWrites(
+      'block_out',
+      () => saveBlockOut(database.db, clock, blockInput()),
+      () => bookSlot(deps, { patientId: clinic.patient1.id, slotId: target!.id }),
+    );
+    expect(block).toMatchObject({ status: 'fulfilled', value: { saved: { conflicts: [] } } });
+    expect(booking).toMatchObject({ status: 'rejected', reason: { code: 'slot_blocked' } });
+    expect(await database.db.select().from(bookings)).toEqual([]);
+  });
+
+  it('makes a block-out wait for an overlapping booking and lists it after the booking commits', async () => {
+    const [, target] = await slotsFor();
+    const deps = bookingDeps();
+    const [booking, block] = await runContendingWrites(
+      'booking',
+      () => bookSlot(deps, { patientId: clinic.patient1.id, slotId: target!.id }),
+      () => saveBlockOut(database.db, clock, blockInput()),
+    );
+    if (booking.status === 'rejected') throw booking.reason;
+    expect(block).toMatchObject({
+      status: 'fulfilled',
+      value: { saved: { conflicts: [{ id: booking.value.id, patientName: clinic.patient1.name }] } },
+    });
   });
 });

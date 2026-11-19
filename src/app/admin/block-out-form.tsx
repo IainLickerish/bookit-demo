@@ -19,6 +19,7 @@ export function BlockOutForm({ practitioners, timeZone, reasonLimit }: BlockOutF
   }, [state.attempt]);
 
   const { saved, error, values } = state;
+  const formTimeZone = state.timeZone ?? timeZone;
   const practitionerError = error === 'invalid_practitioner';
   const startError = error === 'invalid_start';
   const endError = error === 'invalid_end' || error === 'invalid_range';
@@ -66,6 +67,7 @@ export function BlockOutForm({ practitioners, timeZone, reasonLimit }: BlockOutF
         <p>There are no physiotherapists available to select.</p>
       ) : (
         <form key={state.attempt} action={formAction} className="max-w-xl space-y-4" data-testid="block-out-form">
+          <input type="hidden" name="timeZone" value={formTimeZone} />
           <label>
             Physiotherapist
             <select
@@ -86,7 +88,7 @@ export function BlockOutForm({ practitioners, timeZone, reasonLimit }: BlockOutF
             </select>
           </label>
           <p id="block-out-time-zone" className="text-sm">
-            Enter dates and times in the clinic’s time zone ({timeZone}).
+            Enter dates and times in the clinic’s time zone ({formTimeZone}).
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="min-w-0">
