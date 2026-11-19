@@ -14,3 +14,6 @@ the view; an empty list means no appointments match the current selection.
 
 The table includes patient names and booking status. Only authorised Acme clinic
 staff should use this page. Patients see their own appointments through **My bookings**.
+
+On a narrow screen, scroll sideways within the bookings table to see all the
+columns.

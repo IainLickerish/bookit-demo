@@ -11,6 +11,7 @@ import { DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
 import { SlotList } from '../../../slot-list';
 import { rescheduleAction } from '../../actions';
+import { PageHeader } from '../../../page-header';
 
 export default async function ReschedulePage({
   params,
@@ -41,32 +42,36 @@ export default async function ReschedulePage({
 
   return (
     <section>
-      <h1>Reschedule your appointment</h1>
+      <PageHeader title="Reschedule your appointment" />
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
         </p>
       ) : null}
-      <p className="mb-2">
-        Currently booked:{' '}
-        <span className="font-medium" data-testid="current-when">
-          {formatSlot(booking.startsAt, view.settings.timeZone)}
-        </span>{' '}
-        with {booking.practitionerName}.
-      </p>
+      <div className="card mb-6 space-y-2">
+        <p>
+          Currently booked:{' '}
+          <span className="font-semibold tabular-nums" data-testid="current-when">
+            {formatSlot(booking.startsAt, view.settings.timeZone)}
+          </span>{' '}
+          with {booking.practitionerName}.
+        </p>
+        {changeable && remaining > 0 ? (
+          <p className="text-muted" data-testid="reschedules-remaining">
+            You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
+          </p>
+        ) : null}
+      </div>
       {!changeable ? (
-        <p className="alert" data-testid="not-reschedulable">
+        <p role="alert" className="alert" data-testid="not-reschedulable">
           This booking can no longer be rescheduled online.
         </p>
       ) : remaining === 0 ? (
-        <p className="alert" data-testid="reschedule-limit">
+        <p role="alert" className="alert" data-testid="reschedule-limit">
           This booking has been rescheduled as many times as the clinic allows. Please contact the clinic.
         </p>
       ) : (
         <>
-          <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
-            You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
-          </p>
           <DayPicker view={view} path={path} />
           <SlotList
             slots={choices}
@@ -77,7 +82,7 @@ export default async function ReschedulePage({
                 <input type="hidden" name="newSlotId" value={slot.id} />
                 <button
                   type="submit"
-                  className="button-secondary w-full"
+                  className="button-secondary w-full tabular-nums"
                   data-testid="reschedule-to"
                   data-slot-id={slot.id}
                   data-starts-at={slot.startsAt.toISOString()}
@@ -89,8 +94,8 @@ export default async function ReschedulePage({
           />
         </>
       )}
-      <p className="mt-6 text-sm">
-        <Link href="/bookings" prefetch={false} className="underline">
+      <p className="mt-4">
+        <Link href="/bookings" prefetch={false} data-testid="reschedule-back">
           Back to my bookings
         </Link>
       </p>

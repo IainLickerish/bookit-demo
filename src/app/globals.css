@@ -203,4 +203,119 @@
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='8'/%3E%3Cpath d='M10 6v4m0 3v.1'/%3E%3C/svg%3E")
       center / contain;
   }
+
+  .day-navigation {
+    @apply grid items-center gap-3 text-[0.9375rem];
+    grid-template-areas:
+      'day day'
+      'previous next';
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 40rem) {
+    .day-navigation {
+      grid-template-areas: 'previous day next';
+      grid-template-columns: 1fr auto 1fr;
+    }
+  }
+
+  .day-navigation > :first-child {
+    grid-area: previous;
+  }
+
+  .day-navigation > :last-child {
+    grid-area: next;
+  }
+
+  .chosen-day {
+    @apply flex items-center justify-center gap-2 rounded-xl border border-pine bg-stone px-4 py-3 text-center font-semibold tabular-nums;
+    grid-area: day;
+  }
+
+  .chosen-day[data-today]::after {
+    @apply size-2 shrink-0 rounded-full bg-clay;
+    content: '';
+  }
+
+  .page-shell:has(.chosen-day[data-today]) .page-header::before {
+    visibility: hidden;
+  }
+
+  .booking-card {
+    @apply grid items-start gap-x-4 gap-y-3;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .booking-date {
+    @apply grid min-w-14 justify-items-center rounded-xl bg-sage px-2 py-2 text-[0.8125rem] leading-tight font-semibold text-pine tabular-nums;
+    grid-row: span 2;
+  }
+
+  .booking-date > :first-child {
+    @apply text-xl;
+  }
+
+  .status-pill {
+    @apply inline-flex w-fit max-w-full items-center rounded-full bg-stone px-3 py-1 text-[0.8125rem] leading-snug font-semibold text-muted;
+  }
+
+  .status-pill[data-status='confirmed'] {
+    @apply bg-sage text-pine;
+  }
+
+  .booking-actions {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 40rem) {
+    .booking-card {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .booking-date {
+      grid-row: auto;
+    }
+
+    .booking-actions {
+      grid-column: 2 / -1;
+    }
+  }
+
+  @media (width < 40rem) and (height >= 31rem) {
+    html:has(.booking-action) {
+      scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    }
+
+    .page-shell:has(.booking-action) {
+      padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+    }
+
+    .booking-action {
+      @apply fixed inset-x-0 bottom-0 z-10 border-t border-line bg-white pt-3;
+      padding-inline: var(--page-inset);
+      padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    }
+  }
+
+  .table-scroll {
+    @apply overflow-x-auto rounded-b-[1.25rem];
+  }
+
+  .table-scroll:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .bookings-table {
+    @apply w-full min-w-[42rem] text-left text-[0.9375rem];
+  }
+
+  .bookings-table thead {
+    @apply bg-stone;
+  }
+
+  .bookings-table th,
+  .bookings-table td {
+    @apply border-t border-line px-6 py-3;
+    overflow-wrap: anywhere;
+  }
 }

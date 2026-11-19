@@ -7,6 +7,7 @@ import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
 import { cancelAction } from './actions';
+import { PageHeader } from '../page-header';
 
 function statusText(booking: BookingView): string {
   if (booking.status === 'confirmed') {
@@ -26,24 +27,36 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
 
+  const dateTile = new Intl.DateTimeFormat('en-GB', {
+    timeZone: settings.timeZone,
+    day: 'numeric',
+    month: 'short',
+  });
+
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+      className="card booking-card"
       data-testid="booking-row"
       data-booking-id={booking.id}
       data-status={booking.status}
     >
-      <div>
-        <p className="font-medium" data-testid="booking-when">
+      <span className="booking-date" aria-hidden="true">
+        {dateTile
+          .formatToParts(booking.startsAt)
+          .map((part) => (part.type === 'literal' ? null : <span key={part.type}>{part.value}</span>))}
+      </span>
+      <div className="min-w-0">
+        <p className="text-lg font-semibold tabular-nums" data-testid="booking-when">
           {formatSlot(booking.startsAt, settings.timeZone)}
         </p>
-        <p className="text-sm text-slate-600">
-          With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
-        </p>
+        <p className="text-muted">With {booking.practitionerName}</p>
       </div>
+      <span className="status-pill" data-status={booking.status} data-testid="booking-status">
+        {statusText(booking)}
+      </span>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="booking-actions flex flex-wrap gap-2">
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -65,7 +78,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
 
   return (
     <section>
-      <h1>My bookings</h1>
+      <PageHeader title="My bookings" />
       {notice ? (
         <p role="status" className="notice" data-testid="notice">
           {notice}
@@ -76,24 +89,24 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           {error}
         </p>
       ) : null}
-      <h2>Upcoming</h2>
+      <h2 className="mb-4">Upcoming</h2>
       {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">
+        <p className="card" data-testid="no-upcoming">
           You have no upcoming appointments.{' '}
-          <Link href="/slots" prefetch={false} className="underline">
+          <Link href="/slots" prefetch={false} data-testid="book-one">
             Book one
           </Link>
           .
         </p>
       ) : (
-        <ul className="space-y-2" data-testid="upcoming-bookings">
+        <ul className="space-y-4" data-testid="upcoming-bookings">
           {upcoming.map((b) => row(b, true))}
         </ul>
       )}
       {others.length > 0 ? (
         <>
-          <h2>Past and cancelled</h2>
-          <ul className="space-y-2" data-testid="other-bookings">
+          <h2 className="mt-8 mb-4">Past and cancelled</h2>
+          <ul className="space-y-4" data-testid="other-bookings">
             {others.map((b) => row(b, false))}
           </ul>
         </>

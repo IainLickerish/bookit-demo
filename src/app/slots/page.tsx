@@ -6,6 +6,7 @@ import { loadDayView } from '@/server/slots/day-view';
 import { DayPicker } from '../day-picker';
 import { single, type SearchParams } from '../messages';
 import { SlotList } from '../slot-list';
+import { PageHeader } from '../page-header';
 
 export default async function SlotsPage({ searchParams }: { searchParams: SearchParams }) {
   await requirePatient();
@@ -16,7 +17,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Search
   });
   return (
     <section>
-      <h1>Book an appointment</h1>
+      <PageHeader title="Book an appointment" />
       <DayPicker view={view} path="/slots" />
       <SlotList
         slots={view.slots}
@@ -25,7 +26,7 @@ export default async function SlotsPage({ searchParams }: { searchParams: Search
           <Link
             href={`/book/${slot.id}`}
             prefetch={false}
-            className="button-secondary block text-center"
+            className="button-secondary w-full tabular-nums"
             data-testid="slot-link"
             data-slot-id={slot.id}
             data-starts-at={slot.startsAt.toISOString()}

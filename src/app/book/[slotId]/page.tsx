@@ -7,6 +7,7 @@ import { loadClinicSettings } from '@/server/settings';
 import { findBookableSlot, isSlotFree } from '@/server/slots/queries';
 import { bookAction } from '../../bookings/actions';
 import { errorText, single, type SearchParams } from '../../messages';
+import { PageHeader } from '../../page-header';
 
 export default async function BookSlotPage({
   params,
@@ -25,14 +26,14 @@ export default async function BookSlotPage({
   }
   const free = await isSlotFree(db, slot.id);
   return (
-    <section className="max-w-md">
-      <h1>Confirm your booking</h1>
+    <section className="page-narrow card">
+      <PageHeader title="Confirm your booking" />
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
           {error}
         </p>
       ) : null}
-      <dl className="mb-6 space-y-1">
+      <dl className="mb-6 space-y-2 rounded-xl bg-sage p-4 tabular-nums">
         <div>
           <dt className="inline font-medium">With: </dt>
           <dd className="inline" data-testid="book-practitioner">
@@ -59,17 +60,19 @@ export default async function BookSlotPage({
               data-testid="book-phone"
             />
           </label>
-          <button type="submit" className="button" data-testid="confirm-booking">
-            Confirm booking
-          </button>
+          <div className="booking-action">
+            <button type="submit" className="button w-full" data-testid="confirm-booking">
+              Confirm booking
+            </button>
+          </div>
         </form>
       ) : (
-        <p className="alert" data-testid="slot-taken">
+        <p role="alert" className="alert" data-testid="slot-taken">
           This time is no longer available.
         </p>
       )}
-      <p className="mt-6 text-sm">
-        <Link href="/slots" prefetch={false} className="underline">
+      <p className="mt-4 border-t border-line pt-2">
+        <Link href="/slots" prefetch={false} data-testid="choose-other-time">
           Choose a different time
         </Link>
       </p>

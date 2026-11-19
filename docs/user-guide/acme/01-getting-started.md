@@ -15,3 +15,6 @@ in Europe/London, including changes between summer and winter time.
 For help, contact Alice Archer, Practice Manager, at `alice@acmephysio.test`.
 Our support hours are Monday to Friday, 09:00 to 17:30, Europe/London.
 Sign out when you finish, particularly on a shared device.
+
+Look for **Acme Physio** at the top of the page. The page title is below it, and
+the main action on each form is a green button.
