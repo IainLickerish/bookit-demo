@@ -1,6 +1,6 @@
 import { emailHash, type Logger } from '@/lib/logger';
 import { reportError } from '../error-reporting';
-import type { Mailer, OutgoingEmail } from './mailer';
+import { getMailer, type Mailer, type OutgoingEmail } from './mailer';
 
 export interface MailSettings {
   mailer: Mailer;
@@ -8,7 +8,11 @@ export interface MailSettings {
   from: string;
 }
 
-export type EmailKind = 'confirmation' | 'password_reset';
+export function mailSettings(): MailSettings {
+  return { mailer: getMailer(), from: (process.env.BOOKIT_MAIL_FROM ?? '').trim() || 'noreply@bookit.test' };
+}
+
+export type EmailKind = 'confirmation' | 'password_reset' | 'reminder';
 
 /**
  * Sends one email and logs `email.<kind>.sent` or `email.<kind>.failed` with
@@ -36,7 +40,9 @@ export async function deliverEmail(
       { event: `email.${kind}.failed`, ...fields, error_name: error instanceof Error ? error.name : 'unknown' },
       'Email failed',
     );
-    reportError(error, { operation: `${kind}_email` });
+    // SMTP failures may include the recipient or the message in their diagnostics.
+    const report = kind === 'reminder' ? new Error('Session reminder email could not be delivered.') : error;
+    reportError(report, { operation: `${kind}_email` });
     return false;
   }
 }
