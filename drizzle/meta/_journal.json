@@ -15,6 +15,13 @@
       "when": 1792777770223,
       "tag": "0001_password_reset",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795087106891,
+      "tag": "0002_booking_reminders",
+      "breakpoints": true
     }
   ]
 }

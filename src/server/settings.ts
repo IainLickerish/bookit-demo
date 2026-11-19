@@ -10,6 +10,7 @@ export const clinicSettingsInput = z.object({
   timeZone: z.string().refine(isValidTimeZone, 'Unknown IANA time zone'),
   lateCancellationHours: z.number().int().min(0).max(336),
   includeContactInConfirmation: z.boolean(),
+  reminderEmailsEnabled: z.boolean(),
   slotHorizonDays: z.number().int().min(1).max(366),
   sessionMinutes: z.number().int().min(5).max(480),
   maxReschedulesPerBooking: z.number().int().min(0).max(20),
@@ -31,15 +32,7 @@ export async function loadClinicSettings(db: Executor): Promise<ClinicSettings> 
   if (!row) {
     throw new ClinicNotConfiguredError();
   }
-  return clinicSettingsInput.parse({
-    clinicName: row.clinicName,
-    timeZone: row.timeZone,
-    lateCancellationHours: row.lateCancellationHours,
-    includeContactInConfirmation: row.includeContactInConfirmation,
-    slotHorizonDays: row.slotHorizonDays,
-    sessionMinutes: row.sessionMinutes,
-    maxReschedulesPerBooking: row.maxReschedulesPerBooking,
-  });
+  return clinicSettingsInput.parse(row);
 }
 
 export async function saveClinicSettings(db: Executor, clock: Clock, input: ClinicSettings): Promise<ClinicSettings> {
