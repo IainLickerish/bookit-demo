@@ -1,7 +1,7 @@
 import { createServer, type Socket } from 'node:net';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import { bookings } from '@/db/schema';
+import { bookingReminderAttempts } from '@/db/schema';
 import { bookingReturnPath } from '@/lib/routes';
 import { addDays, addHours } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
@@ -160,21 +160,16 @@ it('skips bookings and moves made after the reminder was due', async () => {
 });
 
 it.each(['move', 'cancellation'] as const)(
-  'discards a claimed reminder when a %s wins before mail handoff',
+  'skips the old reminder when a %s wins before the final check',
   async (change) => {
     const booking = await bookAt(firstStart);
     clock.set(addHours(booking.startsAt, -24));
     const request = { patientId: clinic.patient1.id, bookingId: booking.id };
-    const claim = async () => {
-      const [row] = await database.db
-        .select({ at: bookings.reminderClaimedAt })
-        .from(bookings)
-        .where(eq(bookings.id, booking.id));
-      return row!.at;
-    };
+    const attempts = () =>
+      database.db.select().from(bookingReminderAttempts).where(eq(bookingReminderAttempts.bookingId, booking.id));
     const transaction = database.db.transaction.bind(database.db);
     const beforeHandoff = vi.spyOn(database.db, 'transaction').mockImplementationOnce(async (work, config) => {
-      expect(await claim()).toEqual(clock.now());
+      expect(await attempts()).toHaveLength(0);
       if (change === 'move') {
         await rescheduleBooking(bookingDeps(), { ...request, newSlotId: await slotIdAt(movedStart) });
       } else {
@@ -186,7 +181,7 @@ it.each(['move', 'cancellation'] as const)(
       await checkReminders();
       expect(beforeHandoff).toHaveBeenCalled();
       expect(mailer.sent).toHaveLength(0);
-      expect(await claim()).toBeNull();
+      expect(await attempts()).toHaveLength(0);
     } finally {
       beforeHandoff.mockRestore();
     }
@@ -310,17 +305,52 @@ it('retries within the reminder window when SMTP refused the connection', async 
   expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient1.email]);
 });
 
-it('retries within the reminder window after a failure in the final database check', async () => {
+it('recovers when the database goes offline at the final check and remains down through cleanup', async () => {
   const booking = await bookAt(firstStart);
   clock.set(addHours(booking.startsAt, -24));
-  const finalCheck = vi.spyOn(database.db, 'transaction').mockRejectedValueOnce(new Error('Database unavailable'));
+  const outage = new Error('Database unavailable');
+  const update = vi.spyOn(database.db, 'update');
+  const remove = vi.spyOn(database.db, 'delete');
+  const finalCheck = vi.spyOn(database.db, 'transaction').mockImplementationOnce(async () => {
+    // Standalone writes also fail once the database goes offline. Before this
+    // point an early claim would have succeeded and could no longer be cleared.
+    const unavailable = () => {
+      throw outage;
+    };
+    update.mockImplementation(unavailable);
+    remove.mockImplementation(unavailable);
+    throw outage;
+  });
   try {
     await expect(checkReminders()).rejects.toThrow('Database unavailable');
     expect(mailer.sent).toHaveLength(0);
   } finally {
     finalCheck.mockRestore();
+    update.mockRestore();
+    remove.mockRestore();
   }
   clock.advanceMinutes(1);
+  await checkReminders();
+  await checkReminders();
+  expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient1.email]);
+});
+
+it('releases a confirmed non-delivery when the first database cleanup fails', async () => {
+  const booking = await bookAt(firstStart);
+  clock.set(addHours(booking.startsAt, -24));
+  const remove = vi.spyOn(database.db, 'delete').mockImplementationOnce(() => {
+    throw new Error('Database unavailable for cleanup');
+  });
+  try {
+    await expect(checkReminders(testMail(createSmtpMailer('smtp://127.0.0.1:9')))).rejects.toThrow(
+      'Database unavailable for cleanup',
+    );
+    expect(await database.db.select().from(bookingReminderAttempts)).toHaveLength(1);
+  } finally {
+    remove.mockRestore();
+  }
+  clock.advanceMinutes(1);
+  await checkReminders();
   await checkReminders();
   expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient1.email]);
 });
@@ -364,6 +394,27 @@ it('does not retry when the mail server may already have accepted a reminder', a
   await checkReminders();
   expect(logs.events()).toContain('email.reminder.failed');
   mailer = acceptingMailer;
+  await checkReminders();
+  expect(mailer.sent).toHaveLength(1);
+});
+
+it('keeps the attempt when the booking transaction rolls back after mail acceptance', async () => {
+  const booking = await bookAt(firstStart);
+  clock.set(addHours(booking.startsAt, -24));
+  const transaction = database.db.transaction.bind(database.db);
+  const interrupted = vi.spyOn(database.db, 'transaction').mockImplementationOnce((work, config) =>
+    transaction(async (tx) => {
+      await work(tx);
+      throw new Error('Booking transaction interrupted');
+    }, config),
+  );
+  try {
+    await expect(checkReminders()).rejects.toThrow('Booking transaction interrupted');
+    expect(mailer.sent).toHaveLength(1);
+  } finally {
+    interrupted.mockRestore();
+  }
+  clock.advanceMinutes(1);
   await checkReminders();
   expect(mailer.sent).toHaveLength(1);
 });

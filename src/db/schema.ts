@@ -133,7 +133,6 @@ export const bookings = pgTable(
     createdAt: instant('created_at').notNull(),
     updatedAt: instant('updated_at').notNull(),
     cancelledAt: instant('cancelled_at'),
-    reminderClaimedAt: instant('reminder_claimed_at'),
   },
   (t) => [
     // At most one confirmed booking per slot, so concurrent bookings of the
@@ -147,6 +146,15 @@ export const bookings = pgTable(
     check('booking_reschedule_count_nonnegative', sql`"reschedule_count" >= 0`),
   ],
 );
+
+export const bookingReminderAttempts = pgTable('booking_reminder_attempt', {
+  id: uuid('id').primaryKey(),
+  bookingId: uuid('booking_id')
+    .notNull()
+    .unique()
+    .references(() => bookings.id, { onDelete: 'cascade' }),
+  attemptedAt: instant('attempted_at').notNull(),
+});
 
 export const clinicSettings = pgTable(
   'clinic_settings',

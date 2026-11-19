@@ -1,7 +1,8 @@
-import { and, asc, eq, gt, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import type { Database } from '@/db/client';
-import { bookings, clinicSettings, practitioners, slots, users } from '@/db/schema';
+import { bookingReminderAttempts, bookings, clinicSettings, practitioners, slots, users } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
+import { newId } from '@/lib/ids';
 import type { Logger } from '@/lib/logger';
 import { bookingCancellationPath, bookingReschedulePath } from '@/lib/routes';
 import { addHours, addMinutes, formatSlot } from '@/lib/time';
@@ -11,6 +12,7 @@ import type { OutgoingEmail } from './mailer';
 const LEAD_HOURS = 24;
 const SEND_WINDOW_MINUTES = 30;
 const UK_TIME_ZONE = 'Europe/London';
+const pendingReleases = new WeakMap<Database, Set<string>>();
 
 interface ReminderDependencies {
   db: Database;
@@ -81,39 +83,42 @@ function composeReminder(
   };
 }
 
+async function releaseUnacceptedAttempts(db: Database, releases: Set<string>): Promise<void> {
+  if (releases.size === 0) return;
+  const ids = [...releases];
+  await db.delete(bookingReminderAttempts).where(inArray(bookingReminderAttempts.id, ids));
+  ids.forEach((id) => releases.delete(id));
+}
+
 export async function sendDueReminders({ db, clock, log, mail, publicUrl }: ReminderDependencies): Promise<void> {
   if (mail.mailer.kind === 'disabled') return;
+
+  const releases = pendingReleases.get(db) ?? new Set<string>();
+  pendingReleases.set(db, releases);
+  // A database outage may interrupt cleanup after a confirmed failure.
+  // Retry deleting only those specific attempts, never another worker's.
+  await releaseUnacceptedAttempts(db, releases);
 
   const candidates = await db
     .select({ id: bookings.id })
     .from(bookings)
     .innerJoin(slots, eq(slots.id, bookings.slotId))
     .innerJoin(clinicSettings, eq(clinicSettings.reminderEmailsEnabled, true))
-    .where(and(isNull(bookings.reminderClaimedAt), dueReminder(clock.now())))
+    .leftJoin(bookingReminderAttempts, eq(bookingReminderAttempts.bookingId, bookings.id))
+    .where(and(isNull(bookingReminderAttempts.id), dueReminder(clock.now())))
     .orderBy(asc(slots.startsAt), asc(bookings.id));
 
   for (const { id } of candidates) {
-    const now = clock.now();
-    // Persist the claim before handing the message to the mailer. If the
-    // process or connection is lost, the server may already have accepted it.
-    const [claim] = await db
-      .update(bookings)
-      .set({ reminderClaimedAt: now })
-      .from(slots)
-      .innerJoin(clinicSettings, eq(clinicSettings.reminderEmailsEnabled, true))
-      .where(
-        and(eq(bookings.id, id), eq(bookings.slotId, slots.id), isNull(bookings.reminderClaimedAt), dueReminder(now)),
-      )
-      .returning({ slotId: bookings.slotId });
-    if (!claim) continue;
-
-    const claimedBooking = and(eq(bookings.id, id), eq(bookings.reminderClaimedAt, now));
-    let keepClaim = false;
+    let releaseAttemptId: string | undefined;
     try {
       await db.transaction(async (tx) => {
-        // The same locks protect the final check and SMTP submission, so a
-        // move, cancellation or switch-off cannot commit during submission.
-        const [locked] = await tx.select({ id: bookings.id }).from(bookings).where(claimedBooking).for('update');
+        // This lock is the only reservation until the final checks succeed.
+        // It blocks moves and cancellations while allowing the attempt's FK check.
+        const [locked] = await tx
+          .select({ id: bookings.id })
+          .from(bookings)
+          .where(eq(bookings.id, id))
+          .for('no key update');
         if (!locked) return;
 
         const [session] = await tx
@@ -123,20 +128,32 @@ export async function sendDueReminders({ db, clock, log, mail, publicUrl }: Remi
           .innerJoin(practitioners, eq(practitioners.id, slots.practitionerId))
           .innerJoin(users, and(eq(users.id, bookings.patientId), eq(users.role, 'patient')))
           .innerJoin(clinicSettings, eq(clinicSettings.reminderEmailsEnabled, true))
-          .where(and(eq(bookings.id, id), eq(bookings.slotId, claim.slotId), dueReminder(clock.now())))
+          .leftJoin(bookingReminderAttempts, eq(bookingReminderAttempts.bookingId, bookings.id))
+          .where(and(eq(bookings.id, id), isNull(bookingReminderAttempts.id), dueReminder(clock.now())))
           .for('share', { of: clinicSettings });
-        if (session) {
-          const email = composeReminder(id, session, mail.from, publicUrl);
-          keepClaim = true;
-          const outcome = await deliverEmailWithOutcome(mail, log, email, 'reminder', { booking_id: id });
-          keepClaim = outcome !== 'retryable';
-        }
+        if (!session) return;
+
+        const email = composeReminder(id, session, mail.from, publicUrl);
+        const attemptId = newId(clock);
+        releaseAttemptId = attemptId;
+        // Commit the attempt on a separate connection right before SMTP.
+        // The booking and settings stay locked even if acceptance is uncertain.
+        const [attempt] = await db
+          .insert(bookingReminderAttempts)
+          .values({ id: attemptId, bookingId: id, attemptedAt: clock.now() })
+          .onConflictDoNothing({ target: bookingReminderAttempts.bookingId })
+          .returning({ id: bookingReminderAttempts.id });
+        releaseAttemptId = undefined;
+        if (!attempt) return;
+
+        const outcome = await deliverEmailWithOutcome(mail, log, email, 'reminder', { booking_id: id });
+        if (outcome === 'retryable') releaseAttemptId = attemptId;
       });
     } finally {
-      // Even a failed final check can be retried if SMTP could not have
-      // accepted a message. Release outside the final transaction so a
-      // rollback there cannot undo the release.
-      if (!keepClaim) await db.update(bookings).set({ reminderClaimedAt: null }).where(claimedBooking);
+      if (releaseAttemptId) {
+        releases.add(releaseAttemptId);
+        await releaseUnacceptedAttempts(db, releases);
+      }
     }
   }
 }
