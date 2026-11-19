@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Executor } from '@/db/client';
 import { bookings, practitioners, slots, users } from '@/db/schema';
 import { addDaysToLocalDate, isLocalDate, startOfLocalDate } from '@/lib/time';
+import { slotOverlaps } from '../slots/queries';
 
 export const bookingFiltersSchema = z.strictObject({
   practitionerId: z.uuid().optional(),
@@ -27,7 +28,12 @@ export function parseBookingFilters(params: URLSearchParams): BookingFilters {
 }
 
 /** The executor belongs to this server's clinic; no request chooses another database. */
-export async function listAdminBookings(db: Executor, filters: BookingFilters, timeZone: string) {
+export async function listAdminBookings(
+  db: Executor,
+  filters: BookingFilters,
+  timeZone: string,
+  period?: { startsAt: Date; endsAt: Date },
+) {
   const start = filters.date ? startOfLocalDate(filters.date, timeZone) : undefined;
   const end = filters.date ? startOfLocalDate(addDaysToLocalDate(filters.date, 1), timeZone) : undefined;
   return db
@@ -52,6 +58,7 @@ export async function listAdminBookings(db: Executor, filters: BookingFilters, t
         filters.status ? eq(bookings.status, filters.status) : undefined,
         start ? gte(slots.startsAt, start) : undefined,
         end ? lt(slots.startsAt, end) : undefined,
+        period ? slotOverlaps(period.startsAt, period.endsAt) : undefined,
       ),
     )
     .orderBy(asc(slots.startsAt), asc(bookings.id));

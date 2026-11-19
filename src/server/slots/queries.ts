@@ -1,6 +1,6 @@
-import { and, asc, eq, gt, lte, notExists, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, lt, lte, notExists, sql, type SQLWrapper } from 'drizzle-orm';
 import type { Executor } from '@/db/client';
-import { bookings, practitioners, slots } from '@/db/schema';
+import { blockedPeriods, bookings, practitioners, slots } from '@/db/schema';
 import { isUuid } from '../bookings/queries';
 
 export interface SlotView {
@@ -33,22 +33,48 @@ export async function listActivePractitioners(db: Executor): Promise<Practitione
     .orderBy(asc(practitioners.name), asc(practitioners.id));
 }
 
-/** A slot of an active practitioner, whether or not it is booked. */
-export async function findBookableSlot(db: Executor, slotId: string): Promise<SlotView | null> {
+/** Writers take a shared practitioner lock before checking availability in a separate statement. */
+export async function findBookableSlot(
+  db: Executor,
+  slotId: string,
+  lockPractitioner = false,
+): Promise<SlotView | null> {
   if (!isUuid(slotId)) {
     return null;
   }
-  const [row] = await db
+  const query = db
     .select(slotViewColumns)
     .from(slots)
     .innerJoin(practitioners, eq(practitioners.id, slots.practitionerId))
     .where(and(eq(slots.id, slotId), eq(practitioners.active, true)));
+  const [row] = await (lockPractitioner ? query.for('share', { of: practitioners }) : query);
   return row ?? null;
+}
+
+/** A session that ends as the period starts, or starts as it ends, is outside the period. */
+export function slotOverlaps(startsAt: Date | SQLWrapper, endsAt: Date | SQLWrapper) {
+  return and(lt(slots.startsAt, endsAt), gt(slots.endsAt, startsAt));
 }
 
 const noConfirmedBooking = notExists(
   sql`(select 1 from ${bookings} where ${bookings.slotId} = ${slots.id} and ${bookings.status} = 'confirmed')`,
 );
+
+const blockingPeriods = sql`(
+  select 1 from ${blockedPeriods}
+  where ${blockedPeriods.practitionerId} = ${slots.practitionerId}
+  and ${slotOverlaps(blockedPeriods.startsAt, blockedPeriods.endsAt)}
+)`;
+
+const slotIsFree = and(noConfirmedBooking, notExists(blockingPeriods));
+
+export async function isSlotBlocked(db: Executor, slotId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ blocked: sql<boolean>`exists ${blockingPeriods}` })
+    .from(slots)
+    .where(eq(slots.id, slotId));
+  return row?.blocked ?? false;
+}
 
 export async function isSlotFree(db: Executor, slotId: string): Promise<boolean> {
   if (!isUuid(slotId)) {
@@ -57,7 +83,7 @@ export async function isSlotFree(db: Executor, slotId: string): Promise<boolean>
   const [row] = await db
     .select({ id: slots.id })
     .from(slots)
-    .where(and(eq(slots.id, slotId), noConfirmedBooking));
+    .where(and(eq(slots.id, slotId), slotIsFree));
   return row !== undefined;
 }
 
@@ -84,7 +110,7 @@ export async function listAvailableSlots(db: Executor, query: AvailableSlotsQuer
         eq(practitioners.active, true),
         gt(slots.startsAt, query.after),
         lte(slots.startsAt, query.until),
-        noConfirmedBooking,
+        slotIsFree,
       ),
     )
     .orderBy(asc(slots.startsAt));

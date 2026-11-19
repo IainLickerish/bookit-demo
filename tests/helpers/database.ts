@@ -85,6 +85,6 @@ const isStarting = (error: unknown): boolean =>
 
 export async function emptyDatabase(db: Database): Promise<void> {
   await db.execute(
-    sql`truncate table "booking", "session", "password_reset_token", "slot", "practitioner", "user", "clinic_settings"`,
+    sql`truncate table "booking", "session", "password_reset_token", "slot", "blocked_period", "practitioner", "user", "clinic_settings"`,
   );
 }
