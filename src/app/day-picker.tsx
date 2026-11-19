@@ -37,19 +37,17 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           Show times
         </button>
       </form>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
         {view.date > view.today ? (
           <Link
             href={dayLink(previous)}
             prefetch={false}
-            className="text-link justify-self-start"
+            className="text-link col-start-1 row-start-2 justify-self-start sm:row-start-1"
             data-testid="previous-day"
           >
             ← Previous day
           </Link>
-        ) : (
-          <span />
-        )}
+        ) : null}
         <time
           dateTime={view.date}
           className={view.date === view.today ? 'day-tile day-tile--today' : 'day-tile'}
@@ -62,12 +60,15 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           <span className="block">{calendarDate}</span>
         </time>
         {view.date < view.lastDate ? (
-          <Link href={dayLink(next)} prefetch={false} className="text-link justify-self-end" data-testid="next-day">
+          <Link
+            href={dayLink(next)}
+            prefetch={false}
+            className="text-link col-start-2 row-start-2 justify-self-end sm:col-start-3 sm:row-start-1"
+            data-testid="next-day"
+          >
             Next day →
           </Link>
-        ) : (
-          <span />
-        )}
+        ) : null}
       </div>
     </div>
   );

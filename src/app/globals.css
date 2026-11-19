@@ -202,6 +202,9 @@
   }
 
   .day-tile {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
     border: 1px solid var(--color-pine);
     background: var(--color-stone);
     font-weight: 500;
@@ -371,6 +374,10 @@
 
     .site-main {
       padding-top: 3rem;
+    }
+
+    .day-tile {
+      grid-column: 2;
     }
   }
 }
