@@ -6,6 +6,7 @@ import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
 import { createSmtpMailer } from '@/server/notifications/mailer';
+import { composePasswordResetEmail } from '@/server/notifications/password-reset-email';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots } from '@/server/slots/queries';
@@ -74,6 +75,25 @@ beforeEach(async () => {
 });
 
 describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stand-in, no real email)', () => {
+  it('keeps booking confirmation and password reset emails as plain text', async () => {
+    await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
+    await createSmtpMailer(smtp.url).send(
+      composePasswordResetEmail({
+        from: TEST_MAIL_FROM,
+        to: clinic.patient1.email,
+        name: clinic.patient1.name,
+        clinicName: clinic.settings.clinicName,
+        link: 'https://clinic.example.test/auth/reset-password/example',
+        validMinutes: 30,
+      }),
+    );
+
+    expect(smtp.messages.map(({ raw }) => /^Content-Type: ([^;\r\n]+)/im.exec(raw)?.[1])).toEqual([
+      'text/plain',
+      'text/plain',
+    ]);
+  });
+
   it('sends one confirmation with the contact phone when the clinic includes contact details', async () => {
     await saveClinicSettings(database.db, clock, { ...clinic.settings, includeContactInConfirmation: true });
     const booking = await bookSlot(deps(), {
