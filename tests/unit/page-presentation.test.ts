@@ -5,16 +5,18 @@ import { describe, expect, it, vi } from 'vitest';
 import AdminBookingsPage from '@/app/admin/page';
 import SignInPage from '@/app/auth/sign-in/page';
 import ReschedulePage from '@/app/bookings/[bookingId]/reschedule/page';
+import MyBookingsPage from '@/app/bookings/page';
 import { DayPicker } from '@/app/day-picker';
 import ErrorPage from '@/app/error';
 import NotFound from '@/app/not-found';
 import SlotsPage from '@/app/slots/page';
 import { listAdminBookings, listAdminPractitioners } from '@/server/admin/bookings';
 import { requireAdmin } from '@/server/admin/context';
-import { findBookingForPatient } from '@/server/bookings/queries';
+import { findBookingForPatient, listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { currentUser, requirePatient } from '@/server/request-context';
 import { loadClinicSettings, type ClinicSettings } from '@/server/settings';
 import { loadDayView, type DayView } from '@/server/slots/day-view';
+import type { PublicUser } from '@/server/users';
 
 vi.mock('@/db/client', () => ({ getDatabase: vi.fn() }));
 vi.mock('@/server/request-context', () => ({ currentUser: vi.fn(), requirePatient: vi.fn() }));
@@ -27,6 +29,7 @@ vi.mock('@/server/admin/bookings', async (importOriginal) => ({
 vi.mock('@/server/bookings/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/server/bookings/queries')>()),
   findBookingForPatient: vi.fn(),
+  listBookingsForPatient: vi.fn(),
 }));
 vi.mock('@/server/settings', () => ({ loadClinicSettings: vi.fn() }));
 vi.mock('@/server/slots/day-view', () => ({ loadDayView: vi.fn() }));
@@ -56,6 +59,29 @@ const view: DayView = {
   practitioner,
   practitioners: [practitioner],
   slots: [slot],
+};
+const patient: PublicUser = {
+  id: 'patient-1',
+  email: 'patient@example.test',
+  name: 'Test Patient',
+  role: 'patient',
+  phone: null,
+};
+const booking: BookingView = {
+  id: 'booking-1',
+  patientId: patient.id,
+  slotId: 'old-slot',
+  startsAt: new Date('2026-11-19T11:00:00Z'),
+  endsAt: new Date('2026-11-19T11:45:00Z'),
+  practitionerId: practitioner.id,
+  practitionerName: practitioner.name,
+  status: 'confirmed',
+  lateCancellation: false,
+  rescheduleCount: 0,
+  phone: null,
+  createdAt: new Date('2026-10-20T09:30:00Z'),
+  updatedAt: new Date('2026-10-20T09:30:00Z'),
+  cancelledAt: null,
 };
 
 describe('BookIt page presentation', () => {
@@ -87,33 +113,10 @@ describe('BookIt page presentation', () => {
   });
 
   it('renders the slot link and reschedule fields alongside their own day filter action bars', async () => {
-    const patientId = 'patient-1';
-    const bookingId = 'booking-1';
-    vi.mocked(requirePatient).mockResolvedValue({
-      id: patientId,
-      email: 'patient@example.test',
-      name: 'Test Patient',
-      role: 'patient',
-      phone: null,
-    });
+    vi.mocked(requirePatient).mockResolvedValue(patient);
     vi.mocked(loadDayView).mockResolvedValue(view);
     vi.mocked(loadClinicSettings).mockResolvedValue(settings);
-    vi.mocked(findBookingForPatient).mockResolvedValue({
-      id: bookingId,
-      patientId,
-      slotId: 'old-slot',
-      startsAt: new Date('2026-11-19T11:00:00Z'),
-      endsAt: new Date('2026-11-19T11:45:00Z'),
-      practitionerId: practitioner.id,
-      practitionerName: practitioner.name,
-      status: 'confirmed',
-      lateCancellation: false,
-      rescheduleCount: 0,
-      phone: null,
-      createdAt: new Date('2026-10-20T09:30:00Z'),
-      updatedAt: new Date('2026-10-20T09:30:00Z'),
-      cancelledAt: null,
-    });
+    vi.mocked(findBookingForPatient).mockResolvedValue(booking);
     const searchParams = Promise.resolve({});
     const slots = renderToStaticMarkup(await SlotsPage({ searchParams }));
     expect(slots).toMatch(/data-testid="slot-link"[^>]*href="\/book\/slot-1">Thu, 19 Nov 2026, 09:30<\/a>/);
@@ -122,7 +125,7 @@ describe('BookIt page presentation', () => {
     expect(slotFilters).toMatch(/<div class="booking-action"><button type="submit"[^>]*>Show times<\/button>/);
 
     const reschedule = renderToStaticMarkup(
-      await ReschedulePage({ params: Promise.resolve({ bookingId }), searchParams }),
+      await ReschedulePage({ params: Promise.resolve({ bookingId: booking.id }), searchParams }),
     );
     const [moveFilters, choice] = reschedule.match(/<form[^>]*>.*?<\/form>/gs) ?? [];
     expect(moveFilters).toContain('action="/bookings/booking-1/reschedule" method="get"');
@@ -131,6 +134,21 @@ describe('BookIt page presentation', () => {
     expect(choice).toContain('name="bookingId" value="booking-1"');
     expect(choice).toContain('name="newSlotId" value="slot-1"');
     expect(choice).toContain('Thu, 19 Nov 2026, 09:30</button>');
+  });
+
+  it('assigns right alignment to the status pills in upcoming and cancelled booking cards', async () => {
+    vi.mocked(requirePatient).mockResolvedValue(patient);
+    vi.mocked(loadClinicSettings).mockResolvedValue(settings);
+    vi.mocked(listBookingsForPatient).mockResolvedValue([
+      booking,
+      { ...booking, id: 'booking-2', status: 'cancelled', lateCancellation: true, cancelledAt: booking.updatedAt },
+    ]);
+    const html = renderToStaticMarkup(await MyBookingsPage({ searchParams: Promise.resolve({}) }));
+    const [upcoming, cancelled] = html.match(/<li[^>]*data-testid="booking-row"[^>]*>.*?<\/li>/gs) ?? [];
+    expect(upcoming).toMatch(/class="status-pill justify-self-end" data-testid="booking-status">Confirmed</);
+    expect(cancelled).toMatch(
+      /class="status-pill justify-self-end status-pill--cancelled" data-testid="booking-status">Cancelled \(late\)</,
+    );
   });
 
   it('shows sign-in notices inside the card with the same fields and reset link', async () => {
