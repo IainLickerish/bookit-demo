@@ -43,7 +43,7 @@ export interface SmtpReceiver {
 }
 
 /** A local SMTP server standing in for Mailpit; nothing leaves the machine. */
-export async function startSmtpReceiver(): Promise<SmtpReceiver> {
+export async function startSmtpReceiver(beforeAccept?: () => Promise<void>): Promise<SmtpReceiver> {
   const messages: ReceivedMessage[] = [];
   const listeners: ((message: ReceivedMessage) => void)[] = [];
   const server = new SMTPServer({
@@ -54,7 +54,8 @@ export async function startSmtpReceiver(): Promise<SmtpReceiver> {
       let raw = '';
       stream.setEncoding('utf8');
       stream.on('data', (chunk: string) => (raw += chunk));
-      stream.on('end', () => {
+      stream.on('end', async () => {
+        if (beforeAccept) await beforeAccept();
         const from = session.envelope.mailFrom === false ? '' : session.envelope.mailFrom.address;
         const message = { from, to: session.envelope.rcptTo.map((r) => r.address), raw };
         messages.push(message);

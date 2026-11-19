@@ -1,11 +1,12 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Transaction } from '@/db/client';
+import type { Executor, Transaction } from '@/db/client';
 import { bookings, clinicSettings } from '@/db/schema';
 import { addHours, addMinutes } from '@/lib/time';
 import { updateAdminSettings } from '@/server/admin/settings';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
+import type { BookingView } from '@/server/bookings/queries';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer, type Mailer } from '@/server/notifications/mailer';
 import { sendDueBookingReminders } from '@/server/notifications/reminders';
@@ -63,6 +64,17 @@ async function slotAt(instant: string, practitionerId = clinic.practitioners.wee
 
 async function bookAt(instant: string, patientId = clinic.patient1.id) {
   return bookSlot(deps(), { patientId, slotId: await slotAt(instant) });
+}
+
+function setReminders(db: Executor, sendBookingReminders: boolean) {
+  const { clinicName, timeZone, lateCancellationHours, includeContactInConfirmation } = clinic.settings;
+  return updateAdminSettings(db, clock, {
+    clinicName,
+    timeZone,
+    lateCancellationHours,
+    includeContactInConfirmation,
+    sendBookingReminders,
+  });
 }
 
 async function updateBeforeHandoff(bookingId: string, mailer: Mailer, update: (tx: Transaction) => Promise<unknown>) {
@@ -145,18 +157,14 @@ describe('booking reminders', () => {
 
   it('stops and resumes due reminders when staff change the clinic setting', async () => {
     const booking = await bookAt('2026-10-22T08:00:00Z');
-    const { clinicName, timeZone, lateCancellationHours, includeContactInConfirmation } = clinic.settings;
-    const editable = { clinicName, timeZone, lateCancellationHours, includeContactInConfirmation };
     const mailer = recordingMailer();
     clock.set(addHours(booking.startsAt, -24));
 
-    await updateBeforeHandoff(booking.id, mailer, (tx) =>
-      updateAdminSettings(tx, clock, { ...editable, sendBookingReminders: false }),
-    );
+    await updateBeforeHandoff(booking.id, mailer, (tx) => setReminders(tx, false));
     await sendDueBookingReminders(deps(mailer));
     expect(mailer.sent).toHaveLength(0);
 
-    await updateAdminSettings(database.db, clock, { ...editable, sendBookingReminders: true });
+    await setReminders(database.db, true);
     await sendDueBookingReminders(deps(mailer));
     expect(mailer.sent).toHaveLength(1);
     expect(mailer.sent[0]?.to).toBe(clinic.patient1.email);
@@ -187,6 +195,67 @@ describe('booking reminders', () => {
       expect(cancellation.booking.status).toBe('cancelled');
     });
     expect(mailer.sent).toHaveLength(0);
+  });
+
+  const changesDuringDelivery = {
+    'moving the session': async ({ id, patientId }: BookingView) =>
+      rescheduleBooking(deps(), { bookingId: id, patientId, newSlotId: await slotAt('2026-10-23T08:45:00Z') }),
+    'cancelling the session': ({ id, patientId }: BookingView) => cancelBooking(deps(), { bookingId: id, patientId }),
+    'turning reminders off': () => setReminders(database.db, false),
+  };
+
+  it.each(Object.entries(changesDuringDelivery))('waits for SMTP acceptance before %s', async (_name, change) => {
+    const booking = await bookAt('2026-10-22T08:00:00Z');
+    clock.set(addHours(booking.startsAt, -24));
+    const received = Promise.withResolvers<void>();
+    const accept = Promise.withResolvers<void>();
+    const receiver = await startSmtpReceiver(() => {
+      received.resolve();
+      return accept.promise;
+    });
+    const poll = sendDueBookingReminders(deps(createSmtpMailer(receiver.url, 5_000)));
+    let changeResult: Promise<unknown> | undefined;
+    try {
+      await Promise.race([received.promise, poll]);
+      changeResult = change(booking);
+      await vi.waitFor(async () => {
+        const waiting = await database.db.execute(
+          sql`select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`,
+        );
+        expect(waiting.rows).toHaveLength(1);
+      });
+      expect(receiver.messages).toHaveLength(0);
+    } finally {
+      accept.resolve();
+      await Promise.all([poll, changeResult]);
+      await receiver.stop();
+    }
+    expect(receiver.messages).toHaveLength(1);
+    expect(logs.events()).toContain('email.reminder.sent');
+  });
+
+  it('releases the booking lock after an SMTP receiver takes too long to accept', async () => {
+    const booking = await bookAt('2026-10-22T08:00:00Z');
+    clock.set(addHours(booking.startsAt, -24));
+    const received = Promise.withResolvers<void>();
+    const accept = Promise.withResolvers<void>();
+    const receiver = await startSmtpReceiver(() => {
+      received.resolve();
+      return accept.promise;
+    });
+    const poll = sendDueBookingReminders(deps(createSmtpMailer(receiver.url, 1_000)));
+    try {
+      await Promise.race([received.promise, poll]);
+      const cancellation = await cancelBooking(deps(), { bookingId: booking.id, patientId: booking.patientId });
+      expect(cancellation.booking.status).toBe('cancelled');
+      await poll;
+      expect(receiver.messages).toHaveLength(0);
+      expect(logs.events().slice(-2)).toEqual(['email.reminder.failed', 'booking.cancelled']);
+    } finally {
+      accept.resolve();
+      await poll;
+      await receiver.stop();
+    }
   });
 
   it('does not retry when delivery may have succeeded before reporting a failure', async () => {

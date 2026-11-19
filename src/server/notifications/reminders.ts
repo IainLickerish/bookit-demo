@@ -45,14 +45,14 @@ export async function sendDueBookingReminders(deps: ReminderDependencies): Promi
         .returning({ id: bookings.id });
       if (!reserved) continue;
 
-      const handoff = await db.transaction(async (tx) => {
+      await db.transaction(async (tx) => {
         const settings = await loadClinicSettings(tx, 'share');
         const [locked] = await tx
           .select({ slotId: bookings.slotId, patientId: bookings.patientId, status: bookings.status })
           .from(bookings)
           .where(eq(bookings.id, id))
           .for('update');
-        if (!locked) return null;
+        if (!locked) return;
 
         if (settings.sendBookingReminders && locked.status === 'confirmed') {
           const [details] = await tx
@@ -63,16 +63,15 @@ export async function sendDueBookingReminders(deps: ReminderDependencies): Promi
             .where(and(eq(slots.id, locked.slotId), startsWithinReminderWindow(clock.now())));
           if (details) {
             const email = composeReminderEmail({ bookingId: id, publicUrl, from: mail.from, ...settings, ...details });
-            // Start sending under the locks, then release them while SMTP finishes.
-            return { delivery: deliverEmail(mail, log, email, 'reminder', { booking_id: id }) };
+            // Keep booking and settings changes ordered with the SMTP acceptance or failure.
+            await deliverEmail(mail, log, email, 'reminder', { booking_id: id });
+            return;
           }
         }
 
         // A move or settings change can make the booking eligible on a later poll.
         await tx.update(bookings).set({ reminderAttemptedAt: null }).where(eq(bookings.id, id));
-        return null;
       });
-      await handoff?.delivery;
     }
   } catch (error) {
     throw withoutQueryDetails(error);

@@ -5,15 +5,17 @@ import { getLogger } from '@/lib/logger';
 import { nextRequestId } from '@/lib/request-id';
 import { publicBaseUrl } from '@/lib/runtime-identity';
 import { mailSettings } from './deliver';
+import { mailerFromEnv } from './mailer';
 import { sendDueBookingReminders } from './reminders';
 
 const WORKER_KEY = Symbol.for('bookit.reminderWorker');
 const POLL_INTERVAL_MS = 60_000;
+const SMTP_TIMEOUT_MS = 5_000;
 
 export function startReminderWorker(): void {
   const holder = globalThis as { [WORKER_KEY]?: boolean };
   if (holder[WORKER_KEY] || !process.env.DATABASE_URL) return;
-  const mail = mailSettings();
+  const mail = mailSettings(mailerFromEnv(process.env, SMTP_TIMEOUT_MS));
   if (mail.mailer.kind === 'disabled') return;
 
   const db = getDatabase();
