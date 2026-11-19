@@ -148,7 +148,7 @@ describe('physiotherapist block-outs', () => {
     expect(await database.db.select().from(blockOuts)).toEqual([]);
   });
 
-  it('refuses a stale form time zone and saves after staff review the times in the new zone', async () => {
+  it('refuses to save with the old time zone and accepts a submission with the current zone', async () => {
     const input = { ...blockInput(), reason: 'Training' };
     const timeZone = 'Europe/Paris';
     const { clinicName, lateCancellationHours, includeContactInConfirmation } = clinic.settings;
