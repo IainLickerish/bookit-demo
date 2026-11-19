@@ -162,6 +162,20 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
     expect(smtp.messages).toHaveLength(0);
   });
 
+  it('keeps the new session time when its confirmation email cannot be sent', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
+    const newSlotId = await freeSlotId();
+    await rescheduleBooking(deps('smtp://127.0.0.1:9'), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId,
+    });
+    const [row] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+    expect(row).toMatchObject({ status: 'confirmed', slotId: newSlotId, rescheduleCount: 1 });
+    expect(smtp.messages).toHaveLength(1);
+    expect(logs.events().slice(-2)).toEqual(['booking.rescheduled', 'email.confirmation.failed']);
+  });
+
   it('refuses to email a patient whose address is not on a .test domain, and keeps the booking', async () => {
     const outsider = await createUser(database.db, clock, {
       email: 'someone@example.com',
