@@ -6,6 +6,7 @@ import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { listAvailableSlots } from '@/server/slots/queries';
 import { seedClinic } from '../helpers/clinic';
+import { manualClock } from '../helpers/clock';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 import { captureLogs } from '../helpers/logs';
 import { testMail } from '../helpers/mail';
@@ -41,14 +42,21 @@ function download(bookingId: string): Promise<Response> {
 it('only downloads the calendar file for the signed-in client’s own upcoming confirmed booking', async () => {
   const { db } = database;
   const clock = getClock();
-  const clinic = await seedClinic(db, clock, { settings: { clinicName: 'Acme Physio' } });
+  const earlier = manualClock('2026-10-19T07:00:00Z');
+  const clinic = await seedClinic(db, earlier, { settings: { clinicName: 'Acme Physio' } });
   const deps = { db, clock, log: captureLogs(clock).log, mail: testMail() };
-  const [slot] = await listAvailableSlots(db, {
+  const [pastSlot] = await listAvailableSlots(db, {
+    practitionerId: clinic.practitioners.weekdays,
+    after: earlier.now(),
+    until: clock.now(),
+  });
+  const past = await bookSlot({ ...deps, clock: earlier }, { patientId: clinic.patient1.id, slotId: pastSlot!.id });
+  const [upcomingSlot] = await listAvailableSlots(db, {
     practitionerId: clinic.practitioners.weekdays,
     after: new Date('2026-10-22T07:59:00Z'),
     until: new Date('2026-10-22T09:00:00Z'),
   });
-  const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot!.id });
+  const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: upcomingSlot!.id });
 
   await expect(download(booking.id)).rejects.toMatchObject({ digest: expect.stringContaining('/auth/sign-in') });
   sessionToken = (await createSession(db, clock, clinic.admin.id)).token;
@@ -57,6 +65,7 @@ it('only downloads the calendar file for the signed-in client’s own upcoming c
   expect((await download(booking.id)).status).toBe(404);
 
   sessionToken = (await createSession(db, clock, clinic.patient1.id)).token;
+  expect((await download(past.id)).status).toBe(404);
   expect((await download('invalid')).status).toBe(404);
   const response = await download(booking.id);
   expect(response.status).toBe(200);

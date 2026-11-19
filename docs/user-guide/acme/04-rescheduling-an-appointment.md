@@ -11,6 +11,10 @@ In **My bookings** at `/bookings`, select **Reschedule** beside an upcoming sess
 Choose an available date and time, then confirm the move. Check the new time in
 your bookings list. Your old slot is released only when the move succeeds.
 
+Select **Add to calendar** in the move confirmation or beside the new time in
+**My bookings**. You can also use the file in your new confirmation email. If
+the old time is still in your calendar, remove it.
+
 Acme Physio allows up to **3 reschedules per booking**. The new time must be in
 the future and within the booking horizon. If a time is taken while you are
 choosing, your existing booking stays in place. Contact the clinic for help once

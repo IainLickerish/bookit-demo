@@ -1,6 +1,8 @@
 import { and, eq } from 'drizzle-orm';
-import { bookings, slots } from '@/db/schema';
+import { bookings, slots, users } from '@/db/schema';
 import { isUniqueViolation } from '../errors';
+import { composeConfirmation } from '../notifications/confirmation';
+import { deliverEmail } from '../notifications/deliver';
 import { loadClinicSettings } from '../settings';
 import { findBookableSlot } from '../slots/queries';
 import type { BookingDependencies } from './book';
@@ -22,7 +24,7 @@ export async function rescheduleBooking(
     throw new BookingError('booking_not_found');
   }
   const now = deps.clock.now();
-  const { booking, previousSlotId } = await deps.db.transaction(async (tx) => {
+  const { booking, previousSlotId, confirmation } = await deps.db.transaction(async (tx) => {
     const settings = await loadClinicSettings(tx);
     const [locked] = await tx
       .select({
@@ -30,9 +32,11 @@ export async function rescheduleBooking(
         slotId: bookings.slotId,
         rescheduleCount: bookings.rescheduleCount,
         startsAt: slots.startsAt,
+        patient: { email: users.email, name: users.name },
       })
       .from(bookings)
       .innerJoin(slots, eq(slots.id, bookings.slotId))
+      .innerJoin(users, eq(users.id, bookings.patientId))
       .where(and(eq(bookings.id, request.bookingId), eq(bookings.patientId, request.patientId)))
       .for('update', { of: bookings });
     if (!locked) {
@@ -63,7 +67,17 @@ export async function rescheduleBooking(
     if (!moved) {
       throw new Error('A booking updated in this transaction could not be read back.');
     }
-    return { booking: moved, previousSlotId: locked.slotId };
+    return {
+      booking: moved,
+      previousSlotId: locked.slotId,
+      confirmation: composeConfirmation({
+        booking: moved,
+        patient: locked.patient,
+        settings,
+        from: deps.mail.from,
+        rescheduled: true,
+      }),
+    };
   });
   deps.log.info(
     {
@@ -75,5 +89,6 @@ export async function rescheduleBooking(
     },
     'Booking rescheduled',
   );
+  await deliverEmail(deps.mail, deps.log, confirmation, 'confirmation', { booking_id: booking.id });
   return booking;
 }
