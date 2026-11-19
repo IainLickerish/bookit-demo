@@ -183,7 +183,7 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.sent', 'booking.cancelled']);
   });
 
-  it('shows a late cancellation in My bookings and Clinic bookings and frees the time', async () => {
+  it('records a late cancellation in client and clinic queries and makes the time bookable', async () => {
     const slot = await slotAt('2026-10-21', '09:00');
     const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
     clock.set('2026-10-20T12:00:00Z');
@@ -206,7 +206,7 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     expect(replacement).toMatchObject({ status: 'confirmed', slotId: slot.id });
   });
 
-  it('shows a problem and leaves the booking confirmed when a late cancellation cannot be saved', async () => {
+  it('redirects with the retry message code and keeps the booking confirmed when a late cancellation fails to save', async () => {
     const slot = await slotAt('2026-10-21', '09:00');
     const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
     clock.set('2026-10-20T12:00:00Z');
