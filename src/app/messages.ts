@@ -1,4 +1,5 @@
 import { BOOKING_ERRORS, isBookingErrorCode } from '@/server/bookings/errors';
+import type { TimeBlockErrorCode } from '@/server/admin/time-blocks';
 
 const NOTICES = {
   booked: 'Booking confirmed.',
@@ -22,5 +23,15 @@ export function noticeText(code: string | undefined): string | null {
 export function errorText(code: string | undefined): string | null {
   return isBookingErrorCode(code) ? BOOKING_ERRORS[code].message : null;
 }
+
+export const TIME_BLOCK_SAVED = 'Time block saved.';
+export const TIME_BLOCK_ERRORS: Record<TimeBlockErrorCode, string> = {
+  practitionerId: 'Choose a physiotherapist.',
+  startsAt: 'Enter a valid start date and time.',
+  endsAt: 'Enter a valid end date and time.',
+  reason: 'Shorten the reason to 500 characters or fewer.',
+  order: 'Choose an end time after the start time.',
+  clock_change: 'Choose a time outside the hour when the clocks change.',
+};
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
