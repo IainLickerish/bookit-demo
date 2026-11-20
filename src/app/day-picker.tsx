@@ -51,7 +51,7 @@ export function DayNavigation({ view, path }: { view: DayView; path: string }) {
   const previous = addDaysToLocalDate(view.date, -1);
   const next = addDaysToLocalDate(view.date, 1);
   return (
-    <nav aria-label="Choose another day" className="day-navigation flex items-center justify-between text-sm">
+    <nav aria-label="Choose another day" className="day-navigation">
       {view.date > view.today ? (
         <Link href={dayViewHref(path, practitionerId, previous)} prefetch={false} data-testid="previous-day">
           <span aria-hidden="true">← </span>Previous day
