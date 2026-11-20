@@ -116,6 +116,24 @@ export const slots = pgTable(
   ],
 );
 
+export const timeBlocks = pgTable(
+  'time_block',
+  {
+    id: uuid('id').primaryKey(),
+    practitionerId: uuid('practitioner_id')
+      .notNull()
+      .references(() => practitioners.id),
+    startsAt: instant('starts_at').notNull(),
+    endsAt: instant('ends_at').notNull(),
+    reason: text('reason'),
+    createdAt: instant('created_at').notNull(),
+  },
+  (t) => [
+    index('time_block_practitioner_start_idx').on(t.practitionerId, t.startsAt),
+    check('time_block_ends_after_start', sql`"ends_at" > "starts_at"`),
+  ],
+);
+
 export const bookings = pgTable(
   'booking',
   {
