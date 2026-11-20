@@ -9,7 +9,7 @@ import { SlotList } from '@/app/slot-list';
 import { TEST_CLINIC_SETTINGS } from '../helpers/clinic';
 
 describe('BookIt page appearance', () => {
-  it('serves Fraunces and Figtree from bundled font files', () => {
+  it('bundles Fraunces and Figtree declarations and WOFF2 files', () => {
     const css = new URL('../../src/app/globals.css', import.meta.url);
     const globalStyles = readFileSync(css, 'utf8');
     const fontImport = /@import '([^']+\/fonts\.css)'/.exec(globalStyles)?.[1];
@@ -34,13 +34,15 @@ describe('BookIt page appearance', () => {
   });
 
   it('renders the fallback titles and actions on shared cards', () => {
+    const cardSection = /<section\b[^>]*class="(?:[^"\s]+\s+)*card(?:\s+[^"\s]+)*"/;
     const error = renderToStaticMarkup(createElement(ErrorPage, { error: new Error('test'), reset() {} }));
-    expect(error).toMatch(/<section[^>]*class="[^"]*\bcard\b[^"]*"[^>]*role="alert"/);
+    expect(error).toMatch(cardSection);
+    expect(error).toMatch(/<section[^>]*role="alert"/);
     expect(error).toMatch(/<h1[^>]*>Something went wrong<\/h1>/);
     expect(error).toMatch(/<button[^>]*class="button"[^>]*>Try again<\/button>/);
 
     const missing = renderToStaticMarkup(createElement(NotFound));
-    expect(missing).toMatch(/<section[^>]*class="[^"]*\bcard\b[^"]*"/);
+    expect(missing).toMatch(cardSection);
     expect(missing).toMatch(/<h1[^>]*>Page not found<\/h1>/);
     expect(missing).toMatch(/<a[^>]*class="button"[^>]*href="\/"[^>]*>Go to the start page<\/a>/);
   });
@@ -58,8 +60,8 @@ describe('BookIt page appearance', () => {
     };
     for (const path of ['/slots', '/bookings/example/reschedule']) {
       const today = renderToStaticMarkup(createElement(DayPicker, { view, path }));
-      expect(today).toMatch(/<time[^>]*datetime="2026-11-20"[^>]*aria-current="date"[^>]*class="day-current\b/i);
-      expect(today).toMatch(/<span[^>]*class="[^"]*bg-clay[^"]*"[^>]*aria-hidden="true"/);
+      expect(today).toMatch(/<time[^>]*datetime="2026-11-20"[^>]*aria-current="date"[^>]*class="day-current(?:\s|")/i);
+      expect(today).toMatch(/<span[^>]*class="(?:[^"\s]+\s+)*bg-clay(?:\s+[^"\s]+)*"[^>]*aria-hidden="true"/);
       expect(today).toContain(`href="${path}?practitioner=pat&amp;date=2026-11-21"`);
       expect(today).not.toContain('data-testid="previous-day"');
 
