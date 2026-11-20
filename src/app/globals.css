@@ -154,8 +154,12 @@
     @apply bg-sage text-pine;
   }
   @media (max-width: 39.999rem) {
+    html:has(.booking-action) {
+      --booking-action-clearance: calc(5rem + env(safe-area-inset-bottom));
+      scroll-padding-block-end: var(--booking-action-clearance);
+    }
     .booking-confirmation:has(.booking-action) {
-      padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+      padding-bottom: var(--booking-action-clearance);
     }
     .booking-action {
       @apply fixed inset-x-0 bottom-0 z-10 border-t border-line bg-white px-5 pt-3;

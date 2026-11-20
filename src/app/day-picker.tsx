@@ -36,7 +36,7 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           Show times
         </button>
       </form>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-line pt-4 text-[0.9375rem]">
+      <div className="grid grid-cols-2 items-center gap-2 border-t border-line pt-4 text-[0.9375rem] sm:grid-cols-[1fr_auto_1fr]">
         {view.date > view.today ? (
           <Link
             href={dayLink(previous)}
@@ -50,7 +50,7 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           <span />
         )}
         <span
-          className="max-w-40 rounded-xl bg-stone px-3 py-2 text-center font-medium ring-1 ring-pine tabular-nums sm:max-w-none"
+          className="col-span-2 col-start-1 row-start-1 justify-self-center rounded-xl bg-stone px-3 py-2 text-center font-medium ring-1 ring-pine tabular-nums sm:col-span-1 sm:col-start-2"
           data-testid="shown-date"
         >
           {formatLocalDate(view.date)}
