@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, type ChangeEvent } from 'react';
+import { useActionState, useEffect, useRef } from 'react';
 import type { TimeBlockFields } from '@/server/admin/time-blocks';
 import { TIME_BLOCK_ERRORS } from '../messages';
 import type { TimeBlockFormError } from './time-block-actions';
@@ -14,16 +14,18 @@ interface TimeBlockFormProps {
 
 export function TimeBlockForm({ practitioners, timeZone, reasonLimit, saveAction }: TimeBlockFormProps) {
   const [state, action, pending] = useActionState(saveAction, null);
-  const [values, setValues] = useState<TimeBlockFields>(
-    state?.values ?? { practitionerId: '', startsAt: '', endsAt: '', reason: '' },
-  );
+  const form = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (!state) return;
+    const invalidField = form.current?.elements.namedItem(state.field);
+    if (invalidField instanceof HTMLElement) invalidField.focus();
+  }, [state]);
 
   function fieldProps(field: keyof TimeBlockFields) {
     return {
       name: field,
-      value: values[field],
-      onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-        setValues({ ...values, [field]: event.target.value }),
+      defaultValue: state?.values[field] ?? '',
       'aria-invalid': state?.field === field || undefined,
       'aria-describedby': state?.field === field ? 'time-block-error' : undefined,
     };
@@ -37,7 +39,13 @@ export function TimeBlockForm({ practitioners, timeZone, reasonLimit, saveAction
       >
         Block out time
       </summary>
-      <form action={action} className="mt-4 max-w-lg space-y-4" data-testid="time-block-form">
+      <form
+        key={state?.attempt}
+        ref={form}
+        action={action}
+        className="mt-4 max-w-lg space-y-4"
+        data-testid="time-block-form"
+      >
         {state ? (
           <p role="alert" className="alert" id="time-block-error" data-testid="time-block-error">
             {TIME_BLOCK_ERRORS[state.error]}

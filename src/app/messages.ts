@@ -31,7 +31,7 @@ export const TIME_BLOCK_ERRORS: Record<TimeBlockErrorCode, string> = {
   endsAt: 'Enter a valid end date and time.',
   reason: 'Shorten the reason to 500 characters or fewer.',
   order: 'Choose an end time after the start time.',
-  clock_change: 'Choose a time outside the hour when the clocks change.',
+  clock_change: 'The clocks change at that time. Choose a different time.',
 };
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;

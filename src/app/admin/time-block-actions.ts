@@ -12,11 +12,12 @@ export interface TimeBlockFormError {
   error: TimeBlockErrorCode;
   field: keyof TimeBlockFields;
   values: TimeBlockFields;
+  attempt: number;
 }
 
 export async function saveTimeBlockAction(
   filterQuery: string,
-  _previous: TimeBlockFormError | null,
+  previous: TimeBlockFormError | null,
   form: FormData,
 ): Promise<TimeBlockFormError> {
   await requireAdmin();
@@ -37,7 +38,7 @@ export async function saveTimeBlockAction(
   } catch (error) {
     throw withoutQueryDetails(error);
   }
-  if ('error' in result) return { ...result, values };
+  if ('error' in result) return { ...result, values, attempt: (previous?.attempt ?? 0) + 1 };
   log.info({ event: 'admin.time_block_saved' }, 'Time block saved');
   const query = new URLSearchParams(filterQuery);
   query.set('timeBlock', result.id);
