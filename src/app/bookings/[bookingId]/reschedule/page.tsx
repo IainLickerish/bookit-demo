@@ -9,6 +9,7 @@ import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
 import { DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
+import { PageHeader } from '../../../page-header';
 import { SlotList } from '../../../slot-list';
 import { rescheduleAction } from '../../actions';
 
@@ -41,59 +42,65 @@ export default async function ReschedulePage({
 
   return (
     <section>
-      <h1>Reschedule your appointment</h1>
-      {error ? (
-        <p role="alert" className="alert" data-testid="booking-error">
-          {error}
-        </p>
-      ) : null}
-      <p className="mb-2">
-        Currently booked:{' '}
-        <span className="font-medium" data-testid="current-when">
-          {formatSlot(booking.startsAt, view.settings.timeZone)}
-        </span>{' '}
-        with {booking.practitionerName}.
-      </p>
-      {!changeable ? (
-        <p className="alert" data-testid="not-reschedulable">
-          This booking can no longer be rescheduled online.
-        </p>
-      ) : remaining === 0 ? (
-        <p className="alert" data-testid="reschedule-limit">
-          This booking has been rescheduled as many times as the clinic allows. Please contact the clinic.
-        </p>
-      ) : (
-        <>
-          <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
-            You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
+      <PageHeader title="Reschedule your appointment" />
+      <div className="space-y-4">
+        {error ? (
+          <p role="alert" className="alert" data-testid="booking-error">
+            {error}
           </p>
-          <DayPicker view={view} path={path} />
-          <SlotList
-            slots={choices}
-            timeZone={view.settings.timeZone}
-            renderChoice={(slot, label) => (
-              <form action={rescheduleAction}>
-                <input type="hidden" name="bookingId" value={booking.id} />
-                <input type="hidden" name="newSlotId" value={slot.id} />
-                <button
-                  type="submit"
-                  className="button-secondary w-full"
-                  data-testid="reschedule-to"
-                  data-slot-id={slot.id}
-                  data-starts-at={slot.startsAt.toISOString()}
-                >
-                  {label}
-                </button>
-              </form>
-            )}
-          />
-        </>
-      )}
-      <p className="mt-6 text-sm">
-        <Link href="/bookings" prefetch={false} className="underline">
-          Back to my bookings
-        </Link>
-      </p>
+        ) : null}
+        <div className="card space-y-2">
+          <p>
+            Currently booked:{' '}
+            <span className="font-semibold tabular-nums" data-testid="current-when">
+              {formatSlot(booking.startsAt, view.settings.timeZone)}
+            </span>{' '}
+            with {booking.practitionerName}.
+          </p>
+          {!changeable ? (
+            <p className="alert" data-testid="not-reschedulable">
+              This booking can no longer be rescheduled online.
+            </p>
+          ) : remaining === 0 ? (
+            <p className="alert" data-testid="reschedule-limit">
+              This booking has been rescheduled as many times as the clinic allows. Please contact the clinic.
+            </p>
+          ) : (
+            <p className="text-muted" data-testid="reschedules-remaining">
+              You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
+            </p>
+          )}
+        </div>
+        {changeable && remaining > 0 ? (
+          <>
+            <DayPicker view={view} path={path} />
+            <SlotList
+              slots={choices}
+              timeZone={view.settings.timeZone}
+              renderChoice={(slot, label) => (
+                <form action={rescheduleAction}>
+                  <input type="hidden" name="bookingId" value={booking.id} />
+                  <input type="hidden" name="newSlotId" value={slot.id} />
+                  <button
+                    type="submit"
+                    className="button-secondary w-full"
+                    data-testid="reschedule-to"
+                    data-slot-id={slot.id}
+                    data-starts-at={slot.startsAt.toISOString()}
+                  >
+                    {label}
+                  </button>
+                </form>
+              )}
+            />
+          </>
+        ) : null}
+        <p>
+          <Link href="/bookings" prefetch={false} className="tap-link">
+            Back to my bookings
+          </Link>
+        </p>
+      </div>
     </section>
   );
 }

@@ -44,7 +44,7 @@
   .text-link {
     @apply text-pine underline decoration-1 underline-offset-4 hover:text-pine-hover;
   }
-  :where(a, button, input, select):focus-visible {
+  :where(a, button, input, select, [tabindex='0']):focus-visible {
     outline: 2px solid var(--color-pine);
     outline-offset: 3px;
   }
