@@ -14,3 +14,9 @@ the view; an empty list means no appointments match the current selection.
 
 The table includes patient names and booking status. Only authorised Acme clinic
 staff should use this page. Patients see their own appointments through **My bookings**.
+
+## Session reminders
+
+In **Clinic settings**, tick **Send session reminder emails** to send reminders,
+or untick it to pause them. Select **Save settings** to apply your choice.
+Reminders are on by default.

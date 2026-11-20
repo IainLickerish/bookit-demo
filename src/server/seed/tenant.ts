@@ -27,7 +27,8 @@ export const tenantSchema = z
     allowedSenderDomains: z.array(text).length(1),
     mailFrom: fictionalEmail,
     branding: z.strictObject({ practitionerLabel: text, welcome: text }),
-    settings: clinicSettingsInput.strict(),
+    // Reminders use the database default, so existing tenant seed identities still match after migration.
+    settings: clinicSettingsInput.omit({ reminderEmailsEnabled: true }).strict(),
     supportHours: text,
     tone: text,
     contacts: z
