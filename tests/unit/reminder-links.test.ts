@@ -3,7 +3,7 @@ import { signInBookingDestination, signInPath } from '@/lib/routes';
 
 const id = '0199f2e4-75c0-715e-a2e2-31f54953c64c';
 
-it('keeps the reminder destination when a client needs to try signing in again', () => {
+it('includes the reminder destination in the sign-in retry URL', () => {
   for (const path of [`/bookings/${id}/reschedule`, `/bookings#booking-${id}`]) {
     expect(signInBookingDestination(path)).toBe(path);
     const retry = new URL(signInPath({ next: path, error: 'invalid' }), 'https://bookit.example.test');

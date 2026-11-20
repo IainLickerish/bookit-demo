@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type SMTPTransportOptions } from 'nodemailer';
 
 export interface OutgoingEmail {
   from: string;
@@ -42,9 +42,14 @@ export const disabledMailer: Mailer = {
   },
 };
 
+type SmtpTimeouts = Pick<
+  SMTPTransportOptions,
+  'connectionTimeout' | 'greetingTimeout' | 'socketTimeout' | 'dnsTimeout'
+>;
+
 /** Sends through an SMTP server such as Mailpit (`smtp://mailpit:1025`). */
-export function createSmtpMailer(url: string): Mailer {
-  const transport = nodemailer.createTransport(url);
+export function createSmtpMailer(url: string, timeouts?: SmtpTimeouts): Mailer {
+  const transport = nodemailer.createTransport(timeouts ? { url, ...timeouts } : url);
   return {
     kind: 'smtp',
     async send(email) {
@@ -56,9 +61,9 @@ export function createSmtpMailer(url: string): Mailer {
   };
 }
 
-export function mailerFromEnv(env: Readonly<Record<string, string | undefined>>): Mailer {
+export function mailerFromEnv(env: Readonly<Record<string, string | undefined>>, timeouts?: SmtpTimeouts): Mailer {
   const url = (env.BOOKIT_SMTP_URL ?? '').trim();
-  return url === '' ? disabledMailer : createSmtpMailer(url);
+  return url === '' ? disabledMailer : createSmtpMailer(url, timeouts);
 }
 
 const MAILER_KEY = Symbol.for('bookit.mailer');

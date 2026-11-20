@@ -1,4 +1,6 @@
+import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { bookings, clinicSettings } from '@/db/schema';
 import { addHours } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
@@ -51,6 +53,28 @@ async function setReminders(remindersEnabled: boolean) {
   await saveClinicSettings(database.db, clock, { ...clinic.settings, remindersEnabled });
 }
 
+function changeAfterClaim(bookingId: string, change: () => Promise<unknown>) {
+  const transaction = database.db.transaction.bind(database.db);
+  vi.spyOn(database.db, 'transaction').mockImplementationOnce(async (run, config) => {
+    const result = await transaction(run, config);
+    const [stored] = await database.db
+      .select({ attemptedAt: bookings.reminderAttemptedAt })
+      .from(bookings)
+      .where(eq(bookings.id, bookingId));
+    expect(stored?.attemptedAt).toEqual(clock.now());
+    await change();
+    return result;
+  });
+}
+
+function signal() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 beforeAll(async () => {
   database = await startTestDatabase(5);
 });
@@ -78,6 +102,7 @@ it('sends one reminder at 24 hours even when reminder checks overlap or repeat',
 
   clock.set('2026-10-21T08:00:00Z');
   await Promise.all([sendDueReminders(deps()), sendDueReminders(deps())]);
+  expect(mailer.sent).toHaveLength(1);
   clock.advanceMinutes(30);
   await sendDueReminders(deps());
   expect(mailer.sent).toHaveLength(1);
@@ -107,6 +132,17 @@ it('emails the UK session time, physiotherapist and signed-in booking links to t
     `/bookings#booking-${booking.id}`,
   ]);
   expect(message!.text).not.toContain(clinic.patient1.email);
+});
+
+it('shows the clinic time and UK time when the clinic uses a different time zone', async () => {
+  await saveClinicSettings(database.db, clock, { ...clinic.settings, timeZone: 'Europe/Paris' });
+  await bookAt('2026-10-22T08:00:00.000Z');
+  clock.set('2026-10-21T08:00:00Z');
+  await sendDueReminders(deps());
+
+  expect(mailer.sent).toHaveLength(1);
+  expect(mailer.sent[0]!.text).toContain('Thu, 22 Oct 2026, 10:00 (Europe/Paris) with Pat Physio');
+  expect(mailer.sent[0]!.text).toContain('In the UK, your session starts at Thu, 22 Oct 2026, 09:00.');
 });
 
 it('skips cancelled sessions and sends a moved session’s reminder at its new time only', async () => {
@@ -140,6 +176,70 @@ it('skips cancelled sessions and sends a moved session’s reminder at its new t
   });
   clock.set('2026-10-25T09:00:00Z');
   await sendDueReminders(deps());
+  expect(mailer.sent).toHaveLength(1);
+});
+
+it('drops a claimed reminder after a move and sends it when the new session is due', async () => {
+  const booking = await bookAt('2026-10-22T08:00:00.000Z');
+  const newSlotId = await slotAt('2026-10-23T08:45:00.000Z');
+  clock.set('2026-10-21T08:00:00Z');
+  changeAfterClaim(booking.id, () =>
+    rescheduleBooking(deps(), { bookingId: booking.id, patientId: booking.patientId, newSlotId }),
+  );
+  await sendDueReminders(deps());
+  expect(mailer.sent).toHaveLength(0);
+
+  clock.set('2026-10-22T08:45:00Z');
+  await sendDueReminders(deps());
+  expect(mailer.sent).toHaveLength(1);
+  expect(mailer.sent[0]!.text).toContain('Fri, 23 Oct 2026, 09:45 (UK time)');
+});
+
+it('drops a claimed reminder after a cancellation', async () => {
+  const booking = await bookAt('2026-10-22T08:00:00.000Z');
+  clock.set('2026-10-21T08:00:00Z');
+  changeAfterClaim(booking.id, () => cancelBooking(deps(), { bookingId: booking.id, patientId: booking.patientId }));
+  await sendDueReminders(deps());
+  expect(mailer.sent).toHaveLength(0);
+});
+
+it('drops a claimed reminder when switched off and can send if switched back on', async () => {
+  const booking = await bookAt('2026-10-22T08:00:00.000Z');
+  clock.set('2026-10-21T08:00:00Z');
+  changeAfterClaim(booking.id, () => setReminders(false));
+  await sendDueReminders(deps());
+  expect(mailer.sent).toHaveLength(0);
+
+  await setReminders(true);
+  await sendDueReminders(deps());
+  expect(mailer.sent).toHaveLength(1);
+});
+
+it('holds the booking and clinic setting until the reminder has been handed to SMTP', async () => {
+  const booking = await bookAt('2026-10-22T08:00:00.000Z');
+  clock.set('2026-10-21T08:00:00Z');
+  const entered = signal();
+  const release = signal();
+  const send = mailer.send;
+  mailer.send = async (email) => {
+    entered.resolve();
+    await release.promise;
+    return send(email);
+  };
+  const worker = sendDueReminders(deps());
+  try {
+    await Promise.race([entered.promise, worker]);
+    const locked = { cause: { code: '55P03' } };
+    await expect(
+      database.db.select().from(bookings).where(eq(bookings.id, booking.id)).for('update', { noWait: true }),
+    ).rejects.toMatchObject(locked);
+    await expect(
+      database.db.select().from(clinicSettings).for('no key update', { noWait: true }),
+    ).rejects.toMatchObject(locked);
+  } finally {
+    release.resolve();
+    await worker;
+  }
   expect(mailer.sent).toHaveLength(1);
 });
 

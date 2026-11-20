@@ -7,16 +7,27 @@ import { publicBaseUrl } from '@/lib/runtime-identity';
 import { reportError } from '../error-reporting';
 import { withoutQueryDetails } from '../errors';
 import { mailSettings } from './deliver';
+import { mailerFromEnv } from './mailer';
 import { sendDueReminders } from './reminders';
 
 const WORKER_STARTED = Symbol.for('bookit.reminderWorkerStarted');
 const POLL_INTERVAL_MS = 30_000;
+const SMTP_TIMEOUT_MS = 5_000;
 
 /** The running Node server checks for reminders even when nobody is using the site. */
 export function startReminderWorker(): void {
   const holder = globalThis as { [WORKER_STARTED]?: boolean };
-  const mail = mailSettings();
-  if (holder[WORKER_STARTED] || mail.mailer.kind === 'disabled') return;
+  if (holder[WORKER_STARTED]) return;
+  // The booking and settings are locked while handing the message to SMTP.
+  const mail = mailSettings(
+    mailerFromEnv(process.env, {
+      connectionTimeout: SMTP_TIMEOUT_MS,
+      greetingTimeout: SMTP_TIMEOUT_MS,
+      socketTimeout: SMTP_TIMEOUT_MS,
+      dnsTimeout: SMTP_TIMEOUT_MS,
+    }),
+  );
+  if (mail.mailer.kind === 'disabled') return;
   const publicUrl = publicBaseUrl();
   holder[WORKER_STARTED] = true;
 

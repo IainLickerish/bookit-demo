@@ -8,8 +8,8 @@ export interface MailSettings {
   from: string;
 }
 
-export function mailSettings(): MailSettings {
-  return { mailer: getMailer(), from: (process.env.BOOKIT_MAIL_FROM ?? '').trim() || 'noreply@bookit.test' };
+export function mailSettings(mailer = getMailer()): MailSettings {
+  return { mailer, from: (process.env.BOOKIT_MAIL_FROM ?? '').trim() || 'noreply@bookit.test' };
 }
 
 export type EmailKind = 'confirmation' | 'password_reset' | 'reminder';
