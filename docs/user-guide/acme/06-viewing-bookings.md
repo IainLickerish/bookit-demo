@@ -14,3 +14,9 @@ the view; an empty list means no appointments match the current selection.
 
 The table includes patient names and booking status. Only authorised Acme clinic
 staff should use this page. Patients see their own appointments through **My bookings**.
+
+## Checking the daily workload
+
+**Daily workload** shows how many confirmed sessions start today, using the clinic's time zone.
+To check another day, choose a **Workload date** and select **Show workload**.
+The count covers all physiotherapists. You can filter and export the bookings list separately.

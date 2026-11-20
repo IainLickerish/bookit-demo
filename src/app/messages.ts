@@ -9,6 +9,8 @@ const NOTICES = {
 
 export type NoticeCode = keyof typeof NOTICES;
 
+export const WORKLOAD_DATE_ERROR = 'Choose a valid date to see the workload.';
+
 export function single(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }

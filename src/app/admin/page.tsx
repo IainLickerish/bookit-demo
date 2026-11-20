@@ -1,19 +1,21 @@
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
-import { formatSlot } from '@/lib/time';
+import { getClock } from '@/lib/clock';
+import { formatLocalDate, formatSlot, localDateOf } from '@/lib/time';
 import { requireAdmin } from '@/server/admin/context';
 import {
   listAdminBookings,
   listAdminPractitioners,
+  loadDailyWorkload,
   parseBookingFilters,
   type BookingFilters,
 } from '@/server/admin/bookings';
 import { loadClinicSettings } from '@/server/settings';
-import type { SearchParams } from '../messages';
+import { WORKLOAD_DATE_ERROR, type SearchParams } from '../messages';
 
 export default async function AdminBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
-  const params = await searchParams;
+  const { workloadDate, ...params } = await searchParams;
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item);
@@ -27,8 +29,15 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   }
   const db = getDatabase();
   const [settings, practitioners] = await Promise.all([loadClinicSettings(db), listAdminPractitioners(db)]);
-  const rows = invalid ? [] : await listAdminBookings(db, filters, settings.timeZone);
-  const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
+  const today = localDateOf(getClock().now(), settings.timeZone);
+  const [rows, workload] = await Promise.all([
+    invalid ? [] : listAdminBookings(db, filters, settings.timeZone),
+    loadDailyWorkload(db, workloadDate ?? today, settings.timeZone),
+  ]);
+  const filterEntries = Object.entries(filters);
+  const exportQuery = new URLSearchParams(filterEntries).toString();
+  const selectedWorkloadDate = workloadDate === undefined ? undefined : workload?.date;
+  const clearFiltersHref = selectedWorkloadDate ? `/admin?workloadDate=${selectedWorkloadDate}` : '/admin';
   return (
     <section>
       <h1>Clinic bookings</h1>
@@ -37,7 +46,53 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           Clinic settings
         </Link>
       </p>
+      <section aria-labelledby="daily-workload" className="mb-6 border-b border-slate-200 pb-6">
+        <h2 id="daily-workload">Daily workload</h2>
+        {workload ? (
+          <p role="status">
+            <strong data-testid="admin-workload-count">
+              {workload.confirmed} confirmed {workload.confirmed === 1 ? 'session' : 'sessions'}
+            </strong>
+            {workload.date === today ? ' today, ' : ' on '}
+            <time dateTime={workload.date}>{formatLocalDate(workload.date)}</time>.
+          </p>
+        ) : null}
+        <form
+          method="get"
+          action="/admin"
+          className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,15rem)_auto] sm:items-end sm:justify-start"
+        >
+          {filterEntries.map(([name, value]) => (
+            <input key={name} type="hidden" name={name} value={value} />
+          ))}
+          {/* Use the date from the URL when the browser restores this page. */}
+          <label className="min-w-0">
+            Workload date ({settings.timeZone})
+            <input
+              key={workload?.date ?? 'invalid'}
+              type="date"
+              name="workloadDate"
+              defaultValue={workload?.date ?? today}
+              autoComplete="off"
+              required
+              aria-invalid={workload ? undefined : true}
+              aria-describedby={workload ? undefined : 'workload-date-error'}
+              className="min-h-11"
+              data-testid="admin-workload-date"
+            />
+          </label>
+          <button className="button-secondary min-h-11" type="submit" data-testid="admin-show-workload">
+            Show workload
+          </button>
+        </form>
+        {!workload ? (
+          <p id="workload-date-error" role="alert" className="alert mt-3" data-testid="admin-workload-date-error">
+            {WORKLOAD_DATE_ERROR}
+          </p>
+        ) : null}
+      </section>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
+        {selectedWorkloadDate ? <input type="hidden" name="workloadDate" value={selectedWorkloadDate} /> : null}
         <label>
           Practitioner
           <select name="practitionerId" defaultValue={filters.practitionerId ?? ''} data-testid="admin-practitioner">
@@ -64,7 +119,7 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
         <button className="button" type="submit" data-testid="admin-filter">
           Filter bookings
         </button>
-        <Link href="/admin" prefetch={false} className="button-secondary">
+        <Link href={clearFiltersHref} prefetch={false} className="button-secondary">
           Clear filters
         </Link>
       </form>
