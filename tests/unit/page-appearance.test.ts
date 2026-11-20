@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { jsx } from 'react/jsx-runtime';
 import { createSourceFile, isImportDeclaration, isStringLiteral, ScriptTarget } from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { DayPicker } from '@/app/day-picker';
@@ -65,7 +66,7 @@ describe('BookIt page appearance', () => {
     ['notice', 'status', 'Booking confirmed.'],
     ['alert', 'alert', 'This time is no longer available.'],
   ] as const)('announces the shared %s text and hides its icon', (kind, role, message) => {
-    const markup = renderToStaticMarkup(createElement(Notice, { kind, testId: 'booking-message', children: message }));
+    const markup = renderToStaticMarkup(jsx(Notice, { kind, testId: 'booking-message', children: message }));
     expect(markup).toContain(`role="${role}"`);
     expect(markup).toContain(`class="${kind}"`);
     expect(markup).toMatch(/<svg\b[^>]*aria-hidden="true"/);
