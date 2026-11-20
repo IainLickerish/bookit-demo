@@ -10,6 +10,7 @@ import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots } from '@/server/slots/queries';
+import { expectCalendarEvent } from '../helpers/calendar';
 import { seedClinic, TEST_PASSWORD, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/database';
@@ -59,7 +60,7 @@ function calendarAttachment(raw: string): string {
     /Content-Type: text\/calendar;[^\r\n]*name=session\.ics\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=session\.ics\r\n\r\n([A-Za-z0-9+/=\r\n]+)\r\n--/i,
   );
   expect(part, 'an attached session.ics file').not.toBeNull();
-  return Buffer.from(part![1]!, 'base64').toString('utf8').replaceAll('\r\n ', '');
+  return Buffer.from(part![1]!, 'base64').toString('utf8');
 }
 
 function recordEvidence(name: string, data: unknown): void {
@@ -90,7 +91,7 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
   it('attaches a calendar file for the booked session and the moved session', async () => {
     await saveClinicSettings(database.db, clock, { ...clinic.settings, clinicName: 'Acme Physio' });
     const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
-    const original = calendarAttachment(smtp.messages[0]!.raw);
+    const original = expectCalendarEvent(calendarAttachment(smtp.messages[0]!.raw), booking.id);
     expect(original).toContain('SUMMARY:Acme Physio session with Pat Physio');
     expect(original).toContain('DTSTART:20261022T080000Z\r\nDTEND:20261022T084500Z');
     expect(original).toContain('SEQUENCE:0');
@@ -102,11 +103,10 @@ describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stan
     });
 
     expect(smtp.messages).toHaveLength(2);
-    const moved = calendarAttachment(smtp.messages[1]!.raw);
+    const moved = expectCalendarEvent(calendarAttachment(smtp.messages[1]!.raw), booking.id);
     expect(moved).toContain('SUMMARY:Acme Physio session with Sam Sports');
     expect(moved).toContain('DTSTART:20261027T100000Z\r\nDTEND:20261027T104500Z');
     expect(moved).toContain('SEQUENCE:1');
-    expect(moved.match(/^UID:.+$/m)?.[0]).toBe(original.match(/^UID:.+$/m)?.[0]);
   });
 
   it('emails the client the updated time and physiotherapist after a move', async () => {

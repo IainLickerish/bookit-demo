@@ -8,6 +8,7 @@ import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { listBookingsForPatient } from '@/server/bookings/queries';
 import { listAvailableSlots } from '@/server/slots/queries';
+import { expectCalendarEvent } from '../helpers/calendar';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
 import { manualClock } from '../helpers/clock';
 import { emptyDatabase, startTestDatabase, type TestDatabase } from '../helpers/database';
@@ -86,7 +87,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await database.stop();
+  await database?.stop();
 });
 
 beforeEach(async () => {
@@ -111,14 +112,14 @@ it('links to the saved session from both booking and move confirmations', async 
   expect(original.headers.get('Content-Type')).toBe('text/calendar; charset=utf-8');
   expect(original.headers.get('Content-Disposition')).toBe('attachment; filename="session.ics"');
   expect(original.headers.get('Cache-Control')).toBe('private, no-store');
-  expect(await original.text()).toContain('DTSTART:20261022T084500Z');
+  expect(expectCalendarEvent(await original.text(), bookingId)).toContain('DTSTART:20261022T084500Z');
 
   const moved = await followBookingAction(rescheduleAction, { bookingId, newSlotId: targetSlot!.id });
   expect(moved).toContain('Booking rescheduled.');
   expect(confirmationDownload(moved)).toBe(download);
   const updated = await downloadCalendar(bookingId);
   expect(updated.status).toBe(200);
-  expect(await updated.text()).toContain('DTSTART:20261022T093000Z');
+  expect(expectCalendarEvent(await updated.text(), bookingId)).toContain('DTSTART:20261022T093000Z');
 });
 
 it('offers calendar downloads for each upcoming confirmed session in My bookings', async () => {
