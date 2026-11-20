@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
+import { rescheduleBooking } from '@/server/bookings/reschedule';
 import { createSmtpMailer } from '@/server/notifications/mailer';
 import { createUser } from '@/server/users';
 import { saveClinicSettings } from '@/server/settings';
@@ -23,15 +24,19 @@ let clinic: SeededClinic;
 let logs: CapturedLogs;
 const clock = manualClock('2026-10-20T07:00:00Z');
 
-async function freeSlotId(index = 0): Promise<string> {
+async function freeSlotId(
+  index = 0,
+  date = '2026-10-22',
+  practitionerId = clinic.practitioners.weekdays,
+): Promise<string> {
   const slots = await listAvailableSlots(database.db, {
-    practitionerId: clinic.practitioners.weekdays,
+    practitionerId,
     after: clock.now(),
     until: new Date('2026-11-30T00:00:00Z'),
   });
-  const slot = slots.filter((s) => localDateOf(s.startsAt, 'Europe/London') === '2026-10-22')[index];
+  const slot = slots.filter((s) => localDateOf(s.startsAt, 'Europe/London') === date)[index];
   if (!slot) {
-    throw new Error('No free slot on 22 October');
+    throw new Error(`No free slot on ${date}`);
   }
   return slot.id;
 }
@@ -47,6 +52,14 @@ function bodyOf(raw: string): string {
   return body
     .replace(/=\r?\n/g, '')
     .replace(/=([0-9A-F]{2})/g, (_match, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+function calendarAttachment(raw: string): string {
+  const part = raw.match(
+    /Content-Type: text\/calendar;[^\r\n]*name=session\.ics\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=session\.ics\r\n\r\n([A-Za-z0-9+/=\r\n]+)\r\n--/i,
+  );
+  expect(part, 'an attached session.ics file').not.toBeNull();
+  return Buffer.from(part![1]!, 'base64').toString('utf8').replaceAll('\r\n ', '');
 }
 
 function recordEvidence(name: string, data: unknown): void {
@@ -74,6 +87,63 @@ beforeEach(async () => {
 });
 
 describe('confirmation emails through SMTP (REQ-18.1-01, plan 12.1; Mailpit stand-in, no real email)', () => {
+  it('attaches a calendar file for the booked session and the moved session', async () => {
+    await saveClinicSettings(database.db, clock, { ...clinic.settings, clinicName: 'Acme Physio' });
+    const booking = await bookSlot(deps(), { patientId: clinic.patient1.id, slotId: await freeSlotId() });
+    const original = calendarAttachment(smtp.messages[0]!.raw);
+    expect(original).toContain('SUMMARY:Acme Physio session with Pat Physio');
+    expect(original).toContain('DTSTART:20261022T080000Z\r\nDTEND:20261022T084500Z');
+    expect(original).toContain('SEQUENCE:0');
+
+    await rescheduleBooking(deps(), {
+      patientId: clinic.patient1.id,
+      bookingId: booking.id,
+      newSlotId: await freeSlotId(0, '2026-10-27', clinic.practitioners.saturdays),
+    });
+
+    expect(smtp.messages).toHaveLength(2);
+    const moved = calendarAttachment(smtp.messages[1]!.raw);
+    expect(moved).toContain('SUMMARY:Acme Physio session with Sam Sports');
+    expect(moved).toContain('DTSTART:20261027T100000Z\r\nDTEND:20261027T104500Z');
+    expect(moved).toContain('SEQUENCE:1');
+    expect(moved.match(/^UID:.+$/m)?.[0]).toBe(original.match(/^UID:.+$/m)?.[0]);
+  });
+
+  it('emails the client the updated time and physiotherapist after a move', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: await freeSlotId() });
+    await rescheduleBooking(deps(), {
+      patientId: clinic.patient2.id,
+      bookingId: booking.id,
+      newSlotId: await freeSlotId(0, '2026-10-27', clinic.practitioners.saturdays),
+    });
+
+    expect(smtp.messages).toHaveLength(2);
+    const message = smtp.messages[1]!;
+    expect(message.to).toEqual([clinic.patient2.email]);
+    expect(message.raw).toContain('Subject: Booking rescheduled: Tue, 27 Oct 2026, 10:00');
+    const body = bodyOf(message.raw);
+    expect(body).toContain('When: Tue, 27 Oct 2026, 10:00 (Europe/London)');
+    expect(body).toContain('With: Sam Sports');
+    expect(body).toContain('Length: 45 minutes');
+    expect(body).not.toContain('Thu, 22 Oct 2026');
+    expect(body).not.toContain('Pat Physio');
+  });
+
+  it('keeps the new time if sending the move confirmation fails', async () => {
+    const booking = await bookSlot(deps(), { patientId: clinic.patient2.id, slotId: await freeSlotId() });
+    const newSlotId = await freeSlotId();
+    await rescheduleBooking(deps('smtp://127.0.0.1:9'), {
+      patientId: clinic.patient2.id,
+      bookingId: booking.id,
+      newSlotId,
+    });
+
+    const [saved] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
+    expect(saved).toMatchObject({ slotId: newSlotId, status: 'confirmed' });
+    expect(smtp.messages).toHaveLength(1);
+    expect(logs.events().slice(-2)).toEqual(['booking.rescheduled', 'email.confirmation.failed']);
+  });
+
   it('sends one confirmation with the contact phone when the clinic includes contact details', async () => {
     await saveClinicSettings(database.db, clock, { ...clinic.settings, includeContactInConfirmation: true });
     const booking = await bookSlot(deps(), {
