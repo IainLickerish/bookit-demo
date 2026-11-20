@@ -2,10 +2,6 @@ import Link from 'next/link';
 import { addDaysToLocalDate, formatLocalDate } from '@/lib/time';
 import type { DayView } from '@/server/slots/day-view';
 
-export function dayViewHref(path: string, practitionerId: string, date: string) {
-  return `${path}?${new URLSearchParams({ practitioner: practitionerId, date }).toString()}`;
-}
-
 /** Practitioner and date controls for a page that lists one day's slots. */
 export function DayPicker({
   view,
@@ -19,7 +15,7 @@ export function DayPicker({
   const practitionerId = view.practitioner?.id ?? '';
   const dayLink = (date: string, label: string, testId: string) => (
     <Link
-      href={dayViewHref(path, practitionerId, date)}
+      href={`${path}?${new URLSearchParams({ practitioner: practitionerId, date }).toString()}`}
       prefetch={false}
       className={forNewBooking ? 'button-secondary booking-control border-slate-500 text-center' : undefined}
       data-testid={testId}
@@ -88,7 +84,6 @@ export function DayPicker({
       </form>
       {forNewBooking ? (
         <>
-          <p>You can book up to {view.settings.slotHorizonDays} days ahead.</p>
           <div className="grid auto-cols-fr grid-flow-col gap-3">
             {previousLink}
             {nextLink}

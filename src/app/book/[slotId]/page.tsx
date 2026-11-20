@@ -1,12 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDatabase } from '@/db/client';
-import { formatSlot, localDateOf } from '@/lib/time';
+import { formatSlot } from '@/lib/time';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { findBookableSlot, isSlotFree } from '@/server/slots/queries';
 import { bookAction } from '../../bookings/actions';
-import { dayViewHref } from '../../day-picker';
 import { errorText, single, type SearchParams } from '../../messages';
 
 export default async function BookSlotPage({
@@ -25,9 +24,6 @@ export default async function BookSlotPage({
     notFound();
   }
   const free = await isSlotFree(db, slot.id);
-  const duration = (slot.endsAt.getTime() - slot.startsAt.getTime()) / 60_000;
-  const returnHref = dayViewHref('/slots', slot.practitionerId, localDateOf(slot.startsAt, settings.timeZone));
-  const lateHours = settings.lateCancellationHours;
   return (
     <section className="mx-auto max-w-[440px] rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <h1 className="mb-2 text-[28px] leading-tight sm:text-[32px]">Confirm your booking</h1>
@@ -53,7 +49,7 @@ export default async function BookSlotPage({
         <div>
           <dt className="font-medium text-slate-700">Duration</dt>
           <dd className="mt-1 text-lg font-semibold" data-testid="book-duration">
-            {duration} minutes
+            {settings.sessionMinutes} minutes
           </dd>
         </div>
       </dl>
@@ -71,11 +67,6 @@ export default async function BookSlotPage({
               data-testid="book-phone"
             />
           </label>
-          {lateHours > 0 ? (
-            <p data-testid="booking-cancellation-window">
-              Cancelling less than {lateHours} {lateHours === 1 ? 'hour' : 'hours'} before your session counts as late.
-            </p>
-          ) : null}
           <button type="submit" className="button booking-control w-full font-semibold" data-testid="confirm-booking">
             Confirm booking
           </button>
@@ -86,7 +77,7 @@ export default async function BookSlotPage({
         </p>
       )}
       <Link
-        href={returnHref}
+        href="/slots"
         prefetch={false}
         className="button-secondary booking-control mt-3 flex w-full items-center justify-center border-slate-500 text-center"
         data-testid="choose-different-time"

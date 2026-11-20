@@ -53,7 +53,7 @@ it('names the day shown and the dates on the previous and next day choices', asy
   );
 });
 
-it('takes clients from a clinic-local time choice to the review for that session', async () => {
+it('links the clinic-local time to the review for that session', async () => {
   vi.mocked(loadDayView).mockResolvedValue(view);
   const page = renderToStaticMarkup(await SlotsPage({ searchParams: Promise.resolve({ date: view.date }) }));
 
@@ -65,7 +65,10 @@ it('takes clients from a clinic-local time choice to the review for that session
 it('keeps the day controls used when moving a session', () => {
   const page = renderToStaticMarkup(DayPicker({ view, path: '/bookings/existing/reschedule' }));
 
+  expect(page).toMatch(/<form[^>]*action="\/bookings\/existing\/reschedule"[^>]*method="get"/);
   expect(page).toContain('Practitioner<select');
+  expect(page).toMatch(/<input[^>]*type="date"[^>]*name="date"[^>]*value="2026-10-22"/);
+  expect(page).toMatch(/<button[^>]*type="submit"[^>]*>Show times<\/button>/);
   expect(page).toMatch(
     /<a[^>]*href="\/bookings\/existing\/reschedule\?practitioner=alex&amp;date=2026-10-21"[^>]*>← Previous day<\/a>/,
   );
@@ -88,18 +91,17 @@ it('lists the physiotherapist, clinic-local date and time, and session length be
 
   expect(page).toMatch(/<dt[^>]*>Physiotherapist<\/dt><dd[^>]*>Alex Physiotherapist<\/dd>/);
   expect(page).toMatch(/<dt[^>]*>Date and time<\/dt><dd[^>]*><time[^>]*>Thu, 22 Oct 2026, 10:30<\/time><\/dd>/);
-  expect(page).toMatch(/<dt[^>]*>Duration<\/dt><dd[^>]*>45 minutes<\/dd>/);
-  expect(page.indexOf('45 minutes')).toBeLessThan(page.indexOf('Confirm booking'));
+  expect(page).toMatch(/<dt[^>]*>Duration<\/dt><dd[^>]*>30 minutes<\/dd>/);
+  expect(page.indexOf('30 minutes')).toBeLessThan(page.indexOf('Confirm booking'));
   expect(page).toMatch(/<label[^>]*>Phone number \(optional\)<input[^>]*name="phone"/);
+  expect(page).toMatch(/<input[^>]*type="hidden"[^>]*name="slotId"[^>]*value="morning"/);
   expect(page).toMatch(/<button[^>]*type="submit"[^>]*>Confirm booking<\/button>/);
 });
 
-it('offers the original day and physiotherapist when a time is no longer available', async () => {
+it('links back to Book when a time is no longer available', async () => {
   const page = await renderReview(false);
 
   expect(page).toContain('This time is no longer available.');
   expect(page).not.toContain('Confirm booking');
-  expect(page).toMatch(
-    /<a[^>]*href="\/slots\?practitioner=alex&amp;date=2026-10-22"[^>]*>Choose a different time<\/a>/,
-  );
+  expect(page).toMatch(/<a[^>]*href="\/slots"[^>]*>Choose a different time<\/a>/);
 });
