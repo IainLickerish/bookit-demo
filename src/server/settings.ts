@@ -27,21 +27,13 @@ export class ClinicNotConfiguredError extends Error {
   }
 }
 
-export async function loadClinicSettings(db: Executor): Promise<ClinicSettings> {
-  const [row] = await db.select().from(clinicSettings).where(eq(clinicSettings.id, SETTINGS_ROW_ID));
+export async function loadClinicSettings(db: Executor, lock?: 'share'): Promise<ClinicSettings> {
+  const query = db.select().from(clinicSettings).where(eq(clinicSettings.id, SETTINGS_ROW_ID));
+  const [row] = await (lock ? query.for(lock) : query);
   if (!row) {
     throw new ClinicNotConfiguredError();
   }
-  return clinicSettingsInput.parse({
-    clinicName: row.clinicName,
-    timeZone: row.timeZone,
-    lateCancellationHours: row.lateCancellationHours,
-    includeContactInConfirmation: row.includeContactInConfirmation,
-    reminderEmailsEnabled: row.reminderEmailsEnabled,
-    slotHorizonDays: row.slotHorizonDays,
-    sessionMinutes: row.sessionMinutes,
-    maxReschedulesPerBooking: row.maxReschedulesPerBooking,
-  });
+  return clinicSettingsInput.parse(row);
 }
 
 export async function saveClinicSettings(db: Executor, clock: Clock, input: ClinicSettings): Promise<ClinicSettings> {

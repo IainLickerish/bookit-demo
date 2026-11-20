@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getDatabase } from '@/db/client';
+import { cancelBookingPath, rescheduleBookingPath } from '@/lib/booking-links';
 import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
-import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
+import { isUuid, listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
@@ -16,14 +18,18 @@ function statusText(booking: BookingView): string {
 }
 
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
-  const patient = await requirePatient();
   const params = await searchParams;
+  const cancelId = single(params.cancel);
+  const patient = await requirePatient(isUuid(cancelId) ? cancelBookingPath(cancelId) : undefined);
   const notice = noticeText(single(params.notice));
   const error = errorText(single(params.error));
   const db = getDatabase();
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
+  if (cancelId && upcoming.some((booking) => booking.id === cancelId)) {
+    redirect(`/bookings#cancel-${cancelId}`);
+  }
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
 
   const row = (booking: BookingView, changeable: boolean) => (
@@ -45,14 +51,14 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       {changeable ? (
         <div className="flex gap-2">
           <Link
-            href={`/bookings/${booking.id}/reschedule`}
+            href={rescheduleBookingPath(booking.id)}
             prefetch={false}
             className="button-secondary"
             data-testid="reschedule-link"
           >
             Reschedule
           </Link>
-          <form action={cancelAction}>
+          <form id={`cancel-${booking.id}`} action={cancelAction}>
             <input type="hidden" name="bookingId" value={booking.id} />
             <button type="submit" className="button-secondary" data-testid="cancel-booking">
               Cancel
