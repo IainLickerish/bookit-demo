@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
@@ -10,13 +11,14 @@ import { requestLogger } from '@/server/request-context';
 
 export interface TimeBlockFormError {
   error: TimeBlockErrorCode;
-  field: keyof TimeBlockFields;
+  field: keyof TimeBlockFields | null;
   values: TimeBlockFields;
   attempt: number;
 }
 
 export async function saveTimeBlockAction(
   filterQuery: string,
+  displayedTimeZone: string,
   previous: TimeBlockFormError | null,
   form: FormData,
 ): Promise<TimeBlockFormError> {
@@ -34,11 +36,14 @@ export async function saveTimeBlockAction(
   const log = await requestLogger();
   let result: Awaited<ReturnType<typeof saveTimeBlock>>;
   try {
-    result = await saveTimeBlock(getDatabase(), getClock(), values);
+    result = await saveTimeBlock(getDatabase(), getClock(), displayedTimeZone, values);
   } catch (error) {
     throw withoutQueryDetails(error);
   }
-  if ('error' in result) return { ...result, values, attempt: (previous?.attempt ?? 0) + 1 };
+  if ('error' in result) {
+    if (result.error === 'time_zone_changed') revalidatePath('/admin');
+    return { ...result, values, attempt: (previous?.attempt ?? 0) + 1 };
+  }
   log.info({ event: 'admin.time_block_saved' }, 'Time block saved');
   const query = new URLSearchParams(filterQuery);
   query.set('timeBlock', result.id);

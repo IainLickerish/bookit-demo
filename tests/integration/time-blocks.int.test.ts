@@ -2,10 +2,12 @@ import { asc, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { bookings, timeBlocks } from '@/db/schema';
 import { newId } from '@/lib/ids';
+import { updateAdminSettings } from '@/server/admin/settings';
 import { loadTimeBlock, saveTimeBlock } from '@/server/admin/time-blocks';
 import { bookSlot, type BookingDependencies } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
+import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
 import { isSlotFree } from '@/server/slots/queries';
 import { seedClinic, type SeededClinic } from '../helpers/clinic';
@@ -42,8 +44,8 @@ function blockFields() {
   };
 }
 
-async function saveBlock(overrides: Partial<Parameters<typeof saveTimeBlock>[2]> = {}) {
-  const result = await saveTimeBlock(database.db, clock, { ...blockFields(), ...overrides });
+async function saveBlock(overrides: Partial<Parameters<typeof saveTimeBlock>[3]> = {}) {
+  const result = await saveTimeBlock(database.db, clock, clinic.settings.timeZone, { ...blockFields(), ...overrides });
   if (!('id' in result)) throw new Error(`Time block refused: ${result.error}`);
   return result.id;
 }
@@ -84,9 +86,44 @@ it('refuses invalid dates, unknown practitioners, reversed times and times durin
     [{ endsAt: '2026-10-25T01:30' }, 'clock_change'],
   ] as const;
   for (const [override, error] of invalid) {
-    expect(await saveTimeBlock(database.db, clock, { ...blockFields(), ...override })).toMatchObject({ error });
+    const fields = { ...blockFields(), ...override };
+    expect(await saveTimeBlock(database.db, clock, clinic.settings.timeZone, fields)).toMatchObject({ error });
   }
   expect(await database.db.select().from(timeBlocks)).toEqual([]);
+});
+
+it('requires staff to review the block again if the clinic changes time zone after the form opens', async () => {
+  const {
+    clinicName,
+    timeZone: displayedTimeZone,
+    lateCancellationHours,
+    includeContactInConfirmation,
+  } = await loadClinicSettings(database.db);
+  const fields = { ...blockFields(), reason: 'Training' };
+  const updatedTimeZone = 'Europe/Paris';
+  await updateAdminSettings(database.db, clock, {
+    clinicName,
+    timeZone: updatedTimeZone,
+    lateCancellationHours,
+    includeContactInConfirmation,
+  });
+
+  expect(await saveTimeBlock(database.db, clock, displayedTimeZone, fields)).toEqual({
+    error: 'time_zone_changed',
+    field: null,
+  });
+  expect(await database.db.select().from(timeBlocks)).toEqual([]);
+
+  const result = await saveTimeBlock(database.db, clock, updatedTimeZone, fields);
+  expect(result).toHaveProperty('id');
+  expect(await database.db.select().from(timeBlocks)).toMatchObject([
+    {
+      practitionerId: fields.practitionerId,
+      startsAt: new Date('2026-10-20T07:50:00Z'),
+      endsAt: new Date('2026-10-20T09:20:00Z'),
+      reason: fields.reason,
+    },
+  ]);
 });
 
 it('hides every overlapping slot for the blocked practitioner from the client day view', async () => {

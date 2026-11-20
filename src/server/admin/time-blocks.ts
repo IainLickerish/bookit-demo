@@ -19,13 +19,14 @@ export interface TimeBlockFields {
   reason: string;
 }
 
-export type TimeBlockErrorCode = keyof TimeBlockFields | 'order' | 'clock_change';
+export type TimeBlockErrorCode = keyof TimeBlockFields | 'order' | 'clock_change' | 'time_zone_changed';
 
 export async function saveTimeBlock(
   db: Database,
   clock: Clock,
+  displayedTimeZone: string,
   fields: Omit<TimeBlockFields, 'reason'> & { reason?: string },
-): Promise<{ id: string } | { error: TimeBlockErrorCode; field: keyof TimeBlockFields }> {
+): Promise<{ id: string } | { error: TimeBlockErrorCode; field: keyof TimeBlockFields | null }> {
   if (!isUuid(fields.practitionerId)) return { error: 'practitionerId', field: 'practitionerId' };
   if (!localMinute.safeParse(fields.startsAt).success || fields.startsAt.slice(0, 4) < '0100') {
     return { error: 'startsAt', field: 'startsAt' };
@@ -37,7 +38,9 @@ export async function saveTimeBlock(
   if (reason && reason.length > TIME_BLOCK_REASON_LIMIT) return { error: 'reason', field: 'reason' };
 
   return db.transaction(async (tx) => {
-    const { timeZone } = await loadClinicSettings(tx);
+    // Hold the settings row until the block is stored in the zone staff reviewed.
+    const { timeZone } = await loadClinicSettings(tx, 'share');
+    if (timeZone !== displayedTimeZone) return { error: 'time_zone_changed', field: null };
     const toInstant = (local: string) =>
       zonedTimeToUtc(local.slice(0, 10), local.slice(11), timeZone, { rejectAmbiguous: true });
     const startsAt = toInstant(fields.startsAt);

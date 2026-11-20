@@ -93,7 +93,7 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
         practitioners={practitioners.filter((person) => person.active).map(({ id, name }) => ({ id, name }))}
         timeZone={settings.timeZone}
         reasonLimit={TIME_BLOCK_REASON_LIMIT}
-        saveAction={saveTimeBlockAction.bind(null, exportQuery)}
+        saveAction={saveTimeBlockAction.bind(null, exportQuery, settings.timeZone)}
       />
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">
         <label>

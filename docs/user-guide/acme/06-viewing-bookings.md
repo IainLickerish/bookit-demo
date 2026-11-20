@@ -19,6 +19,7 @@ staff should use this page. Patients see their own appointments through **My boo
 
 In **Clinic bookings**, choose **Block out time**. Select the physiotherapist and enter the start and end in the
 clinic's time zone. Add a reason if you wish, then choose **Save time block**.
+If the clinic's time zone changes while the form is open, check the dates and times in the updated zone before saving again.
 
 Clients cannot book or move a session into any time that overlaps the block. If confirmed bookings overlap it,
 the warning lists each client's name and session time. The bookings stay confirmed. Contact the clients listed

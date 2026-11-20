@@ -18,8 +18,10 @@ export function TimeBlockForm({ practitioners, timeZone, reasonLimit, saveAction
 
   useEffect(() => {
     if (!state) return;
-    const invalidField = form.current?.elements.namedItem(state.field);
-    if (invalidField instanceof HTMLElement) invalidField.focus();
+    const target = state.field
+      ? form.current?.elements.namedItem(state.field)
+      : form.current?.querySelector('[role="alert"]');
+    if (target instanceof HTMLElement) target.focus();
   }, [state]);
 
   function fieldProps(field: keyof TimeBlockFields) {
@@ -47,11 +49,13 @@ export function TimeBlockForm({ practitioners, timeZone, reasonLimit, saveAction
         data-testid="time-block-form"
       >
         {state ? (
-          <p role="alert" className="alert" id="time-block-error" data-testid="time-block-error">
+          <p role="alert" tabIndex={-1} className="alert" id="time-block-error" data-testid="time-block-error">
             {TIME_BLOCK_ERRORS[state.error]}
           </p>
         ) : null}
-        <p className="text-sm">Use the clinic’s time zone ({timeZone}). Existing bookings will stay confirmed.</p>
+        <p className="text-sm" data-testid="time-block-time-zone">
+          Use the clinic’s time zone ({timeZone}). Existing bookings will stay confirmed.
+        </p>
         <label>
           Physiotherapist
           <select {...fieldProps('practitionerId')} className="min-h-11" required data-testid="time-block-practitioner">

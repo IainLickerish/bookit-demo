@@ -32,6 +32,7 @@ export const TIME_BLOCK_ERRORS: Record<TimeBlockErrorCode, string> = {
   reason: 'Shorten the reason to 500 characters or fewer.',
   order: 'Choose an end time after the start time.',
   clock_change: 'The clocks change at that time. Choose a different time.',
+  time_zone_changed: 'The clinic’s time zone has changed. Check the dates and times before saving again.',
 };
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
