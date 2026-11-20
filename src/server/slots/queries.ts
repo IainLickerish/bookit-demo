@@ -1,7 +1,10 @@
 import { and, asc, eq, gt, lte, notExists, sql } from 'drizzle-orm';
-import type { Executor } from '@/db/client';
-import { bookings, practitioners, slots } from '@/db/schema';
+import type { Executor, Transaction } from '@/db/client';
+import { bookings, practitioners, practitionerTimeBlocks, slots } from '@/db/schema';
+import { BookingError } from '../bookings/errors';
 import { isUuid } from '../bookings/queries';
+import { lockPractitionerSchedule } from '../practitioners';
+import { slotOverlaps } from './overlap';
 
 export interface SlotView {
   id: string;
@@ -50,6 +53,22 @@ const noConfirmedBooking = notExists(
   sql`(select 1 from ${bookings} where ${bookings.slotId} = ${slots.id} and ${bookings.status} = 'confirmed')`,
 );
 
+const noTimeBlock = notExists(sql`(
+  select 1 from ${practitionerTimeBlocks}
+  where ${practitionerTimeBlocks.practitionerId} = ${slots.practitionerId}
+    and ${slotOverlaps(practitionerTimeBlocks.startsAt, practitionerTimeBlocks.endsAt)}
+)`);
+
+export async function assertSlotNotBlocked(tx: Transaction, slot: SlotView): Promise<void> {
+  const practitioner = await lockPractitionerSchedule(tx, slot.practitionerId, 'share');
+  if (!practitioner?.active) throw new BookingError('slot_not_found');
+  const [available] = await tx
+    .select({ id: slots.id })
+    .from(slots)
+    .where(and(eq(slots.id, slot.id), noTimeBlock));
+  if (!available) throw new BookingError('slot_blocked');
+}
+
 export async function isSlotFree(db: Executor, slotId: string): Promise<boolean> {
   if (!isUuid(slotId)) {
     return false;
@@ -57,7 +76,7 @@ export async function isSlotFree(db: Executor, slotId: string): Promise<boolean>
   const [row] = await db
     .select({ id: slots.id })
     .from(slots)
-    .where(and(eq(slots.id, slotId), noConfirmedBooking));
+    .where(and(eq(slots.id, slotId), noConfirmedBooking, noTimeBlock));
   return row !== undefined;
 }
 
@@ -85,6 +104,7 @@ export async function listAvailableSlots(db: Executor, query: AvailableSlotsQuer
         gt(slots.startsAt, query.after),
         lte(slots.startsAt, query.until),
         noConfirmedBooking,
+        noTimeBlock,
       ),
     )
     .orderBy(asc(slots.startsAt));

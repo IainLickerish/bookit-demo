@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Executor } from '@/db/client';
 import { bookings, practitioners, slots, users } from '@/db/schema';
 import { addDaysToLocalDate, isLocalDate, startOfLocalDate } from '@/lib/time';
+import { slotOverlaps } from '../slots/overlap';
 
 export const bookingFiltersSchema = z.strictObject({
   practitionerId: z.uuid().optional(),
@@ -58,6 +59,32 @@ export async function listAdminBookings(db: Executor, filters: BookingFilters, t
 }
 
 export type AdminBooking = Awaited<ReturnType<typeof listAdminBookings>>[number];
+
+export async function listAffectedBookings(
+  db: Executor,
+  block: { practitionerId: string; startsAt: Date; endsAt: Date },
+) {
+  return db
+    .select({
+      id: bookings.id,
+      patientName: users.name,
+      patientEmail: users.email,
+      phone: bookings.phone,
+      startsAt: slots.startsAt,
+      endsAt: slots.endsAt,
+    })
+    .from(bookings)
+    .innerJoin(users, eq(users.id, bookings.patientId))
+    .innerJoin(slots, eq(slots.id, bookings.slotId))
+    .where(
+      and(
+        eq(slots.practitionerId, block.practitionerId),
+        eq(bookings.status, 'confirmed'),
+        slotOverlaps(block.startsAt, block.endsAt),
+      ),
+    )
+    .orderBy(asc(slots.startsAt), asc(bookings.id));
+}
 
 export async function listAdminPractitioners(db: Executor) {
   // Inactive practitioners remain filterable for historical bookings.

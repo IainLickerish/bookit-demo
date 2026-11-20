@@ -114,9 +114,15 @@ export function localTimeFromMinutes(minutes: number): string {
 /**
  * The instant at which the zone's wall clock shows the given local date and
  * time. Returns null for a local time skipped by a clock change. For a local
- * time that occurs twice (clocks going back), returns the earlier instant.
+ * time that occurs twice (clocks going back), returns the earlier instant
+ * unless the caller requires an unambiguous time.
  */
-export function zonedTimeToUtc(localDate: string, localTime: string, timeZone: string): Date | null {
+export function zonedTimeToUtc(
+  localDate: string,
+  localTime: string,
+  timeZone: string,
+  disambiguation: 'earlier' | 'unambiguous' = 'earlier',
+): Date | null {
   const [year, month, day] = parseLocalDate(localDate);
   const [hour, minute] = parseLocalTime(localTime);
   const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute);
@@ -133,7 +139,7 @@ export function zonedTimeToUtc(localDate: string, localTime: string, timeZone: s
     })
     .sort((a, b) => a - b);
   const first = matches[0];
-  return first === undefined ? null : new Date(first);
+  return first === undefined || (disambiguation === 'unambiguous' && matches.length !== 1) ? null : new Date(first);
 }
 
 export function localDateOf(instant: Date, timeZone: string): string {

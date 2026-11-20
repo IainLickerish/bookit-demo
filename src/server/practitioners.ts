@@ -1,5 +1,6 @@
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Executor } from '@/db/client';
+import type { Transaction, Executor } from '@/db/client';
 import { practitioners } from '@/db/schema';
 import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
@@ -22,6 +23,16 @@ export const newPractitionerInput = z
   );
 
 export type NewPractitioner = z.input<typeof newPractitionerInput>;
+
+/** Booking writers share the row lock. Saving a block takes it exclusively before checking bookings. */
+export async function lockPractitionerSchedule(tx: Transaction, id: string, mode: 'share' | 'no key update') {
+  const [practitioner] = await tx
+    .select({ name: practitioners.name, active: practitioners.active })
+    .from(practitioners)
+    .where(eq(practitioners.id, id))
+    .for(mode);
+  return practitioner;
+}
 
 export async function createPractitioner(db: Executor, clock: Clock, input: NewPractitioner): Promise<{ id: string }> {
   const practitioner = newPractitionerInput.parse(input);
