@@ -65,6 +65,7 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
           {filterEntries.map(([name, value]) => (
             <input key={name} type="hidden" name={name} value={value} />
           ))}
+          {/* Use the date from the URL when the browser restores this page. */}
           <label className="min-w-0">
             Workload date ({settings.timeZone})
             <input
@@ -72,6 +73,7 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
               type="date"
               name="workloadDate"
               defaultValue={workload?.date ?? today}
+              autoComplete="off"
               required
               aria-invalid={workload ? undefined : true}
               aria-describedby={workload ? undefined : 'workload-date-error'}

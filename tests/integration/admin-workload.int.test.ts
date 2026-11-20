@@ -87,7 +87,9 @@ it("shows the clinic's count of confirmed sessions for today by default", async 
 it('shows the count for another chosen day, including days with no confirmed sessions', async () => {
   const chosen = await bookingsPage({ workloadDate: '2026-10-26' });
   expect(chosen).toContain('Monday, 26 October 2026');
-  expect(chosen).toMatch(/data-testid="admin-workload-date"[^>]*value="2026-10-26"/);
+  const dateInput = chosen.match(/<input [^>]*data-testid="admin-workload-date"[^>]*>/)?.[0];
+  expect(dateInput).toContain('value="2026-10-26"');
+  expect(dateInput).toMatch(/autocomplete="off"/i);
   expect(chosen).toMatch(/data-testid="admin-workload-count"[^>]*>1 confirmed session</);
 
   const empty = await bookingsPage({ workloadDate: '2026-10-27' });
