@@ -42,23 +42,11 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           Show times
         </button>
       </form>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-line pt-4">
-        {view.date > view.today ? (
-          <Link
-            href={dayLink(previous)}
-            prefetch={false}
-            className="text-action justify-self-start"
-            data-testid="previous-day"
-          >
-            ← Previous day
-          </Link>
-        ) : (
-          <span />
-        )}
+      <div className="grid grid-cols-2 items-center gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_auto_1fr]">
         <time
           dateTime={view.date}
           aria-current={isToday ? 'date' : undefined}
-          className="day-current"
+          className="day-current col-span-2 row-start-1 justify-self-center sm:col-span-1 sm:col-start-2"
           data-testid="shown-date"
         >
           <span className="flex items-center gap-2">
@@ -67,18 +55,26 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
           </span>{' '}
           <span className="tabular-nums">{dateParts.join(' ')}</span>
         </time>
+        {view.date > view.today ? (
+          <Link
+            href={dayLink(previous)}
+            prefetch={false}
+            className="text-action col-start-1 row-start-2 justify-self-start sm:row-start-1"
+            data-testid="previous-day"
+          >
+            ← Previous day
+          </Link>
+        ) : null}
         {view.date < view.lastDate ? (
           <Link
             href={dayLink(next)}
             prefetch={false}
-            className="text-action justify-self-end text-right"
+            className="text-action col-start-2 row-start-2 justify-self-end text-right sm:col-start-3 sm:row-start-1"
             data-testid="next-day"
           >
             Next day →
           </Link>
-        ) : (
-          <span />
-        )}
+        ) : null}
       </div>
     </div>
   );

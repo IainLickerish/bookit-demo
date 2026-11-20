@@ -58,7 +58,7 @@ describe('BookIt page appearance', () => {
     };
     for (const path of ['/slots', '/bookings/example/reschedule']) {
       const today = renderToStaticMarkup(createElement(DayPicker, { view, path }));
-      expect(today).toMatch(/<time[^>]*datetime="2026-11-20"[^>]*aria-current="date"[^>]*class="day-current"/i);
+      expect(today).toMatch(/<time[^>]*datetime="2026-11-20"[^>]*aria-current="date"[^>]*class="day-current\b/i);
       expect(today).toMatch(/<span[^>]*class="[^"]*bg-clay[^"]*"[^>]*aria-hidden="true"/);
       expect(today).toContain(`href="${path}?practitioner=pat&amp;date=2026-11-21"`);
       expect(today).not.toContain('data-testid="previous-day"');

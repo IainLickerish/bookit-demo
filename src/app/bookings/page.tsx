@@ -51,7 +51,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           </p>
           <p className="text-muted">With {booking.practitionerName}</p>
         </div>
-        <span className="status-pill" data-status={booking.status} data-testid="booking-status">
+        <span className="status-pill ml-auto" data-status={booking.status} data-testid="booking-status">
           {statusText(booking)}
         </span>
       </div>
