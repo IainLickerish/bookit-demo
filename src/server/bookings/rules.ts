@@ -67,6 +67,10 @@ export interface ReschedulableBooking {
   rescheduleCount: number;
 }
 
+export function isUpcomingBooking(booking: Pick<ReschedulableBooking, 'status' | 'startsAt'>, now: Date): boolean {
+  return booking.status === 'confirmed' && booking.startsAt > now;
+}
+
 /** Checks the booking may move; the target slot is checked separately. */
 export function assertReschedulable(
   booking: ReschedulableBooking,

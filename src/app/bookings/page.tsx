@@ -3,6 +3,7 @@ import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
+import { isUpcomingBooking } from '@/server/bookings/rules';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
@@ -15,16 +16,35 @@ function statusText(booking: BookingView): string {
   return booking.lateCancellation ? 'Cancelled (late)' : 'Cancelled';
 }
 
+function CalendarDownload({ bookingId, confirmation = false }: { bookingId: string; confirmation?: boolean }) {
+  return (
+    <a
+      href={`/bookings/${bookingId}/calendar`}
+      download
+      className="inline-flex min-h-11 items-center text-sm underline focus-visible:outline-2 focus-visible:outline-teal-700"
+      aria-describedby={`booking-when-${bookingId}`}
+      data-testid={confirmation ? 'add-to-calendar-confirmation' : 'add-to-calendar'}
+    >
+      Add to calendar
+    </a>
+  );
+}
+
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   const patient = await requirePatient();
   const params = await searchParams;
-  const notice = noticeText(single(params.notice));
+  const noticeCode = single(params.notice);
+  const notice = noticeText(noticeCode);
   const error = errorText(single(params.error));
   const db = getDatabase();
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
   const now = getClock().now();
-  const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
+  const upcoming = bookings.filter((b) => isUpcomingBooking(b, now));
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
+  const confirmedBooking =
+    noticeCode === 'booked' || noticeCode === 'rescheduled'
+      ? upcoming.find((booking) => booking.id === single(params.booking))
+      : undefined;
 
   const row = (booking: BookingView, changeable: boolean) => (
     <li
@@ -35,12 +55,13 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       data-status={booking.status}
     >
       <div>
-        <p className="font-medium" data-testid="booking-when">
+        <p id={`booking-when-${booking.id}`} className="font-medium" data-testid="booking-when">
           {formatSlot(booking.startsAt, settings.timeZone)}
         </p>
         <p className="text-sm text-slate-600">
           With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
         </p>
+        {changeable ? <CalendarDownload bookingId={booking.id} /> : null}
       </div>
       {changeable ? (
         <div className="flex gap-2">
@@ -67,9 +88,12 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
     <section>
       <h1>My bookings</h1>
       {notice ? (
-        <p role="status" className="notice" data-testid="notice">
-          {notice}
-        </p>
+        <div className="notice flex flex-wrap items-center gap-x-4">
+          <p role="status" data-testid="notice">
+            {notice}
+          </p>
+          {confirmedBooking ? <CalendarDownload bookingId={confirmedBooking.id} confirmation /> : null}
+        </div>
       ) : null}
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">
