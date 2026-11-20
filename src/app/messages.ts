@@ -9,6 +9,15 @@ const NOTICES = {
 
 export type NoticeCode = keyof typeof NOTICES;
 
+export const TIME_BLOCK_MESSAGES = {
+  invalid_fields: 'Choose a physiotherapist and enter valid dates and times. Keep the reason to 240 characters.',
+  invalid_practitioner: 'This physiotherapist is no longer available. Choose another.',
+  invalid_range: 'The end must be after the start. Check the dates and times and try again.',
+  clock_change: 'A time you entered is skipped or repeated when the clocks change. Choose a different time.',
+  review_changed: 'The details have changed since your last review. Check them again before saving.',
+  saved: 'Time block saved.',
+} as const;
+
 export function single(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }

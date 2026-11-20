@@ -32,9 +32,17 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   return (
     <section>
       <h1>Clinic bookings</h1>
-      <p>
+      <p className="flex flex-wrap gap-x-4 gap-y-2">
         <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
           Clinic settings
+        </Link>
+        <Link
+          href="/admin/settings#time-blocks"
+          prefetch={false}
+          className="underline"
+          data-testid="admin-block-time-link"
+        >
+          Block time
         </Link>
       </p>
       <form method="get" action="/admin" className="my-6 grid gap-4 sm:grid-cols-3">

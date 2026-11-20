@@ -1,13 +1,21 @@
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { requireAdmin } from '@/server/admin/context';
+import { TIME_BLOCK_REASON_LIMIT } from '@/server/admin/time-block-input';
 import { loadClinicSettings } from '@/server/settings';
+import { listActivePractitioners } from '@/server/slots/queries';
 import type { SearchParams } from '../../messages';
 import { saveSettingsAction } from './actions';
+import { TimeBlockForm } from './time-block-form';
 
 export default async function AdminSettingsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
-  const [settings, params] = await Promise.all([loadClinicSettings(getDatabase()), searchParams]);
+  const db = getDatabase();
+  const [settings, params, practitioners] = await Promise.all([
+    loadClinicSettings(db),
+    searchParams,
+    listActivePractitioners(db),
+  ]);
   return (
     <section>
       <h1>Clinic settings</h1>
@@ -74,6 +82,21 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           Save settings
         </button>
       </form>
+      <section
+        id="time-blocks"
+        aria-labelledby="time-block-heading"
+        className="mt-8 max-w-xl border-t border-slate-300 pt-6"
+      >
+        <h2 id="time-block-heading" className="mt-0">
+          Block time
+        </h2>
+        <p>Block time when a physiotherapist is away.</p>
+        <TimeBlockForm
+          practitioners={practitioners.map(({ id, name }) => ({ id, name }))}
+          timeZone={settings.timeZone}
+          reasonLimit={TIME_BLOCK_REASON_LIMIT}
+        />
+      </section>
     </section>
   );
 }
