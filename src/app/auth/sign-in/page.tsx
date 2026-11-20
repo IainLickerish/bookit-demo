@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { FORGOT_PASSWORD_PATH } from '@/lib/routes';
 import { currentUser } from '@/server/request-context';
 import { single, type SearchParams } from '../../messages';
+import { Notice } from '../../notice';
+import { PageHeader } from '../../page-header';
 import { signIn } from '../actions';
 
 export default async function SignInPage({ searchParams }: { searchParams: SearchParams }) {
@@ -13,17 +15,17 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
   const error = single(query.error);
   const passwordReset = single(query.notice) === 'password_reset';
   return (
-    <section className="max-w-sm">
-      <h1>Sign in</h1>
+    <section className="page page-narrow card card-accent">
+      <PageHeader title="Sign in" />
       {passwordReset ? (
-        <p role="status" className="notice" data-testid="sign-in-notice">
+        <Notice kind="notice" testId="sign-in-notice">
           Your password has been changed. Sign in with your new password.
-        </p>
+        </Notice>
       ) : null}
       {error === 'invalid' ? (
-        <p role="alert" className="alert" data-testid="sign-in-error">
+        <Notice kind="alert" testId="sign-in-error">
           The email address or password is not correct.
-        </p>
+        </Notice>
       ) : null}
       <form action={signIn} className="space-y-4">
         <label>
@@ -40,15 +42,13 @@ export default async function SignInPage({ searchParams }: { searchParams: Searc
             data-testid="sign-in-password"
           />
         </label>
-        <button type="submit" className="button" data-testid="sign-in-submit">
+        <button type="submit" className="button w-full" data-testid="sign-in-submit">
           Sign in
         </button>
       </form>
-      <p className="mt-4">
-        <Link href={FORGOT_PASSWORD_PATH} data-testid="forgot-password-link">
-          Forgot your password?
-        </Link>
-      </p>
+      <Link href={FORGOT_PASSWORD_PATH} className="text-action" data-testid="forgot-password-link">
+        Forgot your password?
+      </Link>
     </section>
   );
 }

@@ -8,6 +8,8 @@ import { isResetTokenUsable } from '@/server/auth/password-reset';
 import { MIN_PASSWORD_LENGTH } from '@/server/auth/password';
 import { requestLogger } from '@/server/request-context';
 import { single, type SearchParams } from '../../../messages';
+import { Notice } from '../../../notice';
+import { PageHeader } from '../../../page-header';
 import { completePasswordResetAction } from '../../password-reset-actions';
 
 // The token is in this page's URL: never send it to another site as a Referer.
@@ -32,26 +34,26 @@ export default async function ResetPasswordPage({
   );
   if (!usable) {
     return (
-      <section className="max-w-sm">
-        <h1>Reset your password</h1>
-        <p role="alert" className="alert" data-testid="reset-password-invalid">
+      <section className="page page-narrow card card-accent">
+        <PageHeader title="Reset your password" />
+        <Notice kind="alert" testId="reset-password-invalid">
           This reset link has expired or has already been used.
-        </p>
-        <p>
-          <Link href={FORGOT_PASSWORD_PATH}>Request a new link</Link>
-        </p>
+        </Notice>
+        <Link href={FORGOT_PASSWORD_PATH} className="button">
+          Request a new link
+        </Link>
       </section>
     );
   }
   const error = single((await searchParams).error);
   const message = error !== undefined && Object.hasOwn(ERRORS, error) ? ERRORS[error] : null;
   return (
-    <section className="max-w-sm">
-      <h1>Choose a new password</h1>
+    <section className="page page-narrow card card-accent">
+      <PageHeader title="Choose a new password" />
       {message ? (
-        <p role="alert" className="alert" data-testid="reset-password-error">
+        <Notice kind="alert" testId="reset-password-error">
           {message}
-        </p>
+        </Notice>
       ) : null}
       <form action={completePasswordResetAction} className="space-y-4">
         <input type="hidden" name="token" value={token} />
@@ -77,7 +79,7 @@ export default async function ResetPasswordPage({
             data-testid="reset-password-confirm"
           />
         </label>
-        <button type="submit" className="button" data-testid="reset-password-submit">
+        <button type="submit" className="button w-full" data-testid="reset-password-submit">
           Set new password
         </button>
       </form>

@@ -1,32 +1,201 @@
 @import 'tailwindcss';
+@import './fonts/fonts.css';
+
+@theme {
+  --font-sans: 'Figtree', system-ui, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+  --color-ivory: #faf8f4;
+  --color-ink: #16241f;
+  --color-muted: #5a6862;
+  --color-line: #e6e1d8;
+  --color-field: #8c9792;
+  --color-stone: #f1eee8;
+  --color-pine: #1d5c4b;
+  --color-pine-hover: #164a3c;
+  --color-sage: #e9f1ec;
+  --color-clay: #b9603f;
+  --color-clay-tint: #f8e9e1;
+  --color-attention: #92400e;
+  --color-attention-tint: #fdf3e2;
+  --color-brick: #a8261b;
+  --color-brick-tint: #fcebe8;
+}
 
 @layer base {
+  body {
+    @apply min-h-screen bg-ivory font-sans text-base leading-[1.6] text-ink;
+    overflow-wrap: anywhere;
+  }
+
+  h1,
+  h2,
+  .clinic-name {
+    @apply font-serif leading-tight font-medium tracking-[-0.025em];
+  }
+
   h1 {
-    @apply mb-4 text-2xl font-semibold;
+    @apply text-[1.75rem] sm:text-[2rem];
   }
+
   h2 {
-    @apply mt-6 mb-2 text-lg font-semibold;
+    @apply text-[1.375rem];
   }
+
+  a {
+    @apply text-pine underline decoration-1 underline-offset-4 hover:text-pine-hover;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: 3px;
+  }
+
   label {
-    @apply block text-sm font-medium;
+    @apply block text-[0.9375rem] font-medium;
   }
-  input,
+
+  input:not([type='hidden'], [type='checkbox']),
   select {
-    @apply mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2;
+    @apply mt-2 block min-h-12 w-full min-w-0 rounded-xl border border-field bg-white px-3 text-base text-ink;
+  }
+
+  input[type='checkbox'] {
+    @apply size-5 shrink-0 accent-pine;
+  }
+
+  button {
+    @apply cursor-pointer;
   }
 }
 
 @layer components {
-  .button {
-    @apply inline-block rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800;
+  .site-shell {
+    width: min(100%, calc(45rem + 2 * var(--gutter)));
+    padding-inline: var(--gutter);
+    margin-inline: auto;
+    --gutter: 1.25rem;
+
+    @media (width >= 40rem) {
+      --gutter: 2rem;
+    }
   }
+
+  .site-shell-wide {
+    width: min(100%, calc(70rem + 2 * var(--gutter)));
+  }
+
+  .site-header {
+    @apply border-b border-line bg-white;
+  }
+
+  .clinic-name {
+    @apply inline-flex min-h-11 min-w-0 items-center text-2xl no-underline;
+  }
+
+  .nav-link,
+  .text-action {
+    @apply inline-flex min-h-11 max-w-full items-center text-[0.9375rem] font-medium text-pine underline underline-offset-4 hover:text-pine-hover;
+  }
+
+  .nav-link {
+    @apply rounded-full px-3 no-underline hover:bg-stone hover:underline;
+  }
+
+  .page {
+    @apply mx-auto max-w-[45rem] space-y-8;
+  }
+
+  .page-wide {
+    @apply max-w-none;
+  }
+
+  .page-narrow {
+    @apply max-w-[27.5rem] space-y-6;
+  }
+
+  .page-header {
+    @apply space-y-2;
+  }
+
+  .page-header p {
+    @apply text-muted;
+  }
+
+  .card {
+    @apply rounded-[1.25rem] border border-line bg-white p-6;
+    box-shadow:
+      0 2px 4px rgb(22 36 31 / 3%),
+      0 12px 28px rgb(22 36 31 / 5%);
+  }
+
+  .card-accent {
+    background-image:
+      radial-gradient(circle at 10px 10px, var(--color-clay) 0 3px, transparent 3.5px),
+      radial-gradient(circle at 28px 0, var(--color-sage) 0 17px, transparent 17.5px);
+    background-position: top right;
+    background-size: 28px 28px;
+    background-repeat: no-repeat;
+  }
+
+  .button,
   .button-secondary {
-    @apply inline-block rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100;
+    @apply inline-flex min-h-12 max-w-full items-center justify-center rounded-full border px-4 py-2 text-center text-[0.9375rem] leading-snug font-medium no-underline;
   }
-  .notice {
-    @apply mb-4 rounded border border-teal-200 bg-teal-50 px-4 py-3 text-sm;
+
+  .button {
+    @apply border-pine bg-pine text-white hover:border-pine-hover hover:bg-pine-hover hover:text-white;
   }
+
+  .button-secondary {
+    @apply border-field bg-white text-pine hover:bg-stone hover:text-pine-hover;
+  }
+
+  .notice,
   .alert {
-    @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
+    @apply flex items-start gap-3 rounded-xl px-4 py-3;
+  }
+
+  .notice {
+    @apply bg-sage text-pine;
+  }
+
+  .alert {
+    @apply bg-brick-tint text-brick;
+  }
+
+  .day-current {
+    @apply flex flex-col items-center justify-center gap-1 rounded-xl border border-pine bg-stone px-3 py-2 text-center text-[0.9375rem] font-medium;
+  }
+
+  .status-pill {
+    @apply inline-flex w-fit items-center rounded-full px-3 py-1 text-[0.8125rem] leading-snug font-semibold;
+  }
+
+  .status-confirmed {
+    @apply bg-sage text-pine;
+  }
+
+  .status-cancelled {
+    @apply bg-stone text-muted;
+  }
+
+  .booking-table th,
+  .booking-table td {
+    @apply px-4 py-3;
+  }
+
+  @media (width < 40rem) {
+    .with-booking-action {
+      padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    }
+
+    .booking-action {
+      @apply fixed inset-x-0 bottom-0 z-10 flex justify-center border-t border-line bg-white px-5 pt-3;
+      padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    }
+
+    .booking-action .button {
+      @apply w-full max-w-[27.5rem];
+    }
   }
 }
