@@ -1,17 +1,14 @@
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getDatabase } from '@/db/client';
+import { bookingSignInPath } from '@/lib/booking-links';
 import { getClock } from '@/lib/clock';
 import { getLogger, type Logger } from '@/lib/logger';
 import { REQUEST_ID_HEADER, ROUTE_HEADER } from '@/lib/request-id';
 import { findSessionUser, SESSION_COOKIE } from './auth/session';
 import type { BookingDependencies } from './bookings/book';
-import type { MailSettings } from './notifications/deliver';
-import { getMailer } from './notifications/mailer';
+import { mailSettings } from './notifications/deliver';
 import type { PublicUser } from './users';
-
-/** The sender when BOOKIT_MAIL_FROM is unset; each tenant's container sets its own (plan 12.3 article 05). */
-const DEFAULT_MAIL_FROM = 'noreply@bookit.test';
 
 /** The logger for the current request, carrying its request ID and route. */
 export async function requestLogger(): Promise<Logger> {
@@ -20,10 +17,6 @@ export async function requestLogger(): Promise<Logger> {
     request_id: incoming.get(REQUEST_ID_HEADER) ?? 'none',
     route: incoming.get(ROUTE_HEADER) ?? 'unknown',
   });
-}
-
-export function mailSettings(): MailSettings {
-  return { mailer: getMailer(), from: (process.env.BOOKIT_MAIL_FROM ?? '').trim() || DEFAULT_MAIL_FROM };
 }
 
 export async function bookingDependencies(): Promise<BookingDependencies> {
@@ -51,10 +44,10 @@ export async function currentUser(): Promise<PublicUser | null> {
 }
 
 /** The signed-in patient; anyone else is sent to the sign-in page. */
-export async function requirePatient(): Promise<PublicUser> {
+export async function requirePatient(returnTo?: string): Promise<PublicUser> {
   const user = await currentUser();
   if (!user) {
-    redirect('/auth/sign-in');
+    redirect(bookingSignInPath(returnTo));
   }
   if (user.role !== 'patient') {
     redirect('/');

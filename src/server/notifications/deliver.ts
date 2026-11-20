@@ -1,6 +1,6 @@
 import { emailHash, type Logger } from '@/lib/logger';
 import { reportError } from '../error-reporting';
-import type { Mailer, OutgoingEmail } from './mailer';
+import { getMailer, type Mailer, type OutgoingEmail } from './mailer';
 
 export interface MailSettings {
   mailer: Mailer;
@@ -8,7 +8,12 @@ export interface MailSettings {
   from: string;
 }
 
-export type EmailKind = 'confirmation' | 'password_reset';
+export function mailSettings(): MailSettings {
+  const from = (process.env.BOOKIT_MAIL_FROM ?? '').trim() || 'noreply@bookit.test';
+  return { mailer: getMailer(), from };
+}
+
+export type EmailKind = 'confirmation' | 'password_reset' | 'reminder';
 
 /**
  * Sends one email and logs `email.<kind>.sent` or `email.<kind>.failed` with
