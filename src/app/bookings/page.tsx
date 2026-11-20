@@ -6,6 +6,8 @@ import { listBookingsForPatient, type BookingView } from '@/server/bookings/quer
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { errorText, noticeText, single, type SearchParams } from '../messages';
+import { Notice } from '../notice';
+import { PageHeader } from '../page-header';
 import { cancelAction } from './actions';
 
 function statusText(booking: BookingView): string {
@@ -25,25 +27,36 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
+  const dateTile = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: settings.timeZone });
 
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+      className="card grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-4 sm:gap-x-4"
       data-testid="booking-row"
       data-booking-id={booking.id}
       data-status={booking.status}
     >
-      <div>
-        <p className="font-medium" data-testid="booking-when">
-          {formatSlot(booking.startsAt, settings.timeZone)}
-        </p>
-        <p className="text-sm text-slate-600">
-          With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
-        </p>
+      <div
+        className="w-14 rounded-xl bg-sage px-2 py-2 text-center text-[0.8125rem] leading-snug font-semibold whitespace-pre-line text-pine tabular-nums first-line:text-xl"
+        aria-hidden="true"
+        data-testid="booking-date-tile"
+      >
+        {dateTile.format(booking.startsAt).replace(' ', '\n')}
+      </div>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div>
+          <p className="text-lg font-semibold tabular-nums" data-testid="booking-when">
+            {formatSlot(booking.startsAt, settings.timeZone)}
+          </p>
+          <p className="text-muted">With {booking.practitionerName}</p>
+        </div>
+        <span className="status-pill" data-status={booking.status} data-testid="booking-status">
+          {statusText(booking)}
+        </span>
       </div>
       {changeable ? (
-        <div className="flex gap-2">
+        <div className="col-span-full flex flex-wrap gap-2 sm:col-start-2">
           <Link
             href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
@@ -64,39 +77,41 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   );
 
   return (
-    <section>
-      <h1>My bookings</h1>
+    <section className="page">
+      <PageHeader title="My bookings" />
       {notice ? (
-        <p role="status" className="notice" data-testid="notice">
+        <Notice kind="notice" testId="notice">
           {notice}
-        </p>
+        </Notice>
       ) : null}
       {error ? (
-        <p role="alert" className="alert" data-testid="booking-error">
+        <Notice kind="alert" testId="booking-error">
           {error}
-        </p>
+        </Notice>
       ) : null}
-      <h2>Upcoming</h2>
-      {upcoming.length === 0 ? (
-        <p data-testid="no-upcoming">
-          You have no upcoming appointments.{' '}
-          <Link href="/slots" prefetch={false} className="underline">
-            Book one
-          </Link>
-          .
-        </p>
-      ) : (
-        <ul className="space-y-2" data-testid="upcoming-bookings">
-          {upcoming.map((b) => row(b, true))}
-        </ul>
-      )}
+      <section className="space-y-4">
+        <h2>Upcoming</h2>
+        {upcoming.length === 0 ? (
+          <p className="card card-accent" data-testid="no-upcoming">
+            You have no upcoming appointments.{' '}
+            <Link href="/slots" prefetch={false} className="text-action">
+              Book one
+            </Link>
+            .
+          </p>
+        ) : (
+          <ul className="space-y-4" data-testid="upcoming-bookings">
+            {upcoming.map((b) => row(b, true))}
+          </ul>
+        )}
+      </section>
       {others.length > 0 ? (
-        <>
+        <section className="space-y-4">
           <h2>Past and cancelled</h2>
-          <ul className="space-y-2" data-testid="other-bookings">
+          <ul className="space-y-4" data-testid="other-bookings">
             {others.map((b) => row(b, false))}
           </ul>
-        </>
+        </section>
       ) : null}
     </section>
   );

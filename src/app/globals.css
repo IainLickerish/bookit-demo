@@ -171,11 +171,11 @@
     @apply inline-flex w-fit items-center rounded-full px-3 py-1 text-[0.8125rem] leading-snug font-semibold;
   }
 
-  .status-confirmed {
+  .status-pill[data-status='confirmed'] {
     @apply bg-sage text-pine;
   }
 
-  .status-cancelled {
+  .status-pill[data-status='cancelled'] {
     @apply bg-stone text-muted;
   }
 

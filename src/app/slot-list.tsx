@@ -12,11 +12,15 @@ export function SlotList({
   renderChoice: (slot: SlotView, label: string) => ReactNode;
 }) {
   if (slots.length === 0) {
-    return <p data-testid="no-slots">No free times on this day. Try another day.</p>;
+    return (
+      <p className="card text-muted" role="status" data-testid="no-slots">
+        No free times on this day. Try another day.
+      </p>
+    );
   }
 
   return (
-    <ul className="grid gap-2 sm:grid-cols-2" data-testid="slot-list">
+    <ul className="card grid gap-2 sm:grid-cols-2" data-testid="slot-list">
       {slots.map((slot) => (
         <li key={slot.id}>{renderChoice(slot, formatSlot(slot.startsAt, timeZone))}</li>
       ))}
