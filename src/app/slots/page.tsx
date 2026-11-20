@@ -15,9 +15,10 @@ export default async function SlotsPage({ searchParams }: { searchParams: Search
     date: single(params.date),
   });
   return (
-    <section>
-      <h1>Book an appointment</h1>
-      <DayPicker view={view} path="/slots" />
+    <section className="mx-auto max-w-[720px]">
+      <h1 className="mb-2 text-[28px] sm:text-[32px]">Book a session</h1>
+      <p className="mb-6">Choose your physiotherapist, day and time.</p>
+      <DayPicker view={view} path="/slots" forNewBooking />
       <SlotList
         slots={view.slots}
         timeZone={view.settings.timeZone}
@@ -25,12 +26,12 @@ export default async function SlotsPage({ searchParams }: { searchParams: Search
           <Link
             href={`/book/${slot.id}`}
             prefetch={false}
-            className="button-secondary block text-center"
+            className="button-secondary booking-control flex items-center justify-center border-slate-500 text-center text-lg font-semibold tabular-nums"
             data-testid="slot-link"
             data-slot-id={slot.id}
             data-starts-at={slot.startsAt.toISOString()}
           >
-            {label}
+            <time dateTime={slot.startsAt.toISOString()}>{label}</time>
           </Link>
         )}
       />
