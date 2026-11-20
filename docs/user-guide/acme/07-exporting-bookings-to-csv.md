@@ -7,9 +7,10 @@ audience: admin
 
 # Exporting Acme Physio bookings
 
-Open the clinic bookings page at `/admin`, select the required filters and choose
-**Export CSV**. The downloaded file contains the same filtered bookings. Open it
-in a spreadsheet using UTF-8 so accented patient names display correctly.
+Open **Clinic bookings**, select the filters you need and choose **Filter bookings**.
+Choose **Export filtered bookings (CSV)** to download the bookings in the list.
+Open the file in a spreadsheet using UTF-8 to see client names as they appear in the list,
+including accents and other non-English letters.
 
 Commas, quotation marks and line breaks in fields are quoted in the CSV. Values
 that could be interpreted as spreadsheet formulas are treated as text. Store
