@@ -36,11 +36,11 @@ export async function deliverEmail(
     );
     return true;
   } catch (error) {
-    log.error(
-      { event: `email.${kind}.failed`, ...fields, error_name: error instanceof Error ? error.name : 'unknown' },
-      'Email failed',
-    );
-    reportError(error, { operation: `${kind}_email` });
+    const errorName = error instanceof Error ? error.name : 'unknown';
+    log.error({ event: `email.${kind}.failed`, ...fields, error_name: errorName }, 'Email failed');
+    // SMTP error messages can contain recipient addresses.
+    const reported = kind === 'reminder' ? new Error('Session reminder could not be sent.') : error;
+    reportError(reported, { operation: `${kind}_email` });
     return false;
   }
 }

@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { addHours } from '@/lib/time';
 import { bookSlot } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { rescheduleBooking } from '@/server/bookings/reschedule';
+import * as errorReporting from '@/server/error-reporting';
 import { sendDueReminders } from '@/server/notifications/reminders';
 import { saveClinicSettings } from '@/server/settings';
 import { listAvailableSlots } from '@/server/slots/queries';
@@ -57,6 +58,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await database?.stop();
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 beforeEach(async () => {
   clock.set(start);
@@ -154,12 +157,13 @@ it('sends nothing while reminders are off and skips sessions that have already s
   expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient2.email]);
 });
 
-it('does not send twice if the mail connection drops after accepting the reminder', async () => {
+it('does not send twice or report a client address if SMTP disconnects after acceptance', async () => {
   await bookAt('2026-10-22T08:00:00.000Z');
+  const report = vi.spyOn(errorReporting, 'reportError').mockImplementation(() => undefined);
   const accept = mailer.send;
   mailer.send = async (email) => {
     await accept(email);
-    throw new Error('Test disconnect after acceptance');
+    throw new Error(`Test disconnect after sending to ${email.to}`);
   };
   clock.set('2026-10-21T08:00:00Z');
   await sendDueReminders(deps());
@@ -168,4 +172,8 @@ it('does not send twice if the mail connection drops after accepting the reminde
   expect(logs.events().filter((event) => typeof event === 'string' && event.startsWith('email.reminder.'))).toEqual([
     'email.reminder.failed',
   ]);
+  expect(JSON.stringify(logs.lines)).not.toContain(clinic.patient1.email);
+  expect(report).toHaveBeenCalledWith(new Error('Session reminder could not be sent.'), {
+    operation: 'reminder_email',
+  });
 });
