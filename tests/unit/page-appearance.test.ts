@@ -65,7 +65,7 @@ describe('BookIt page appearance', () => {
     ['notice', 'status', 'Booking confirmed.'],
     ['alert', 'alert', 'This time is no longer available.'],
   ] as const)('announces the shared %s text and hides its icon', (kind, role, message) => {
-    const markup = renderToStaticMarkup(createElement(Notice, { kind, testId: 'booking-message' }, message));
+    const markup = renderToStaticMarkup(createElement(Notice, { kind, testId: 'booking-message', children: message }));
     expect(markup).toContain(`role="${role}"`);
     expect(markup).toContain(`class="${kind}"`);
     expect(markup).toMatch(/<svg\b[^>]*aria-hidden="true"/);
