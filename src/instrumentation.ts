@@ -2,6 +2,10 @@ export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { runStartupChecks } = await import('./server/startup');
     runStartupChecks();
+    if (process.env.NEXT_PHASE !== 'phase-production-build' && process.env.DATABASE_URL) {
+      const { startReminderWorker } = await import('./server/notifications/reminder-worker');
+      startReminderWorker();
+    }
   }
 }
 

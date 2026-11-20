@@ -1,6 +1,31 @@
 export const FORGOT_PASSWORD_PATH = '/auth/forgot-password';
 export const RESET_PASSWORD_PREFIX = '/auth/reset-password/';
 
+export function rescheduleBookingPath(bookingId: string): string {
+  return `/bookings/${bookingId}/reschedule`;
+}
+
+export function bookingRowId(bookingId: string): string {
+  return `booking-${bookingId}`;
+}
+
+const UUID = '[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
+const bookingDestination = new RegExp(`^/bookings(?:/${UUID}/reschedule|#booking-${UUID})$`);
+
+/** Only the two booking destinations in reminders are valid sign-in redirects. */
+export function signInBookingDestination(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const match = bookingDestination.exec(value);
+  return match?.[0] === value ? value : undefined;
+}
+
+export function signInPath(options: { next?: string; error?: 'invalid' } = {}): string {
+  const query = new URLSearchParams();
+  if (options.next) query.set('next', options.next);
+  if (options.error) query.set('error', options.error);
+  return query.size ? `/auth/sign-in?${query}` : '/auth/sign-in';
+}
+
 export function resetPasswordPath(token: string): string {
   return `${RESET_PASSWORD_PREFIX}${encodeURIComponent(token)}`;
 }

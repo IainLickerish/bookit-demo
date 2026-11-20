@@ -43,7 +43,6 @@ describe('REQ-18.2-01 tenant configuration boundaries', () => {
       sessionMinutes: 45,
       maxReschedulesPerBooking: 3,
       includeContactInConfirmation: true,
-      remindersEnabled: false,
     });
     expect(tenant.allowedSenderDomains).toEqual([tenant.domain]);
     expect(tenant.allowedSenderDomains).not.toContain(`patients.${tenant.domain}`);

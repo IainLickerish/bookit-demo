@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
+import { signInBookingDestination, signInPath } from '@/lib/routes';
 import { authenticate, createSession, deleteSession, SESSION_COOKIE, SESSION_TTL_HOURS } from '@/server/auth/session';
 import { withoutQueryDetails } from '@/server/errors';
 import { requestLogger, secureCookies } from '@/server/request-context';
@@ -11,8 +12,10 @@ import { requestLogger, secureCookies } from '@/server/request-context';
 export async function signIn(formData: FormData): Promise<void> {
   const email = formData.get('email');
   const password = formData.get('password');
+  const next = signInBookingDestination(formData.get('next'));
+  const invalid = signInPath({ next, error: 'invalid' });
   if (typeof email !== 'string' || typeof password !== 'string' || password === '') {
-    redirect('/auth/sign-in?error=invalid');
+    redirect(invalid);
   }
   const log = await requestLogger();
   let destination: string;
@@ -21,7 +24,7 @@ export async function signIn(formData: FormData): Promise<void> {
     const user = await authenticate(db, email, password);
     if (!user) {
       log.info({ event: 'auth.sign_in.failed' }, 'Sign-in failed');
-      destination = '/auth/sign-in?error=invalid';
+      destination = invalid;
     } else {
       const session = await createSession(db, getClock(), user.id);
       // maxAge rather than an absolute expiry: a test-clock build's virtual
@@ -34,7 +37,7 @@ export async function signIn(formData: FormData): Promise<void> {
         maxAge: SESSION_TTL_HOURS * 60 * 60,
       });
       log.info({ event: 'auth.sign_in.succeeded', user_id: user.id, role: user.role }, 'Signed in');
-      destination = user.role === 'patient' ? '/bookings' : '/';
+      destination = user.role === 'patient' ? (next ?? '/bookings') : '/';
     }
   } catch (error) {
     throw withoutQueryDetails(error);

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
 import { getClock } from '@/lib/clock';
+import { bookingRowId, rescheduleBookingPath } from '@/lib/routes';
 import { formatSlot } from '@/lib/time';
 import { listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
@@ -29,7 +30,9 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
   const row = (booking: BookingView, changeable: boolean) => (
     <li
       key={booking.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4"
+      id={bookingRowId(booking.id)}
+      tabIndex={-1}
+      className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 bg-white p-4 target:ring-2 target:ring-teal-700"
       data-testid="booking-row"
       data-booking-id={booking.id}
       data-status={booking.status}
@@ -45,7 +48,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       {changeable ? (
         <div className="flex gap-2">
           <Link
-            href={`/bookings/${booking.id}/reschedule`}
+            href={rescheduleBookingPath(booking.id)}
             prefetch={false}
             className="button-secondary"
             data-testid="reschedule-link"
