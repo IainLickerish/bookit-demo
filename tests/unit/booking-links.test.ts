@@ -3,7 +3,7 @@ import { bookingReturnPath } from '@/lib/booking-links';
 
 const BOOKING_ID = '019a0000-1234-7abc-8abc-123456789abc';
 
-describe('booking links after sign-in', () => {
+describe('booking link URL validation', () => {
   it('keeps both My bookings destinations', () => {
     const reschedule = `/bookings?booking=${BOOKING_ID}&action=reschedule`;
     const cancel = `/bookings?booking=${BOOKING_ID}&action=cancel`;
