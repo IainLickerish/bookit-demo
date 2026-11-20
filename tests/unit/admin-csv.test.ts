@@ -68,6 +68,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin CSV and validation', () => {
       { lateCancellationHours: -1 },
       { lateCancellationHours: 1.5 },
       { lateCancellationHours: 337 },
+      { reminderEmailsEnabled: 'on' },
       { slotHorizonDays: 1 },
     ]) {
       expect(adminSettingsInput.safeParse({ ...valid, ...change }).success).toBe(false);

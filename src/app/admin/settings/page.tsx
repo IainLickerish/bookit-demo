@@ -70,12 +70,12 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           />
           Include contact details in confirmation emails
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex min-h-11 w-fit items-center gap-2">
           <input
             type="checkbox"
             name="reminderEmailsEnabled"
             defaultChecked={settings.reminderEmailsEnabled}
-            className="w-auto"
+            className="mt-0 w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1D5C4B]"
             data-testid="admin-reminder-emails"
           />
           Send session reminder emails
