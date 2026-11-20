@@ -103,7 +103,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
       timeZone: 'Europe/Paris',
       lateCancellationHours: 48,
       includeContactInConfirmation: false,
-      reminderEmailsEnabled: false,
+      reminderEmailsEnabled: true,
     };
     try {
       await updateAdminSettings(acme.db, clock, updated);

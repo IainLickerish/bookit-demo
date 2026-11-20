@@ -1,21 +1,19 @@
 import { z } from 'zod';
 
 const bookingId = z.uuid();
+type BookingAction = 'reschedule' | 'cancel';
 
-export function rescheduleBookingPath(id: string): string {
-  return `/bookings/${id}/reschedule`;
-}
-
-export function cancelBookingPath(id: string): string {
-  return `/bookings?cancel=${id}`;
+export function bookingActionPath(id: string, action: BookingAction): string {
+  return `/bookings?booking=${id}&action=${action}`;
 }
 
 /** Only these two local booking links may continue after sign-in. */
 export function bookingReturnPath(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  const match = /^\/bookings(?:\/([a-f\d-]+)\/reschedule|\?cancel=([a-f\d-]+))$/i.exec(value);
-  const id = bookingId.safeParse(match?.[1] ?? match?.[2]);
-  if (id.success) return match?.[1] ? rescheduleBookingPath(id.data) : cancelBookingPath(id.data);
+  const match = /^\/bookings\?booking=([a-fA-F\d-]+)&action=(reschedule|cancel)$/.exec(value);
+  const id = bookingId.safeParse(match?.[1]);
+  const action = match?.[2];
+  if (id.success && (action === 'reschedule' || action === 'cancel')) return bookingActionPath(id.data, action);
   return undefined;
 }
 

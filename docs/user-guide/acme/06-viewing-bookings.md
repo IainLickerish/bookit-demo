@@ -19,4 +19,4 @@ staff should use this page. Patients see their own appointments through **My boo
 
 In **Clinic settings**, tick **Send session reminder emails** to send reminders,
 or untick it to pause them. Select **Save settings** to apply your choice.
-Reminders are on by default.
+Reminders are off by default.

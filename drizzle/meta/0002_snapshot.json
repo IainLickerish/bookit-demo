@@ -1,5 +1,5 @@
 {
-  "id": "90670d82-573b-4da1-8dc7-8ed6359d39a7",
+  "id": "2b508cdb-ab2b-4edc-933e-de4574f433c5",
   "prevId": "1eadf702-42f7-4ac6-867f-a3bb0b0e5e6a",
   "version": "7",
   "dialect": "postgresql",
@@ -195,7 +195,7 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": false
         },
         "slot_horizon_days": {
           "name": "slot_horizon_days",

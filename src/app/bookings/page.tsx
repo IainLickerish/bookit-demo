@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getDatabase } from '@/db/client';
-import { cancelBookingPath, rescheduleBookingPath } from '@/lib/booking-links';
+import { bookingActionPath } from '@/lib/booking-links';
 import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
 import { isUuid, listBookingsForPatient, type BookingView } from '@/server/bookings/queries';
@@ -19,16 +19,19 @@ function statusText(booking: BookingView): string {
 
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const cancelId = single(params.cancel);
-  const patient = await requirePatient(isUuid(cancelId) ? cancelBookingPath(cancelId) : undefined);
+  const bookingId = single(params.booking);
+  const action = single(params.action);
+  const target =
+    isUuid(bookingId) && (action === 'reschedule' || action === 'cancel') ? ({ bookingId, action } as const) : null;
+  const patient = await requirePatient(target ? bookingActionPath(target.bookingId, target.action) : undefined);
   const notice = noticeText(single(params.notice));
   const error = errorText(single(params.error));
   const db = getDatabase();
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
-  if (cancelId && upcoming.some((booking) => booking.id === cancelId)) {
-    redirect(`/bookings#cancel-${cancelId}`);
+  if (target && upcoming.some((booking) => booking.id === target.bookingId)) {
+    redirect(`/bookings#${target.action}-${target.bookingId}`);
   }
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
 
@@ -51,7 +54,8 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
       {changeable ? (
         <div className="flex gap-2">
           <Link
-            href={rescheduleBookingPath(booking.id)}
+            id={`reschedule-${booking.id}`}
+            href={`/bookings/${booking.id}/reschedule`}
             prefetch={false}
             className="button-secondary"
             data-testid="reschedule-link"

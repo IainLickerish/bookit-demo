@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDatabase } from '@/db/client';
-import { rescheduleBookingPath } from '@/lib/booking-links';
 import { getClock } from '@/lib/clock';
 import { formatSlot, localDateOf } from '@/lib/time';
-import { findBookingForPatient, isUuid } from '@/server/bookings/queries';
+import { findBookingForPatient } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
@@ -20,8 +19,8 @@ export default async function ReschedulePage({
   params: Promise<{ bookingId: string }>;
   searchParams: SearchParams;
 }) {
+  const patient = await requirePatient();
   const { bookingId } = await params;
-  const patient = await requirePatient(isUuid(bookingId) ? rescheduleBookingPath(bookingId) : undefined);
   const query = await searchParams;
   const db = getDatabase();
   const clock = getClock();
@@ -38,7 +37,7 @@ export default async function ReschedulePage({
   const remaining = Math.max(0, view.settings.maxReschedulesPerBooking - booking.rescheduleCount);
   const changeable = booking.status === 'confirmed' && booking.startsAt > clock.now();
   const choices = view.slots.filter((s) => s.id !== booking.slotId);
-  const path = rescheduleBookingPath(booking.id);
+  const path = `/bookings/${booking.id}/reschedule`;
 
   return (
     <section>

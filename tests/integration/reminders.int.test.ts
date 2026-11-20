@@ -48,7 +48,7 @@ beforeEach(async () => {
   clock.set(INITIAL_TIME);
   await emptyDatabase(database.db);
   smtp.messages.length = 0;
-  clinic = await seedClinic(database.db, clock);
+  clinic = await seedClinic(database.db, clock, { settings: { reminderEmailsEnabled: true } });
 });
 
 afterAll(async () => {
@@ -75,7 +75,7 @@ describe('session reminders', () => {
     expect(smtp.messages).toHaveLength(1);
   });
 
-  it('shows the clinic date and time, physiotherapist and private booking links', async () => {
+  it('includes the clinic date and time, physiotherapist and both My bookings URLs in the email', async () => {
     const booking = await book(FIRST_START);
     const mailer = recordingMailer();
     clock.set(FIRST_DUE);
@@ -88,9 +88,11 @@ describe('session reminders', () => {
     expect(email?.text).toContain('Thu, 22 Oct 2026, 09:00 (Europe/London)');
     expect(email?.text).toContain('Physiotherapist: Pat Physio');
     expect(email?.text).toContain(
-      `Reschedule your session: https://clinic.example.test/bookings/${booking.id}/reschedule\n`,
+      `Reschedule your session: https://clinic.example.test/bookings?booking=${booking.id}&action=reschedule\n`,
     );
-    expect(email?.text).toContain(`Cancel your session: https://clinic.example.test/bookings?cancel=${booking.id}\n`);
+    expect(email?.text).toContain(
+      `Cancel your session: https://clinic.example.test/bookings?booking=${booking.id}&action=cancel\n`,
+    );
   });
 
   it('skips cancelled sessions and uses the new time for a moved session', async () => {
@@ -104,6 +106,10 @@ describe('session reminders', () => {
       bookingId: moved.id,
       newSlotId: await slotAt('2026-10-23T09:30:00Z'),
     });
+
+    clock.set(FIRST_DUE);
+    await sendDueReminders(deps, BASE_URL);
+    expect(mailer.sent).toHaveLength(0);
 
     clock.set('2026-10-21T08:45:00Z');
     await sendDueReminders(deps, BASE_URL);
@@ -144,16 +150,44 @@ describe('session reminders', () => {
     expect(mailer.sent).toHaveLength(1);
   });
 
-  it('picks up short-notice bookings and skips sessions that have already started', async () => {
-    await book(FIRST_START);
-    clock.set(FIRST_START);
-    await book('2026-10-22T08:45:00Z', clinic.patient2.id);
+  it('skips sessions booked or moved less than 24 hours before the start', async () => {
+    const moved = await book('2026-10-23T09:30:00Z');
     const mailer = recordingMailer();
+    const deps = dependencies(testMail(mailer));
+    clock.set('2026-10-21T08:01:00Z');
+    await book(FIRST_START, clinic.patient2.id);
+    await sendDueReminders(deps, BASE_URL);
+    expect(mailer.sent).toHaveLength(0);
+
+    clock.set('2026-10-21T08:46:00Z');
+    await rescheduleBooking(deps, {
+      patientId: moved.patientId,
+      bookingId: moved.id,
+      newSlotId: await slotAt('2026-10-22T08:45:00Z'),
+    });
+    await sendDueReminders(deps, BASE_URL);
+    expect(mailer.sent).toHaveLength(0);
+  });
+
+  it('skips reminders once the five-minute delivery window closes', async () => {
+    await book(FIRST_START);
+    const mailer = recordingMailer();
+    clock.set('2026-10-21T08:05:00Z');
+
+    await sendDueReminders(dependencies(testMail(mailer)), BASE_URL);
+
+    expect(mailer.sent).toHaveLength(0);
+  });
+
+  it('keeps a due reminder available while email is disabled', async () => {
+    await book(FIRST_START);
+    const mailer = recordingMailer();
+    clock.set(FIRST_DUE);
 
     await sendDueReminders(dependencies(testMail(disabledMailer)), BASE_URL);
     await sendDueReminders(dependencies(testMail(mailer)), BASE_URL);
 
-    expect(mailer.sent.map((email) => email.to)).toEqual([clinic.patient2.email]);
+    expect(mailer.sent).toHaveLength(1);
   });
 
   it('does not retry an email when delivery may already have succeeded', async () => {
