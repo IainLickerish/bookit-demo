@@ -1,13 +1,17 @@
 import Link from 'next/link';
 import { getDatabase } from '@/db/client';
+import { getClock } from '@/lib/clock';
 import { formatSlot } from '@/lib/time';
 import { requireAdmin } from '@/server/admin/context';
 import {
+  countConfirmedBookingsToday,
   listAdminBookings,
   listAdminPractitioners,
   parseBookingFilters,
   type BookingFilters,
 } from '@/server/admin/bookings';
+import { withoutQueryDetails } from '@/server/errors';
+import { requestLogger } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import type { SearchParams } from '../messages';
 
@@ -27,11 +31,23 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
   }
   const db = getDatabase();
   const [settings, practitioners] = await Promise.all([loadClinicSettings(db), listAdminPractitioners(db)]);
-  const rows = invalid ? [] : await listAdminBookings(db, filters, settings.timeZone);
+  const [rows, confirmedToday] = await Promise.all([
+    invalid ? [] : listAdminBookings(db, filters, settings.timeZone),
+    countConfirmedBookingsToday(db, getClock(), settings.timeZone).catch(async (error: unknown) => {
+      const log = await requestLogger();
+      log.error({ event: 'admin.daily_count_failed' }, 'Daily confirmed count unavailable');
+      throw withoutQueryDetails(error);
+    }),
+  ]);
   const exportQuery = new URLSearchParams(Object.entries(filters)).toString();
   return (
     <section>
       <h1>Clinic bookings</h1>
+      <p className="notice" data-testid="admin-today-confirmed-count">
+        {confirmedToday === 0
+          ? 'No confirmed sessions today.'
+          : `${confirmedToday} confirmed ${confirmedToday === 1 ? 'session' : 'sessions'} today.`}
+      </p>
       <p>
         <Link href="/admin/settings" prefetch={false} className="underline" data-testid="admin-settings-link">
           Clinic settings

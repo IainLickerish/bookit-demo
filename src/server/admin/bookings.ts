@@ -1,8 +1,9 @@
-import { and, asc, eq, gte, lt } from 'drizzle-orm';
+import { and, asc, count, eq, gte, lt } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Executor } from '@/db/client';
 import { bookings, practitioners, slots, users } from '@/db/schema';
-import { addDaysToLocalDate, isLocalDate, startOfLocalDate } from '@/lib/time';
+import type { Clock } from '@/lib/clock';
+import { addDaysToLocalDate, isLocalDate, localDateOf, startOfLocalDate } from '@/lib/time';
 
 export const bookingFiltersSchema = z.strictObject({
   practitionerId: z.uuid().optional(),
@@ -26,10 +27,24 @@ export function parseBookingFilters(params: URLSearchParams): BookingFilters {
   return result.data;
 }
 
+function bookedOnDate(date: string, timeZone: string) {
+  const start = startOfLocalDate(date, timeZone);
+  const end = startOfLocalDate(addDaysToLocalDate(date, 1), timeZone);
+  return and(gte(slots.startsAt, start), lt(slots.startsAt, end));
+}
+
+export async function countConfirmedBookingsToday(db: Executor, clock: Clock, timeZone: string): Promise<number> {
+  const today = localDateOf(clock.now(), timeZone);
+  const [row] = await db
+    .select({ total: count() })
+    .from(bookings)
+    .innerJoin(slots, eq(slots.id, bookings.slotId))
+    .where(and(eq(bookings.status, 'confirmed'), bookedOnDate(today, timeZone)));
+  return row!.total;
+}
+
 /** The executor belongs to this server's clinic; no request chooses another database. */
 export async function listAdminBookings(db: Executor, filters: BookingFilters, timeZone: string) {
-  const start = filters.date ? startOfLocalDate(filters.date, timeZone) : undefined;
-  const end = filters.date ? startOfLocalDate(addDaysToLocalDate(filters.date, 1), timeZone) : undefined;
   return db
     .select({
       id: bookings.id,
@@ -50,8 +65,7 @@ export async function listAdminBookings(db: Executor, filters: BookingFilters, t
       and(
         filters.practitionerId ? eq(practitioners.id, filters.practitionerId) : undefined,
         filters.status ? eq(bookings.status, filters.status) : undefined,
-        start ? gte(slots.startsAt, start) : undefined,
-        end ? lt(slots.startsAt, end) : undefined,
+        filters.date ? bookedOnDate(filters.date, timeZone) : undefined,
       ),
     )
     .orderBy(asc(slots.startsAt), asc(bookings.id));
