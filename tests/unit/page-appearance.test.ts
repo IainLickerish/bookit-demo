@@ -49,28 +49,32 @@ describe('BookIt page appearance', () => {
   });
 
   it('renders the fallback titles and actions on shared cards', () => {
-    const cardSection = /<section\b[^>]*class="(?:[^"\s]+\s+)*card(?:\s+[^"\s]+)*"/;
+    const section = /^<section\b(?<attributes>[^>]*)>(?<content>.*?)<\/section>/s;
+    const cardClass = /\sclass="(?:[^"\s]+\s+)*card(?:\s+[^"\s]+)*"/;
     const error = renderToStaticMarkup(createElement(ErrorPage, { error: new Error('test'), reset() {} }));
-    expect(error).toMatch(cardSection);
-    expect(error).toMatch(/<section[^>]*role="alert"/);
-    expect(error).toMatch(/<h1[^>]*>Something went wrong<\/h1>/);
-    expect(error).toMatch(/<button[^>]*class="button"[^>]*>Try again<\/button>/);
+    const errorCard = section.exec(error)?.groups;
+    expect(errorCard?.attributes).toMatch(cardClass);
+    expect(errorCard?.attributes).toMatch(/\srole="alert"(?:\s|$)/);
+    expect(errorCard?.content).toMatch(/<h1[^>]*>Something went wrong<\/h1>/);
+    expect(errorCard?.content).toMatch(/<button[^>]*class="button"[^>]*>Try again<\/button>/);
 
     const missing = renderToStaticMarkup(createElement(NotFound));
-    expect(missing).toMatch(cardSection);
-    expect(missing).toMatch(/<h1[^>]*>Page not found<\/h1>/);
-    expect(missing).toMatch(/<a[^>]*class="button"[^>]*href="\/"[^>]*>Go to the start page<\/a>/);
+    const missingCard = section.exec(missing)?.groups;
+    expect(missingCard?.attributes).toMatch(cardClass);
+    expect(missingCard?.content).toMatch(/<h1[^>]*>Page not found<\/h1>/);
+    expect(missingCard?.content).toMatch(/<a[^>]*class="button"[^>]*href="\/"[^>]*>Go to the start page<\/a>/);
   });
 
   it.each([
     ['notice', 'status', 'Booking confirmed.'],
     ['alert', 'alert', 'This time is no longer available.'],
-  ] as const)('announces the shared %s text and hides its icon', (kind, role, message) => {
+  ] as const)('renders the message and hidden icon inside the shared %s region', (kind, role, message) => {
     const markup = renderToStaticMarkup(jsx(Notice, { kind, testId: 'booking-message', children: message }));
-    expect(markup).toContain(`role="${role}"`);
-    expect(markup).toContain(`class="${kind}"`);
-    expect(markup).toMatch(/<svg\b[^>]*aria-hidden="true"/);
-    expect(markup).toContain(`<span>${message}</span>`);
+    const region = /^<p\b(?<attributes>[^>]*)>(?<content>.*?)<\/p>/s.exec(markup)?.groups;
+    expect(region?.attributes).toMatch(new RegExp(`\\srole="${role}"(?:\\s|$)`));
+    expect(region?.attributes).toMatch(new RegExp(`\\sclass="${kind}"(?:\\s|$)`));
+    expect(region?.content).toMatch(/<svg\b[^>]*\saria-hidden="true"/);
+    expect(region?.content).toContain(`<span>${message}</span>`);
   });
 
   it('marks today on the shared date card while keeping day navigation', () => {
@@ -86,8 +90,13 @@ describe('BookIt page appearance', () => {
     };
     for (const path of ['/slots', '/bookings/example/reschedule']) {
       const today = renderToStaticMarkup(createElement(DayPicker, { view, path }));
-      expect(today).toMatch(/<time[^>]*datetime="2026-11-20"[^>]*aria-current="date"[^>]*class="day-current(?:\s|")/i);
-      expect(today).toMatch(/<span[^>]*class="(?:[^"\s]+\s+)*bg-clay(?:\s+[^"\s]+)*"[^>]*aria-hidden="true"/);
+      const dateCard = /<time\b(?<attributes>[^>]*)>(?<content>.*?)<\/time>/s.exec(today)?.groups;
+      expect(dateCard?.attributes).toMatch(/\sdatetime="2026-11-20"/i);
+      expect(dateCard?.attributes).toMatch(/\saria-current="date"(?:\s|$)/);
+      expect(dateCard?.attributes).toMatch(/\sclass="day-current(?:\s|")/);
+      expect(dateCard?.content).toMatch(
+        /<span[^>]*class="(?:[^"\s]+\s+)*bg-clay(?:\s+[^"\s]+)*"[^>]*aria-hidden="true"/,
+      );
       expect(today).toContain(`href="${path}?practitioner=pat&amp;date=2026-11-21"`);
       expect(today).not.toContain('data-testid="previous-day"');
 
