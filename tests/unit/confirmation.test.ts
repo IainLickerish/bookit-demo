@@ -99,6 +99,24 @@ describe('confirmation email (REQ-18.1-01, plan 12.1)', () => {
   it('formats a stored phone by collapsing whitespace', () => {
     expect(formatPhone(' +44 7700\t900001 ')).toBe('+44 7700 900001');
   });
+
+  it('keeps accented names intact and escapes calendar text across folded lines', () => {
+    const practitionerName = 'Élodie, M.Sc.; \\ Physio\n' + 'é'.repeat(40);
+    const email = composeConfirmation({
+      booking: { ...booking(null), practitionerName },
+      patient,
+      settings,
+      from: TEST_MAIL_FROM,
+    });
+    const file = email.attachments?.[0]?.content ?? '';
+    expect(file).toContain('\r\n ');
+    for (const line of file.split('\r\n')) {
+      expect(Buffer.byteLength(line)).toBeLessThanOrEqual(75);
+    }
+    expect(file.replaceAll('\r\n ', '')).toContain(
+      'SUMMARY:Test Physio Clinic: session with Élodie\\, M.Sc.\\; \\\\ Physio\\n' + 'é'.repeat(40) + '\r\n',
+    );
+  });
 });
 
 describe('sending confirmations (REQ-18.1-01; brief 18: no real email)', () => {

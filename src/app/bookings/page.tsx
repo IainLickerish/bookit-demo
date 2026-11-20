@@ -15,13 +15,31 @@ function statusText(booking: BookingView): string {
   return booking.lateCancellation ? 'Cancelled (late)' : 'Cancelled';
 }
 
+function CalendarLink({ bookingId, testId }: { bookingId: string; testId: string }) {
+  return (
+    <a
+      href={`/bookings/${bookingId}/calendar`}
+      className="button-secondary inline-flex min-h-11 items-center"
+      data-testid={testId}
+    >
+      Add to calendar
+    </a>
+  );
+}
+
 export default async function MyBookingsPage({ searchParams }: { searchParams: SearchParams }) {
   const patient = await requirePatient();
   const params = await searchParams;
-  const notice = noticeText(single(params.notice));
+  const noticeCode = single(params.notice);
+  const notice = noticeText(noticeCode);
   const error = errorText(single(params.error));
   const db = getDatabase();
   const [settings, bookings] = await Promise.all([loadClinicSettings(db), listBookingsForPatient(db, patient.id)]);
+  const confirmedBookingId = single(params.booking);
+  const confirmedBooking =
+    noticeCode === 'booked' || noticeCode === 'rescheduled'
+      ? bookings.find((booking) => booking.id === confirmedBookingId && booking.status === 'confirmed')
+      : undefined;
   const now = getClock().now();
   const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.startsAt > now);
   const others = bookings.filter((b) => !upcoming.includes(b)).reverse();
@@ -42,22 +60,27 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
           With {booking.practitionerName} · <span data-testid="booking-status">{statusText(booking)}</span>
         </p>
       </div>
-      {changeable ? (
-        <div className="flex gap-2">
-          <Link
-            href={`/bookings/${booking.id}/reschedule`}
-            prefetch={false}
-            className="button-secondary"
-            data-testid="reschedule-link"
-          >
-            Reschedule
-          </Link>
-          <form action={cancelAction}>
-            <input type="hidden" name="bookingId" value={booking.id} />
-            <button type="submit" className="button-secondary" data-testid="cancel-booking">
-              Cancel
-            </button>
-          </form>
+      {booking.status === 'confirmed' ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <CalendarLink bookingId={booking.id} testId="booking-calendar" />
+          {changeable ? (
+            <>
+              <Link
+                href={`/bookings/${booking.id}/reschedule`}
+                prefetch={false}
+                className="button-secondary"
+                data-testid="reschedule-link"
+              >
+                Reschedule
+              </Link>
+              <form action={cancelAction}>
+                <input type="hidden" name="bookingId" value={booking.id} />
+                <button type="submit" className="button-secondary" data-testid="cancel-booking">
+                  Cancel
+                </button>
+              </form>
+            </>
+          ) : null}
         </div>
       ) : null}
     </li>
@@ -67,9 +90,16 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: S
     <section>
       <h1>My bookings</h1>
       {notice ? (
-        <p role="status" className="notice" data-testid="notice">
-          {notice}
-        </p>
+        <div className="notice">
+          <p role="status" data-testid="notice">
+            {notice}
+          </p>
+          {confirmedBooking ? (
+            <div className="mt-2">
+              <CalendarLink bookingId={confirmedBooking.id} testId="confirmation-calendar" />
+            </div>
+          ) : null}
+        </div>
       ) : null}
       {error ? (
         <p role="alert" className="alert" data-testid="booking-error">

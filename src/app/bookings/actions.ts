@@ -33,12 +33,12 @@ export async function bookAction(formData: FormData): Promise<void> {
   const slotId = formText(formData, 'slotId');
   let destination: string;
   try {
-    await bookSlot(deps, {
+    const booking = await bookSlot(deps, {
       patientId: patient.id,
       slotId,
       phone: formText(formData, 'phone'),
     });
-    destination = '/bookings?notice=booked';
+    destination = `/bookings?notice=booked&booking=${booking.id}`;
   } catch (error) {
     const code = refusalCode(error, deps.log, 'book');
     destination = isUuid(slotId) ? `/book/${slotId}?error=${code}` : `/slots?error=${code}`;
@@ -68,12 +68,12 @@ export async function rescheduleAction(formData: FormData): Promise<void> {
   const bookingId = formText(formData, 'bookingId');
   let destination: string;
   try {
-    await rescheduleBooking(deps, {
+    const booking = await rescheduleBooking(deps, {
       patientId: patient.id,
       bookingId,
       newSlotId: formText(formData, 'newSlotId'),
     });
-    destination = '/bookings?notice=rescheduled';
+    destination = `/bookings?notice=rescheduled&booking=${booking.id}`;
   } catch (error) {
     const code = refusalCode(error, deps.log, 'reschedule');
     destination = isUuid(bookingId) ? `/bookings/${bookingId}/reschedule?error=${code}` : `/bookings?error=${code}`;
