@@ -1,32 +1,168 @@
 @import 'tailwindcss';
+@import './fonts/fonts.css';
+
+@theme {
+  --font-sans: 'Figtree', system-ui, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+  --color-ivory: #faf8f4;
+  --color-ink: #16241f;
+  --color-muted: #5a6862;
+  --color-line: #e6e1d8;
+  --color-field: #8c9792;
+  --color-stone: #f1eee8;
+  --color-pine: #1d5c4b;
+  --color-pine-hover: #164a3c;
+  --color-sage: #e9f1ec;
+  --color-clay: #b9603f;
+  --color-brick: #a8261b;
+  --color-brick-tint: #fcebe8;
+}
 
 @layer base {
+  body {
+    @apply min-h-screen bg-ivory text-ink;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  h1,
+  h2 {
+    @apply font-serif font-medium tracking-tight;
+    line-height: 1.2;
+  }
   h1 {
-    @apply mb-4 text-2xl font-semibold;
+    font-size: 1.75rem;
   }
   h2 {
-    @apply mt-6 mb-2 text-lg font-semibold;
+    font-size: 1.375rem;
+  }
+  @media (min-width: 40rem) {
+    h1 {
+      font-size: 2rem;
+    }
+  }
+  a,
+  .text-link {
+    @apply text-pine underline decoration-1 underline-offset-4 hover:text-pine-hover;
+  }
+  :where(a, button, input, select):focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: 3px;
   }
   label {
-    @apply block text-sm font-medium;
+    @apply block min-w-0 text-[0.9375rem] font-medium;
   }
-  input,
+  input:not([type='hidden'], [type='checkbox']),
   select {
-    @apply mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2;
+    @apply mt-2 block min-h-12 w-full min-w-0 rounded-xl border border-field bg-white px-3 py-2 text-base font-normal;
+  }
+  input[type='checkbox'] {
+    @apply size-5 shrink-0 appearance-auto accent-pine;
   }
 }
 
 @layer components {
+  .shell {
+    --gutter: 20px;
+    --client-width: 720px;
+    --staff-width: 1120px;
+    @apply mx-auto;
+    max-width: calc(var(--client-width) + 2 * var(--gutter));
+    padding-inline: var(--gutter);
+  }
+  @media (min-width: 40rem) {
+    .shell {
+      --gutter: 32px;
+    }
+  }
+  .shell-wide,
+  .page-shell {
+    max-width: calc(var(--staff-width) + 2 * var(--gutter));
+  }
+  .page-shell {
+    @apply pt-8 pb-12 sm:pt-12;
+  }
+  .page-shell > * {
+    @apply mx-auto;
+    max-width: var(--client-width);
+  }
+  .page-shell > .page-narrow {
+    max-width: 440px;
+  }
+  .page-shell > .page-wide {
+    max-width: var(--staff-width);
+  }
+  .page-header {
+    @apply mb-6 sm:mb-8;
+  }
+  .clinic-name {
+    @apply inline-flex min-h-11 items-center gap-2 font-serif text-2xl leading-tight font-medium tracking-tight text-ink no-underline;
+  }
+  .clinic-name::after {
+    content: '';
+    @apply size-1.5 shrink-0 rounded-full bg-clay;
+  }
+  .site-nav {
+    @apply flex flex-wrap items-center gap-x-4 text-[0.9375rem] font-medium;
+  }
+  .site-nav a,
+  .site-nav button,
+  .tap-link {
+    @apply inline-flex min-h-11 items-center;
+  }
+  .card {
+    @apply min-w-0 rounded-[20px] border border-line bg-white p-6;
+    box-shadow: 0 4px 16px rgb(22 36 31 / 6%);
+  }
+  .button,
+  .button-secondary {
+    @apply inline-flex min-h-12 max-w-full items-center justify-center rounded-full border px-5 py-2 text-center text-[0.9375rem] leading-tight font-medium no-underline;
+  }
   .button {
-    @apply inline-block rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800;
+    @apply border-pine bg-pine text-white hover:border-pine-hover hover:bg-pine-hover hover:text-white;
   }
   .button-secondary {
-    @apply inline-block rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-100;
+    @apply border-field bg-white text-pine hover:bg-stone;
+  }
+  .notice,
+  .alert {
+    @apply relative rounded-xl py-3 pe-4 ps-11 text-[0.9375rem];
   }
   .notice {
-    @apply mb-4 rounded border border-teal-200 bg-teal-50 px-4 py-3 text-sm;
+    @apply bg-sage text-pine;
   }
   .alert {
-    @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
+    @apply bg-brick-tint text-brick;
+  }
+  .notice::before,
+  .alert::before {
+    content: '';
+    @apply absolute start-4 top-4 size-4 rounded-full border border-current;
+  }
+  .notice::after {
+    content: '';
+    @apply absolute top-5 start-[21px] h-[5px] w-[7px] -rotate-45 border-b border-l border-current;
+  }
+  .alert::after {
+    content: '';
+    @apply absolute top-5 start-[23px] h-2 w-0.5;
+    background: linear-gradient(currentColor 0 60%, transparent 60% 78%, currentColor 78% 100%);
+  }
+  .status-pill {
+    @apply inline-block rounded-full bg-stone px-3 py-1 text-[0.8125rem] font-medium text-muted;
+  }
+  .status-pill[data-status='confirmed'] {
+    @apply bg-sage text-pine;
+  }
+  @media (max-width: 39.999rem) {
+    .booking-confirmation:has(.booking-action) {
+      padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+    .booking-action {
+      @apply fixed inset-x-0 bottom-0 z-10 border-t border-line bg-white px-5 pt-3;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+    .booking-action .button {
+      @apply w-full;
+    }
   }
 }
