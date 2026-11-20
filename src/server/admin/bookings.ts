@@ -1,8 +1,9 @@
-import { and, asc, eq, gte, lt } from 'drizzle-orm';
+import { and, asc, count, eq, gte, lt } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Executor } from '@/db/client';
 import { bookings, practitioners, slots, users } from '@/db/schema';
 import { addDaysToLocalDate, isLocalDate, startOfLocalDate } from '@/lib/time';
+import { withoutQueryDetails } from '@/server/errors';
 
 export const bookingFiltersSchema = z.strictObject({
   practitionerId: z.uuid().optional(),
@@ -26,10 +27,14 @@ export function parseBookingFilters(params: URLSearchParams): BookingFilters {
   return result.data;
 }
 
+function bookingDay(date: string, timeZone: string) {
+  const start = startOfLocalDate(date, timeZone);
+  const end = startOfLocalDate(addDaysToLocalDate(date, 1), timeZone);
+  return and(gte(slots.startsAt, start), lt(slots.startsAt, end));
+}
+
 /** The executor belongs to this server's clinic; no request chooses another database. */
 export async function listAdminBookings(db: Executor, filters: BookingFilters, timeZone: string) {
-  const start = filters.date ? startOfLocalDate(filters.date, timeZone) : undefined;
-  const end = filters.date ? startOfLocalDate(addDaysToLocalDate(filters.date, 1), timeZone) : undefined;
   return db
     .select({
       id: bookings.id,
@@ -50,14 +55,38 @@ export async function listAdminBookings(db: Executor, filters: BookingFilters, t
       and(
         filters.practitionerId ? eq(practitioners.id, filters.practitionerId) : undefined,
         filters.status ? eq(bookings.status, filters.status) : undefined,
-        start ? gte(slots.startsAt, start) : undefined,
-        end ? lt(slots.startsAt, end) : undefined,
+        filters.date ? bookingDay(filters.date, timeZone) : undefined,
       ),
     )
     .orderBy(asc(slots.startsAt), asc(bookings.id));
 }
 
 export type AdminBooking = Awaited<ReturnType<typeof listAdminBookings>>[number];
+
+export async function loadDailyWorkload(db: Executor, requestedDate: string | string[], timeZone: string) {
+  const parsed = bookingFiltersSchema.shape.date.safeParse(requestedDate);
+  if (!parsed.success || !parsed.data) return null;
+
+  const date = parsed.data;
+  let day;
+  try {
+    day = bookingDay(date, timeZone);
+  } catch (error) {
+    if (error instanceof RangeError) return null;
+    throw error;
+  }
+
+  try {
+    const [result] = await db
+      .select({ confirmed: count() })
+      .from(bookings)
+      .innerJoin(slots, eq(slots.id, bookings.slotId))
+      .where(and(eq(bookings.status, 'confirmed'), day));
+    return { date, confirmed: result!.confirmed };
+  } catch (error) {
+    throw withoutQueryDetails(error);
+  }
+}
 
 export async function listAdminPractitioners(db: Executor) {
   // Inactive practitioners remain filterable for historical bookings.
