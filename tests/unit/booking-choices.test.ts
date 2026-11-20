@@ -1,14 +1,27 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
+import BookSlotPage from '@/app/book/[slotId]/page';
 import { DayPicker } from '@/app/day-picker';
 import SlotsPage from '@/app/slots/page';
+import { loadClinicSettings } from '@/server/settings';
 import { loadDayView, type DayView } from '@/server/slots/day-view';
+import { findBookableSlot, isSlotFree } from '@/server/slots/queries';
 
+vi.mock('@/app/bookings/actions', () => ({ bookAction: vi.fn() }));
 vi.mock('@/db/client', () => ({ getDatabase: vi.fn() }));
-vi.mock('@/server/request-context', () => ({ requirePatient: vi.fn() }));
+vi.mock('@/server/request-context', () => ({ requirePatient: vi.fn(() => ({ phone: null })) }));
+vi.mock('@/server/settings', () => ({ loadClinicSettings: vi.fn() }));
 vi.mock('@/server/slots/day-view', () => ({ loadDayView: vi.fn() }));
+vi.mock('@/server/slots/queries', () => ({ findBookableSlot: vi.fn(), isSlotFree: vi.fn() }));
 
 const practitioner = { id: 'alex', name: 'Alex Physiotherapist', bio: '' };
+const morningSlot = {
+  id: 'morning',
+  practitionerId: practitioner.id,
+  practitionerName: practitioner.name,
+  startsAt: new Date('2026-10-22T09:30:00Z'),
+  endsAt: new Date('2026-10-22T10:15:00Z'),
+};
 const view: DayView = {
   settings: {
     clinicName: 'Acme Physio',
@@ -24,15 +37,7 @@ const view: DayView = {
   today: '2026-10-20',
   date: '2026-10-22',
   lastDate: '2027-05-28',
-  slots: [
-    {
-      id: 'morning',
-      practitionerId: practitioner.id,
-      practitionerName: practitioner.name,
-      startsAt: new Date('2026-10-22T09:30:00Z'),
-      endsAt: new Date('2026-10-22T10:15:00Z'),
-    },
-  ],
+  slots: [morningSlot],
 };
 
 it('names the day shown and the dates on the previous and next day choices', async () => {
@@ -66,5 +71,35 @@ it('keeps the day controls used when moving a session', () => {
   );
   expect(page).toMatch(
     /<a[^>]*href="\/bookings\/existing\/reschedule\?practitioner=alex&amp;date=2026-10-23"[^>]*>Next day →<\/a>/,
+  );
+});
+
+async function renderReview(free: boolean): Promise<string> {
+  vi.mocked(loadClinicSettings).mockResolvedValue({ ...view.settings, sessionMinutes: 30 });
+  vi.mocked(findBookableSlot).mockResolvedValue(morningSlot);
+  vi.mocked(isSlotFree).mockResolvedValue(free);
+  return renderToStaticMarkup(
+    await BookSlotPage({ params: Promise.resolve({ slotId: morningSlot.id }), searchParams: Promise.resolve({}) }),
+  );
+}
+
+it('lists the physiotherapist, clinic-local date and time, and session length before confirmation', async () => {
+  const page = await renderReview(true);
+
+  expect(page).toMatch(/<dt[^>]*>Physiotherapist<\/dt><dd[^>]*>Alex Physiotherapist<\/dd>/);
+  expect(page).toMatch(/<dt[^>]*>Date and time<\/dt><dd[^>]*><time[^>]*>Thu, 22 Oct 2026, 10:30<\/time><\/dd>/);
+  expect(page).toMatch(/<dt[^>]*>Duration<\/dt><dd[^>]*>45 minutes<\/dd>/);
+  expect(page.indexOf('45 minutes')).toBeLessThan(page.indexOf('Confirm booking'));
+  expect(page).toMatch(/<label[^>]*>Phone number \(optional\)<input[^>]*name="phone"/);
+  expect(page).toMatch(/<button[^>]*type="submit"[^>]*>Confirm booking<\/button>/);
+});
+
+it('offers the original day and physiotherapist when a time is no longer available', async () => {
+  const page = await renderReview(false);
+
+  expect(page).toContain('This time is no longer available.');
+  expect(page).not.toContain('Confirm booking');
+  expect(page).toMatch(
+    /<a[^>]*href="\/slots\?practitioner=alex&amp;date=2026-10-22"[^>]*>Choose a different time<\/a>/,
   );
 });
