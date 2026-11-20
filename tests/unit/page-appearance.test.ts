@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { DayPicker } from '@/app/day-picker';
 import ErrorPage from '@/app/error';
 import NotFound from '@/app/not-found';
+import { Notice } from '@/app/notice';
 import { SlotList } from '@/app/slot-list';
 import { TEST_CLINIC_SETTINGS } from '../helpers/clinic';
 
@@ -58,6 +59,17 @@ describe('BookIt page appearance', () => {
     expect(missing).toMatch(cardSection);
     expect(missing).toMatch(/<h1[^>]*>Page not found<\/h1>/);
     expect(missing).toMatch(/<a[^>]*class="button"[^>]*href="\/"[^>]*>Go to the start page<\/a>/);
+  });
+
+  it.each([
+    ['notice', 'status', 'Booking confirmed.'],
+    ['alert', 'alert', 'This time is no longer available.'],
+  ] as const)('announces the shared %s text and hides its icon', (kind, role, message) => {
+    const markup = renderToStaticMarkup(createElement(Notice, { kind, testId: 'booking-message' }, message));
+    expect(markup).toContain(`role="${role}"`);
+    expect(markup).toContain(`class="${kind}"`);
+    expect(markup).toMatch(/<svg\b[^>]*aria-hidden="true"/);
+    expect(markup).toContain(`<span>${message}</span>`);
   });
 
   it('marks today on the shared date card while keeping day navigation', () => {
