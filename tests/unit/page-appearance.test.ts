@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { createSourceFile, isImportDeclaration, isStringLiteral, ScriptTarget } from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { DayPicker } from '@/app/day-picker';
 import ErrorPage from '@/app/error';
@@ -9,15 +10,25 @@ import { SlotList } from '@/app/slot-list';
 import { TEST_CLINIC_SETTINGS } from '../helpers/clinic';
 
 describe('BookIt page appearance', () => {
-  it('bundles both local fonts through the shared layout', () => {
+  it('checks the active local font import chain', () => {
     const layout = new URL('../../src/app/layout.tsx', import.meta.url);
-    expect(readFileSync(layout, 'utf8')).toMatch(/^import '\.\/globals\.css';$/m);
+    const source = createSourceFile('layout.tsx', readFileSync(layout, 'utf8'), ScriptTarget.Latest);
+    const importsGlobalStyles = source.statements.some(
+      (statement) =>
+        isImportDeclaration(statement) &&
+        !statement.importClause &&
+        isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text === './globals.css',
+    );
+    expect(importsGlobalStyles).toBe(true);
+
+    const readCss = (file: URL) => readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     const css = new URL('./globals.css', layout);
-    const globalStyles = readFileSync(css, 'utf8');
-    const fontImport = /@import '([^']+\/fonts\.css)'/.exec(globalStyles)?.[1];
+    const globalStyles = readCss(css);
+    const fontImport = /^@import\s+'(\.\/[^']+\/fonts\.css)'\s*;/m.exec(globalStyles)?.[1];
     expect(fontImport).toBeDefined();
     const fontStyles = new URL(fontImport!, css);
-    const faces = readFileSync(fontStyles, 'utf8').match(/@font-face\s*\{[^}]+\}/g) ?? [];
+    const faces = readCss(fontStyles).match(/@font-face\s*\{[^}]+\}/g) ?? [];
 
     for (const [family, token] of [
       ['Fraunces', 'serif'],
