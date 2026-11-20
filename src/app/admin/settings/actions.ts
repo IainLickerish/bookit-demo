@@ -16,6 +16,7 @@ export async function saveSettingsAction(form: FormData): Promise<void> {
     timeZone: form.get('timeZone'),
     lateCancellationHours: typeof hours === 'string' && hours.trim() !== '' ? Number(hours) : NaN,
     includeContactInConfirmation: form.get('includeContactInConfirmation') === 'on',
+    remindersEnabled: form.get('remindersEnabled') === 'on',
   });
   if (!parsed.success) redirect('/admin/settings?error=invalid');
   const log = await requestLogger();

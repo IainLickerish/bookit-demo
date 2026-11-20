@@ -70,6 +70,16 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           />
           Include contact details in confirmation emails
         </label>
+        <label className="flex min-h-11 items-center gap-2">
+          <input
+            type="checkbox"
+            name="remindersEnabled"
+            defaultChecked={settings.remindersEnabled}
+            className="w-auto"
+            data-testid="admin-reminders-enabled"
+          />
+          Send session reminders by email
+        </label>
         <button type="submit" className="button" data-testid="admin-save-settings">
           Save settings
         </button>

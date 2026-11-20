@@ -103,6 +103,7 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
       timeZone: 'Europe/Paris',
       lateCancellationHours: 48,
       includeContactInConfirmation: false,
+      remindersEnabled: before.remindersEnabled,
     };
     try {
       await updateAdminSettings(acme.db, clock, updated);
@@ -115,7 +116,22 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
         timeZone: before.timeZone,
         lateCancellationHours: before.lateCancellationHours,
         includeContactInConfirmation: before.includeContactInConfirmation,
+        remindersEnabled: before.remindersEnabled,
       });
     }
+  });
+  it('saves reminders on and off without changing other clinic settings', async () => {
+    const before = await loadClinicSettings(acme.db);
+    expect(before.remindersEnabled).toBe(false);
+    const editable = {
+      clinicName: before.clinicName,
+      timeZone: before.timeZone,
+      lateCancellationHours: before.lateCancellationHours,
+      includeContactInConfirmation: before.includeContactInConfirmation,
+    };
+    await updateAdminSettings(acme.db, clock, { ...editable, remindersEnabled: true });
+    expect(await loadClinicSettings(acme.db)).toEqual({ ...before, remindersEnabled: true });
+    await updateAdminSettings(acme.db, clock, { ...editable, remindersEnabled: false });
+    expect(await loadClinicSettings(acme.db)).toEqual(before);
   });
 });
