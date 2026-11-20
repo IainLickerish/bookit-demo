@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { bookings, practitioners } from '@/db/schema';
 import { formatLocalTime, localDateOf } from '@/lib/time';
+import { listAdminBookings } from '@/server/admin/bookings';
 import { bookSlot, type BookingDependencies } from '@/server/bookings/book';
 import { cancelBooking } from '@/server/bookings/cancel';
 import { BookingError } from '@/server/bookings/errors';
@@ -172,6 +173,26 @@ describe('cancelling a booking (REQ-18.1-01)', () => {
     const [stored] = await database.db.select().from(bookings).where(eq(bookings.id, booking.id));
     expect(stored).toMatchObject({ status: 'cancelled', lateCancellation: false });
     expect(logs.events()).toEqual(['booking.confirmed', 'email.confirmation.sent', 'booking.cancelled']);
+  });
+
+  it('saves a late cancellation in both booking lists and lets another patient book the time', async () => {
+    const date = '2026-10-21';
+    const slot = await slotAt(date, '09:00');
+    const booking = await bookSlot(deps, { patientId: clinic.patient1.id, slotId: slot.id });
+    clock.set('2026-10-20T09:00:00Z');
+
+    const result = await cancelBooking(deps, { patientId: clinic.patient1.id, bookingId: booking.id });
+    expect(result).toMatchObject({ ok: true, late: true });
+    const cancelled = { id: booking.id, status: 'cancelled', lateCancellation: true };
+    expect(await listBookingsForPatient(database.db, clinic.patient1.id)).toMatchObject([
+      { ...cancelled, cancelledAt: clock.now() },
+    ]);
+    expect(await listAdminBookings(database.db, { date, status: 'cancelled' }, 'Europe/London')).toMatchObject([
+      cancelled,
+    ]);
+    expect(await slotAt(date, '09:00')).toMatchObject({ id: slot.id });
+    const rebooked = await bookSlot(deps, { patientId: clinic.patient2.id, slotId: slot.id });
+    expect(rebooked).toMatchObject({ patientId: clinic.patient2.id, slotId: slot.id, status: 'confirmed' });
   });
 
   it('refuses to cancel after the start, twice, or for another patient', async () => {
