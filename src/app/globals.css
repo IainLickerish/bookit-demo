@@ -29,4 +29,59 @@
   .alert {
     @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
   }
+
+  .booking-flow {
+    @apply mx-auto max-w-[720px] leading-relaxed text-[#16241F];
+  }
+  .booking-flow h1 {
+    @apply text-[1.75rem] sm:text-[2rem];
+  }
+  .booking-flow label {
+    @apply text-base font-semibold;
+  }
+  .booking-flow :is(input:not([type='hidden']), select) {
+    @apply min-h-12 min-w-0 rounded-xl border-[#8C9792] text-base font-normal;
+  }
+  .booking-flow :is(a, button, input, select):focus-visible {
+    @apply outline-2 outline-offset-2 outline-[#1D5C4B];
+  }
+  .booking-flow :is(.button, .button-secondary) {
+    @apply inline-flex min-h-12 items-center rounded-full text-base font-semibold;
+  }
+  .booking-flow .button-secondary {
+    @apply border-[#8C9792];
+  }
+  .booking-flow :is(.button, .day-picker button) {
+    @apply justify-center border-[#1D5C4B] bg-[#1D5C4B] text-white hover:bg-[#164A3C];
+  }
+  .booking-flow .button:disabled {
+    @apply cursor-wait;
+  }
+  .booking-flow .day-navigation {
+    @apply grid grid-cols-2 gap-2 text-base sm:grid-cols-[1fr_auto_1fr];
+  }
+  .booking-flow .day-navigation-date {
+    @apply col-span-2 row-start-1 sm:col-span-1 sm:col-start-2;
+  }
+  .booking-flow .day-navigation > :last-child {
+    @apply justify-self-end;
+  }
+  .booking-flow :is(.day-navigation a, .booking-back) {
+    @apply inline-flex min-h-12 items-center text-base font-medium text-[#1D5C4B] underline;
+  }
+  .booking-flow .empty-times {
+    @apply rounded-xl border border-[#E6E1D8] bg-[#F1EEE8] p-4;
+  }
+  .booking-review {
+    @apply max-w-[440px] rounded-[20px] border border-[#E6E1D8] bg-white p-6 shadow-sm;
+  }
+  .booking-details {
+    @apply mb-6 space-y-3 border-y border-[#E6E1D8] py-4;
+  }
+  .booking-details dt {
+    @apply text-sm text-[#5A6862];
+  }
+  .booking-details dd {
+    @apply text-lg font-semibold;
+  }
 }

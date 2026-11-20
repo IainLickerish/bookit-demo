@@ -7,7 +7,7 @@ import { findBookingForPatient } from '@/server/bookings/queries';
 import { requirePatient } from '@/server/request-context';
 import { loadClinicSettings } from '@/server/settings';
 import { loadDayView } from '@/server/slots/day-view';
-import { DayPicker } from '../../../day-picker';
+import { DayNavigation, DayPicker } from '../../../day-picker';
 import { errorText, single, type SearchParams } from '../../../messages';
 import { SlotList } from '../../../slot-list';
 import { rescheduleAction } from '../../actions';
@@ -67,7 +67,10 @@ export default async function ReschedulePage({
           <p className="mb-6 text-sm text-slate-600" data-testid="reschedules-remaining">
             You can reschedule this booking {remaining} more {remaining === 1 ? 'time' : 'times'}.
           </p>
-          <DayPicker view={view} path={path} />
+          <div className="mb-6 space-y-4">
+            <DayPicker view={view} path={path} />
+            <DayNavigation view={view} path={path} />
+          </div>
           <SlotList
             slots={choices}
             timeZone={view.settings.timeZone}
