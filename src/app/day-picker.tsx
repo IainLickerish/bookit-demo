@@ -3,17 +3,58 @@ import { addDaysToLocalDate, formatLocalDate } from '@/lib/time';
 import type { DayView } from '@/server/slots/day-view';
 
 /** Practitioner and date controls for a page that lists one day's slots. */
-export function DayPicker({ view, path }: { view: DayView; path: string }) {
+export function DayPicker({
+  view,
+  path,
+  forNewBooking = false,
+}: {
+  view: DayView;
+  path: string;
+  forNewBooking?: boolean;
+}) {
   const practitionerId = view.practitioner?.id ?? '';
-  const dayLink = (date: string) => `${path}?${new URLSearchParams({ practitioner: practitionerId, date }).toString()}`;
-  const previous = addDaysToLocalDate(view.date, -1);
-  const next = addDaysToLocalDate(view.date, 1);
+  const dayLink = (date: string, label: string, testId: string) => (
+    <Link
+      href={`${path}?${new URLSearchParams({ practitioner: practitionerId, date }).toString()}`}
+      prefetch={false}
+      className={forNewBooking ? 'button-secondary booking-control border-slate-500 text-center' : undefined}
+      data-testid={testId}
+    >
+      {label}
+      {forNewBooking ? (
+        <time dateTime={date} className="mt-1 block font-semibold tabular-nums">
+          {formatLocalDate(date)}
+        </time>
+      ) : null}
+    </Link>
+  );
+  const previousLink =
+    view.date > view.today &&
+    dayLink(addDaysToLocalDate(view.date, -1), forNewBooking ? 'Previous day' : '← Previous day', 'previous-day');
+  const nextLink =
+    view.date < view.lastDate &&
+    dayLink(addDaysToLocalDate(view.date, 1), forNewBooking ? 'Next day' : 'Next day →', 'next-day');
+  const shownDate = formatLocalDate(view.date);
+  const fieldClass = forNewBooking ? 'booking-control min-w-0 border-slate-500' : undefined;
   return (
     <div className="mb-6 space-y-4">
-      <form method="get" action={path} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        <label>
-          Practitioner
-          <select name="practitioner" defaultValue={practitionerId} data-testid="practitioner-select">
+      <form
+        method="get"
+        action={path}
+        className={
+          forNewBooking
+            ? 'grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end'
+            : 'grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end'
+        }
+      >
+        <label className={forNewBooking ? 'text-base' : undefined}>
+          {forNewBooking ? 'Physiotherapist' : 'Practitioner'}
+          <select
+            name="practitioner"
+            defaultValue={practitionerId}
+            className={fieldClass}
+            data-testid="practitioner-select"
+          >
             {view.practitioners.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -21,7 +62,7 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
             ))}
           </select>
         </label>
-        <label>
+        <label className={forNewBooking ? 'text-base' : undefined}>
           Date
           <input
             type="date"
@@ -29,32 +70,40 @@ export function DayPicker({ view, path }: { view: DayView; path: string }) {
             defaultValue={view.date}
             min={view.today}
             max={view.lastDate}
+            className={fieldClass}
             data-testid="date-input"
           />
         </label>
-        <button type="submit" className="button-secondary" data-testid="show-slots">
+        <button
+          type="submit"
+          className={forNewBooking ? 'button-secondary booking-control border-slate-500' : 'button-secondary'}
+          data-testid="show-slots"
+        >
           Show times
         </button>
       </form>
-      <div className="flex items-center justify-between text-sm">
-        {view.date > view.today ? (
-          <Link href={dayLink(previous)} prefetch={false} data-testid="previous-day">
-            ← Previous day
-          </Link>
-        ) : (
-          <span />
-        )}
-        <span className="font-medium" data-testid="shown-date">
-          {formatLocalDate(view.date)}
-        </span>
-        {view.date < view.lastDate ? (
-          <Link href={dayLink(next)} prefetch={false} data-testid="next-day">
-            Next day →
-          </Link>
-        ) : (
-          <span />
-        )}
-      </div>
+      {forNewBooking ? (
+        <>
+          <div className="grid auto-cols-fr grid-flow-col gap-3">
+            {previousLink}
+            {nextLink}
+          </div>
+          <h2 className="mt-6 mb-0 text-xl leading-snug" aria-live="polite" aria-atomic="true">
+            Available times for{' '}
+            <time dateTime={view.date} data-testid="shown-date">
+              {shownDate}
+            </time>
+          </h2>
+        </>
+      ) : (
+        <div className="flex items-center justify-between text-sm">
+          {previousLink || <span />}
+          <span className="font-medium" data-testid="shown-date">
+            {shownDate}
+          </span>
+          {nextLink || <span />}
+        </div>
+      )}
     </div>
   );
 }
