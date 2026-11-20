@@ -58,13 +58,13 @@ export default async function ReschedulePage({
         </Notice>
       ) : null}
       {!changeable ? (
-        <Notice kind="alert" testId="not-reschedulable">
+        <p className="text-muted" data-testid="not-reschedulable">
           This booking can no longer be rescheduled online.
-        </Notice>
+        </p>
       ) : remaining === 0 ? (
-        <Notice kind="alert" testId="reschedule-limit">
+        <p className="text-muted" data-testid="reschedule-limit">
           This booking has been rescheduled as many times as the clinic allows. Please contact the clinic.
-        </Notice>
+        </p>
       ) : (
         <>
           <div className="space-y-4">

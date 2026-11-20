@@ -69,9 +69,9 @@ export default async function BookSlotPage({
             </div>
           </form>
         ) : (
-          <Notice kind="alert" testId="slot-taken">
+          <p className="text-muted" data-testid="slot-taken">
             This time is no longer available.
-          </Notice>
+          </p>
         )}
         <Link href="/slots" prefetch={false} className="text-action">
           Choose a different time
