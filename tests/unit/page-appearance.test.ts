@@ -9,8 +9,10 @@ import { SlotList } from '@/app/slot-list';
 import { TEST_CLINIC_SETTINGS } from '../helpers/clinic';
 
 describe('BookIt page appearance', () => {
-  it('bundles Fraunces and Figtree declarations and WOFF2 files', () => {
-    const css = new URL('../../src/app/globals.css', import.meta.url);
+  it('bundles both local fonts through the shared layout', () => {
+    const layout = new URL('../../src/app/layout.tsx', import.meta.url);
+    expect(readFileSync(layout, 'utf8')).toMatch(/^import '\.\/globals\.css';$/m);
+    const css = new URL('./globals.css', layout);
     const globalStyles = readFileSync(css, 'utf8');
     const fontImport = /@import '([^']+\/fonts\.css)'/.exec(globalStyles)?.[1];
     expect(fontImport).toBeDefined();
