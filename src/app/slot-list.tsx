@@ -6,19 +6,15 @@ export function SlotList({
   slots,
   timeZone,
   renderChoice,
-  emptyMessage = 'No free times on this day. Try another day.',
+  emptyState,
 }: {
   slots: SlotView[];
   timeZone: string;
   renderChoice: (slot: SlotView, label: string) => ReactNode;
-  emptyMessage?: string;
+  emptyState?: ReactNode;
 }) {
   if (slots.length === 0) {
-    return (
-      <p className="empty-times" role="status" data-testid="no-slots">
-        {emptyMessage}
-      </p>
-    );
+    return emptyState ?? <p data-testid="no-slots">No free times on this day. Try another day.</p>;
   }
 
   return (

@@ -29,11 +29,17 @@ export default async function SlotsPage({ searchParams }: { searchParams: Search
         <h2 id="free-times" className="m-0 text-[1.375rem]">
           {view.practitioner ? `Free times with ${view.practitioner.name}` : 'Free times'}
         </h2>
-        <DayNavigation view={view} path="/slots" />
+        <nav aria-label="Choose another day" className="day-navigation">
+          <DayNavigation view={view} path="/slots" announceDate />
+        </nav>
         <SlotList
           slots={view.slots}
           timeZone={view.settings.timeZone}
-          emptyMessage="No free times on this day. Choose another date and select Show times."
+          emptyState={
+            <p className="empty-times" role="status" data-testid="no-slots">
+              No free times on this day. Choose another date and select Show times.
+            </p>
+          }
           renderChoice={(slot, label) => (
             <Link
               href={`/book/${slot.id}`}

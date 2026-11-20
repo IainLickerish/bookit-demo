@@ -69,7 +69,9 @@ export default async function ReschedulePage({
           </p>
           <div className="mb-6 space-y-4">
             <DayPicker view={view} path={path} />
-            <DayNavigation view={view} path={path} />
+            <div className="flex items-center justify-between text-sm">
+              <DayNavigation view={view} path={path} />
+            </div>
           </div>
           <SlotList
             slots={choices}

@@ -29,10 +29,6 @@
   .alert {
     @apply mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm;
   }
-  .day-navigation {
-    @apply flex items-center justify-between text-sm;
-  }
-
   .booking-flow {
     @apply mx-auto max-w-[720px] leading-relaxed text-[#16241F];
   }
@@ -61,7 +57,7 @@
     @apply cursor-wait;
   }
   .booking-flow .day-navigation {
-    @apply grid grid-cols-2 gap-2 text-base sm:grid-cols-[1fr_auto_1fr];
+    @apply grid grid-cols-2 items-center gap-2 text-base sm:grid-cols-[1fr_auto_1fr];
   }
   .booking-flow .day-navigation-date {
     @apply col-span-2 row-start-1 sm:col-span-1 sm:col-start-2;
@@ -70,7 +66,7 @@
     @apply justify-self-end;
   }
   .booking-flow :is(.day-navigation a, .booking-back) {
-    @apply inline-flex min-h-12 items-center gap-1 text-base font-medium text-[#1D5C4B] underline;
+    @apply inline-flex min-h-12 items-center text-base font-medium text-[#1D5C4B] underline;
   }
   .booking-flow .empty-times {
     @apply rounded-xl border border-[#E6E1D8] bg-[#F1EEE8] p-4;

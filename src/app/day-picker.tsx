@@ -46,29 +46,41 @@ export function DayPicker({
   );
 }
 
-export function DayNavigation({ view, path }: { view: DayView; path: string }) {
+export function DayNavigation({
+  view,
+  path,
+  announceDate = false,
+}: {
+  view: DayView;
+  path: string;
+  announceDate?: boolean;
+}) {
   const practitionerId = view.practitioner?.id ?? '';
   const previous = addDaysToLocalDate(view.date, -1);
   const next = addDaysToLocalDate(view.date, 1);
   return (
-    <nav aria-label="Choose another day" className="day-navigation">
+    <>
       {view.date > view.today ? (
         <Link href={dayViewHref(path, practitionerId, previous)} prefetch={false} data-testid="previous-day">
-          <span aria-hidden="true">← </span>Previous day
+          ← Previous day
         </Link>
       ) : (
         <span />
       )}
-      <span className="day-navigation-date font-medium" data-testid="shown-date" role="status">
+      <span
+        className="day-navigation-date font-medium"
+        data-testid="shown-date"
+        role={announceDate ? 'status' : undefined}
+      >
         {formatLocalDate(view.date)}
       </span>
       {view.date < view.lastDate ? (
         <Link href={dayViewHref(path, practitionerId, next)} prefetch={false} data-testid="next-day">
-          Next day<span aria-hidden="true"> →</span>
+          Next day →
         </Link>
       ) : (
         <span />
       )}
-    </nav>
+    </>
   );
 }
