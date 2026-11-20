@@ -125,16 +125,20 @@ it('shows the expired password link message in the refreshed account layout', as
 it('keeps the configured clinic name and patient navigation in the shared header', async () => {
   vi.mocked(currentUser).mockResolvedValue(patient);
   const html = renderToStaticMarkup(await RootLayout({ children: null }));
-  expect(html).toContain(
+  const header = html.match(/<header\b[^>]*>(.*?)<\/header>/s)?.[1];
+  const navigation = header?.match(/<nav\b[^>]*>(.*?)<\/nav>/s)?.[1];
+  expect(header).toContain(
     `class="clinic-name" data-testid="clinic-name" href="/">${TEST_CLINIC_SETTINGS.clinicName}</a>`,
   );
-  expect(html).toContain('data-testid="nav-book" href="/slots">Book</a>');
-  expect(html).toContain('data-testid="nav-my-bookings" href="/bookings">My bookings</a>');
-  expect(html).toContain('data-testid="sign-out">Sign out</button>');
+  expect(navigation).toContain('data-testid="nav-book" href="/slots">Book</a>');
+  expect(navigation).toContain('data-testid="nav-my-bookings" href="/bookings">My bookings</a>');
+  expect(navigation).toContain('data-testid="sign-out">Sign out</button>');
 });
 
 it('keeps the mobile confirmation button in the booking form', async () => {
   const html = renderToStaticMarkup(await BookSlotPage({ ...props, params: Promise.resolve({ slotId: slot.id }) }));
-  expect(html).toMatch(/<form[^>]*>.*<div class="booking-action"><button type="submit"[^>]*>Confirm booking<\/button>/);
-  expect(html).toContain('data-testid="book-phone"');
+  const bookingForm = html.match(/<form\b[^>]*>(.*?)<\/form>/s)?.[1];
+  expect(bookingForm).toContain('name="slotId"');
+  expect(bookingForm).toContain('data-testid="book-phone"');
+  expect(bookingForm).toMatch(/<div class="booking-action"><button type="submit"[^>]*>Confirm booking<\/button>/);
 });
