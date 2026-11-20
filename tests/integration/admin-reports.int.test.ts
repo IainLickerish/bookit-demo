@@ -36,7 +36,7 @@ function report(query = '', token: string | undefined = adminToken, format: 'csv
 }
 
 describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', () => {
-  it('exports fictional ASCII names, with attachment headers and privacy-safe count logs', async () => {
+  it('exports fictional client names, with attachment headers and privacy-safe count logs', async () => {
     const response = await report();
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
@@ -50,6 +50,19 @@ describe('M0-24b REQ-18.1-01 REQ-18.1-03 admin export, filters and security', ()
     const text = JSON.stringify(logs.lines);
     for (const value of [...ADMIN_PATIENT_NAMES, TEST_PASSWORD, adminToken, patientToken])
       expect(text).not.toContain(value);
+  });
+  it('downloads filtered bookings with client names exactly as written', async () => {
+    const response = await report('date=2026-10-25');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+    expect(response.headers.get('content-disposition')).toBe('attachment; filename="bookings.csv"');
+    const csv = Buffer.from(await response.arrayBuffer()).toString('utf8');
+    expect(csv.split('\r\n')).toEqual([
+      expect.stringContaining('"Booking ID","Patient",'),
+      expect.stringContaining(`"${fixture.bookingIds[1]}","Łukasz Wiśniewski",`),
+      expect.stringContaining(`"${fixture.bookingIds[2]}","Siobhán Ó Briain",`),
+      '',
+    ]);
   });
   it('applies clinic-local date boundaries across the 25-hour clock-change day, with practitioner and status filters', async () => {
     const response = await report(
