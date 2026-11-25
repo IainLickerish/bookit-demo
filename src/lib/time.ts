@@ -214,13 +214,15 @@ export function formatLocalTime(utc: Date, timeZone: string): string {
   return formatter.format(utc);
 }
 
+const localDateFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
 export function formatLocalDate(localDate: string): string {
   const [year, month, day] = parseLocalDate(localDate);
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(Date.UTC(year, month - 1, day)));
+  return localDateFormatter.format(new Date(Date.UTC(year, month - 1, day)));
 }
