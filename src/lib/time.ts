@@ -7,25 +7,26 @@ const DAY_MS = 24 * 60 * MINUTE_MS;
 const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const LOCAL_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-const partsFormatters = new Map<string, Intl.DateTimeFormat>();
-
-function partsFormatter(timeZone: string): Intl.DateTimeFormat {
-  let formatter = partsFormatters.get(timeZone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone,
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    partsFormatters.set(timeZone, formatter);
-  }
-  return formatter;
+function clinicFormatter(options: Intl.DateTimeFormatOptions) {
+  const formatters = new Map<string, Intl.DateTimeFormat>();
+  return (timeZone: string): Intl.DateTimeFormat => {
+    let formatter = formatters.get(timeZone);
+    if (!formatter) {
+      formatter = new Intl.DateTimeFormat('en-GB', { ...options, timeZone, hourCycle: 'h23' });
+      formatters.set(timeZone, formatter);
+    }
+    return formatter;
+  };
 }
+
+const partsFormatter = clinicFormatter({
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
 
 interface WallClock {
   year: number;
@@ -177,41 +178,27 @@ export function addDays(instant: Date, days: number): Date {
   return new Date(instant.getTime() + days * DAY_MS);
 }
 
-const slotFormatters = new Map<string, Intl.DateTimeFormat>();
+const slotFormatter = clinicFormatter({
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 /** A slot's start as patients see it, in the clinic's time zone. */
 export function formatSlot(utc: Date, timeZone: string): string {
-  let formatter = slotFormatters.get(timeZone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone,
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    });
-    slotFormatters.set(timeZone, formatter);
-  }
-  return formatter.format(utc);
+  return slotFormatter(timeZone).format(utc);
 }
 
-const timeFormatters = new Map<string, Intl.DateTimeFormat>();
+const timeFormatter = clinicFormatter({
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 export function formatLocalTime(utc: Date, timeZone: string): string {
-  let formatter = timeFormatters.get(timeZone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    });
-    timeFormatters.set(timeZone, formatter);
-  }
-  return formatter.format(utc);
+  return timeFormatter(timeZone).format(utc);
 }
 
 export function formatLocalDate(localDate: string): string {
